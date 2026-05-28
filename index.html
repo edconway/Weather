@@ -889,9 +889,11 @@ async function getHistorical(lat,lon){
   const now=new Date();
   const mo=String(now.getMonth()+1).padStart(2,'0');
   const lastDay=String(new Date(now.getFullYear(),now.getMonth()+1,0).getDate()).padStart(2,'0');
+  const endYear=now.getFullYear()-1;
+  const startYear=endYear-4;
   const p=new URLSearchParams({
     latitude:lat,longitude:lon,timezone:'auto',
-    start_date:`2020-${mo}-01`,end_date:`2024-${mo}-${lastDay}`,
+    start_date:`${startYear}-${mo}-01`,end_date:`${endYear}-${mo}-${lastDay}`,
     daily:'temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max'
   });
   const r=await fetch(`https://archive-api.open-meteo.com/v1/archive?${p}`);
@@ -904,8 +906,8 @@ async function getHistorical(lat,lon){
     precip:avg(d.daily.precipitation_sum,idx),
     wind:avg(d.daily.wind_speed_10m_max,idx),
     month:now.toLocaleString('en-US',{month:'long'}),
-    startYear:2020,
-    endYear:2024
+    startYear,
+    endYear
   };
 }
 
