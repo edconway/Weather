@@ -635,11 +635,31 @@ function makeTempChart(){
   }
   const band=hMax!=null&&hMin!=null?(()=>{
     const yHMax=yf(hMax),yHMin=yf(hMin);
-    const bTop=Math.min(yHMax,yHMin).toFixed(1);
-    const bHt=Math.abs(yHMax-yHMin).toFixed(1);
-    const bMid=((Math.min(yHMax,yHMin)+Math.max(yHMax,yHMin))/2+3.5).toFixed(1);
-    return `<rect x="${pL}" y="${bTop}" width="${cW}" height="${bHt}" class="ch-band" rx="2"/>` +
-      `<text x="${(pL+6).toFixed(1)}" y="${bMid}" class="ca" opacity="0.6" font-size="8.5" font-style="italic">historical average</text>`;
+    const bTop=Math.min(yHMax,yHMin);
+    const bBot=Math.max(yHMax,yHMin);
+    const bHt=bBot-bTop;
+    const bMidY=(bTop+bBot)/2;
+    // Count forecast line points inside each half of the band to find least-crowded corner
+    const half=Math.floor(n/2);
+    let topL=0,topR=0,botL=0,botR=0;
+    [...maxV,...minV].forEach((v,k)=>{
+      const vy=yf(v), i=k%n;
+      if(vy>=bTop&&vy<=bBot){
+        if(vy<bMidY){if(i<half)topL++;else topR++;}
+        else{if(i<half)botL++;else botR++;}
+      }
+    });
+    const scores={topL,topR,botL,botR};
+    const best=Object.keys(scores).reduce((a,b)=>scores[a]<=scores[b]?a:b);
+    const atBottom=best.startsWith('bot');
+    const atRight=best.endsWith('R');
+    const pad=4, lh=10;
+    const labelY=(atBottom?(bBot-pad):(bTop+lh+pad)).toFixed(1);
+    const labelX=atRight?(W-pR-pad).toFixed(1):(pL+pad+2).toFixed(1);
+    const anchor=atRight?'end':'start';
+    const period=`${histData.month} average ${histData.startYear}–${histData.endYear}`;
+    return `<rect x="${pL}" y="${bTop.toFixed(1)}" width="${cW}" height="${bHt.toFixed(1)}" class="ch-band" rx="2"/>` +
+      `<text x="${labelX}" y="${labelY}" class="ca" text-anchor="${anchor}" opacity="0.65" font-size="8.5">${period}</text>`;
   })():'';
   const mxPts=maxV.map((v,i)=>`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
   const mnPts=minV.map((v,i)=>`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
@@ -883,7 +903,9 @@ async function getHistorical(lat,lon){
     tMin:avg(d.daily.temperature_2m_min,idx),
     precip:avg(d.daily.precipitation_sum,idx),
     wind:avg(d.daily.wind_speed_10m_max,idx),
-    month:now.toLocaleString('en-US',{month:'long'})
+    month:now.toLocaleString('en-US',{month:'long'}),
+    startYear:2020,
+    endYear:2024
   };
 }
 
