@@ -386,8 +386,8 @@ let searching=false, searchResults=[], searchFocusIdx=-1, searchTimer=null;
 let myLat=null, myLon=null, myName=null;       // GPS location
 let customLat=null, customLon=null, customName=null; // searched location
 let activeSource='geo'; // 'geo' | 'custom'
-let ytdData=null;
-let _tempData=null,_rainData=null;
+let ytdData=null, hourlyHistData=null;
+let _tempData=null,_rainData=null,_hourlyData=null;
 
 // ── Unit helpers ───────────────────────────────────────
 const c2f=c=>c*9/5+32, k2m=k=>k*.621371, mm2in=m=>m*.0393701;
