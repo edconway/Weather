@@ -1019,23 +1019,35 @@ function setLoad(msg){
         <div class="tt-row"><span class="tt-lbl">Low</span><span class="tt-cold">${lo}${lo!=='—'?u:''}</span></div>
         <div class="tt-row"><span class="tt-lbl">Hist. range</span><span class="tt-muted">${hr}</span></div>`;
     } else if(chartType==='rain'&&_rainData){
-      const{labels,curV,avgV,thisYear,pL,cW,n}=_rainData;
-      const i=Math.max(0,Math.min(n-1,Math.round((svgX-pL)/cW*(n-1))));
-      const mmdd=labels[i];
-      const dl=new Date(thisYear,+mmdd.slice(0,2)-1,+mmdd.slice(3))
-        .toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      const{labels,curV,avgV,thisYear,pL,cW,n,fcV,numFc,totalN,fcstDates}=_rainData;
+      const tN=totalN||n;
+      const i=Math.max(0,Math.min(tN-1,Math.round((svgX-pL)/cW*(tN-1))));
+      const isFc=i>=n&&fcV&&(i-n)<fcV.length;
       const fmt=v=>imp?(v<1?v.toFixed(2):v.toFixed(1))+'"':(v<10?v.toFixed(1):Math.round(v))+'mm';
-      const c=curV[i],a=avgV[i],d=c-a;
-      const dc=d>0.05?'tt-pos':d<-0.05?'tt-neg':'tt-muted';
-      const ds=(d>=0?'+':'')+fmt(Math.abs(d));
-      const gx=(pL+i/Math.max(n-1,1)*cW).toFixed(1);
+      let dl;
+      if(isFc){
+        dl=new Date(fcstDates[i-n]+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      } else {
+        const mmdd=labels[i];
+        dl=new Date(thisYear,+mmdd.slice(0,2)-1,+mmdd.slice(3)).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      }
+      const c=isFc?fcV[i-n]:curV[i];
+      const a=isFc?null:avgV[i];
+      const gx=(pL+i/Math.max(tN-1,1)*cW).toFixed(1);
       document.getElementById('ttg-rain')?.setAttribute('x1',gx);
       document.getElementById('ttg-rain')?.setAttribute('x2',gx);
       document.getElementById('ttg-rain')?.setAttribute('visibility','visible');
-      html=`<div class="tt-title">${dl} YTD</div>
-        <div class="tt-row"><span class="tt-lbl">${thisYear}</span><span class="tt-cur">${fmt(c)}</span></div>
-        <div class="tt-row"><span class="tt-lbl">Hist. avg</span><span class="tt-muted">${fmt(a)}</span></div>
-        <div class="tt-row"><span class="tt-lbl">Delta</span><span class="${dc}">${ds}</span></div>`;
+      const tag=isFc?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · forecast</span>':'';
+      if(isFc){
+        html=`<div class="tt-title">${dl} YTD${tag}</div>
+          <div class="tt-row"><span class="tt-lbl">${thisYear} (proj.)</span><span class="tt-cur">${fmt(c)}</span></div>`;
+      } else {
+        const d=c-a, dc=d>0.05?'tt-pos':d<-0.05?'tt-neg':'tt-muted';
+        html=`<div class="tt-title">${dl} YTD</div>
+          <div class="tt-row"><span class="tt-lbl">${thisYear}</span><span class="tt-cur">${fmt(c)}</span></div>
+          <div class="tt-row"><span class="tt-lbl">Hist. avg</span><span class="tt-muted">${fmt(a)}</span></div>
+          <div class="tt-row"><span class="tt-lbl">Delta</span><span class="${dc}">${(d>=0?'+':'')+fmt(Math.abs(d))}</span></div>`;
+      }
     } else return;
     tt.innerHTML=html;
     const tW=170,mg=14;
