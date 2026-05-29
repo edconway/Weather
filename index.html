@@ -911,10 +911,15 @@ async function getRainYTD(lat,lon){
   const thisYear=now.getFullYear();
   const pad=n=>String(n).padStart(2,'0');
   const todayStr=`${thisYear}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  // Extend end_date by 7 days so we get historical MM-DD values for the forecast window.
+  // Extra data: 7 days × ~26 years ≈ 182 values — negligible.
+  const extD=new Date(now); extD.setDate(extD.getDate()+7);
+  if(extD.getFullYear()>thisYear){extD.setFullYear(thisYear);extD.setMonth(11);extD.setDate(31);}
+  const extStr=`${extD.getFullYear()}-${pad(extD.getMonth()+1)}-${pad(extD.getDate())}`;
   const startYear=2000;
   const p=new URLSearchParams({
     latitude:lat,longitude:lon,timezone:'auto',
-    start_date:`${startYear}-01-01`,end_date:todayStr,
+    start_date:`${startYear}-01-01`,end_date:extStr,
     daily:'precipitation_sum'
   });
   const r=await fetch(`https://archive-api.open-meteo.com/v1/archive?${p}`);
@@ -949,8 +954,22 @@ async function getRainYTD(lat,lon){
     const vals=histYears.map(y=>histCumByYear[y][i]);
     return vals.reduce((a,b)=>a+b,0)/(vals.length||1);
   });
-  const latestDate=data.daily.time[data.daily.time.length-1];
-  return{labels,cumCurrentYear,cumHistAvg,thisYear,startYear,histYears:histYears.length,latestDate};
+  // latestDate = last date that actually has archive data (≤ today)
+  const latestDate=data.daily.time.filter(t=>t<=todayStr).pop()||todayStr;
+  // Build 7-day historical avg extension for the forecast window.
+  // Uses the extended byYear data (those future MM-DD values now exist for historical years).
+  const latestDateObj=new Date(latestDate+'T12:00:00');
+  let extCum=cumHistAvg[cumHistAvg.length-1];
+  const cumHistAvgExt=[];
+  for(let k=1;k<=7;k++){
+    const tmp=new Date(latestDateObj); tmp.setDate(tmp.getDate()+k);
+    if(tmp.getFullYear()>thisYear) break;
+    const mmdd=`${pad(tmp.getMonth()+1)}-${pad(tmp.getDate())}`;
+    const vals=histYears.map(y=>byYear[y]?.[mmdd]??0);
+    extCum+=vals.reduce((a,b)=>a+b,0)/(vals.length||1);
+    cumHistAvgExt.push(extCum);
+  }
+  return{labels,cumCurrentYear,cumHistAvg,cumHistAvgExt,thisYear,startYear,histYears:histYears.length,latestDate};
 }
 
 // ── UI state helpers ───────────────────────────────────
