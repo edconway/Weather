@@ -1248,10 +1248,11 @@ async function init(){
     myLat=lat; myLon=lon;
     setLoad('Loading weather data…');
     const[fc,hist,name]=await Promise.all([getForecast(lat,lon),getHistorical(lat,lon),geocode(lat,lon)]);
-    fcData=fc; histData=hist; geoName=name; myName=name; ytdData=null;
+    fcData=fc; histData=hist; geoName=name; myName=name; ytdData=null; hourlyHistData=null;
     activeSource='geo';
     render();
     getRainYTD(lat,lon).then(ytd=>{ytdData=ytd;if(fcData)renderContent();}).catch(()=>{});
+    getHourlyHistorical(lat,lon).then(d=>{hourlyHistData=d;if(fcData)renderContent();}).catch(()=>{});
   }catch(e){
     // Geolocation denied/unavailable — skip the error wall and go straight to search
     if(!fcData) showSearchFirst(e.message);
