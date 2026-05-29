@@ -918,15 +918,10 @@ async function getRainYTD(lat,lon){
   const thisYear=now.getFullYear();
   const pad=n=>String(n).padStart(2,'0');
   const todayStr=`${thisYear}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
-  // Extend end_date by 7 days so we get historical MM-DD values for the forecast window.
-  // Extra data: 7 days × ~26 years ≈ 182 values — negligible.
-  const extD=new Date(now); extD.setDate(extD.getDate()+7);
-  if(extD.getFullYear()>thisYear){extD.setFullYear(thisYear);extD.setMonth(11);extD.setDate(31);}
-  const extStr=`${extD.getFullYear()}-${pad(extD.getMonth()+1)}-${pad(extD.getDate())}`;
   const startYear=2000;
   const p=new URLSearchParams({
     latitude:lat,longitude:lon,timezone:'auto',
-    start_date:`${startYear}-01-01`,end_date:extStr,
+    start_date:`${startYear}-01-01`,end_date:todayStr,
     daily:'precipitation_sum'
   });
   const r=await fetch(`https://archive-api.open-meteo.com/v1/archive?${p}`);
