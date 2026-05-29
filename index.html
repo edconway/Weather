@@ -987,6 +987,118 @@ async function getRainYTD(lat,lon){
   return{labels,cumCurrentYear,cumHistAvg,cumHistAvgExt,thisYear,startYear,histYears:histYears.length,latestDate};
 }
 
+async function getHourlyHistorical(lat,lon){
+  const now=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  const thisYear=now.getFullYear();
+  const mo=now.getMonth(), dy=now.getDate();
+  // 5 parallel requests: ±7-day window around today for each of the past 5 years
+  const fetches=[];
+  for(let i=1;i<=5;i++){
+    const yr=thisYear-i;
+    const s=new Date(yr,mo,dy-7), e=new Date(yr,mo,dy+7);
+    const p=new URLSearchParams({
+      latitude:lat,longitude:lon,timezone:'auto',
+      start_date:`${s.getFullYear()}-${pad(s.getMonth()+1)}-${pad(s.getDate())}`,
+      end_date:`${e.getFullYear()}-${pad(e.getMonth()+1)}-${pad(e.getDate())}`,
+      hourly:'temperature_2m'
+    });
+    fetches.push(fetch(`https://archive-api.open-meteo.com/v1/archive?${p}`)
+      .then(r=>r.ok?r.json():null).catch(()=>null));
+  }
+  const results=await Promise.all(fetches);
+  const sums=new Array(24).fill(0), counts=new Array(24).fill(0);
+  results.forEach(data=>{
+    if(!data?.hourly?.time) return;
+    data.hourly.time.forEach((t,i)=>{
+      const v=data.hourly.temperature_2m[i];
+      if(v==null) return;
+      const hr=+t.slice(11,13);
+      sums[hr]+=v; counts[hr]++;
+    });
+  });
+  return{avgByHour:sums.map((s,h)=>counts[h]?s/counts[h]:null)};
+}
+
+function makeHourlyTempChart(){
+  if(!fcData?.hourly?.time) return '';
+  if(!hourlyHistData) return '<p class="search-msg" style="padding:20px 0">⏳ Loading hourly history…</p>';
+  const hh=fcData.hourly;
+  const now=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  const nowStr=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:00`;
+  const rawNow=hh.time.findIndex(t=>t>=nowStr);
+  const nowIdx=rawNow<1?1:rawNow;
+  // Map temps and historical avg, carrying last known value over nulls
+  let lastT=null, lastA=null;
+  const temps=hh.temperature_2m.map(v=>{if(v!=null)lastT=nT(v);return lastT;});
+  const histLine=hh.time.map(t=>{
+    const v=hourlyHistData.avgByHour[+t.slice(11,13)];
+    if(v!=null)lastA=nT(v); return lastA;
+  });
+  const allV=[...temps,...histLine].filter(v=>v!=null&&!isNaN(v));
+  if(!allV.length) return '';
+  const lo=Math.floor(Math.min(...allV))-1, hi=Math.ceil(Math.max(...allV))+1;
+  const W=580,H=175,pL=46,pR=14,pT=20,pB=32;
+  const cW=W-pL-pR,cH=H-pT-pB;
+  const n=temps.length;
+  const xf=i=>pL+i/(n-1)*cW;
+  const yf=v=>pT+(1-(v-lo)/(hi-lo))*cH;
+  // Y-axis ticks
+  const rng=hi-lo, rawStep=rng/3;
+  const mag=Math.pow(10,Math.floor(Math.log10(rawStep||1)));
+  const tickStep=[1,2,5,10].map(s=>s*mag).find(s=>rng/s<=5)||Math.ceil(rawStep);
+  const ticks=[];
+  for(let v=Math.ceil(lo/tickStep)*tickStep;v<=hi;v+=tickStep){
+    const y=yf(v).toFixed(1);
+    ticks.push(`<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" class="cg"/>` +
+      `<text x="${pL-5}" y="${+y+4}" class="ca" text-anchor="end">${v}°</text>`);
+  }
+  // Now marker
+  const nowX=xf(nowIdx).toFixed(1);
+  const nowMark=`<line x1="${nowX}" y1="${pT}" x2="${nowX}" y2="${(pT+cH).toFixed(1)}" stroke="#9ba3ae" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>`;
+  // Polylines
+  const histPts=histLine.map((v,i)=>`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
+  const pastPts=temps.slice(0,nowIdx+1).map((v,i)=>`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
+  const fcstPts=temps.slice(nowIdx).map((v,i)=>`${xf(nowIdx+i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
+  // Dots at 6-hour marks + now; value labels on forecast 6h marks only
+  const dots=temps.map((v,i)=>{
+    if(v==null) return '';
+    const hr=+hh.time[i].slice(11,13);
+    const isNow=i===nowIdx, is6h=hr%6===0;
+    if(!isNow&&!is6h) return '';
+    const isPast=i<nowIdx;
+    const cx=xf(i).toFixed(1),cy=yf(v).toFixed(1);
+    const fill=isPast?'rgba(255,100,100,0.45)':'#ff7b7b';
+    const r=isPast?2.5:3;
+    const lbl=!isPast&&is6h?`<text x="${cx}" y="${(yf(v)-8).toFixed(1)}" class="cv cv-hot" text-anchor="middle">${Math.round(v)}°</text>`:'';
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="rgba(15,12,41,.9)" stroke-width="1.5"/>${lbl}`;
+  }).join('');
+  // X-axis labels every 6h + "Now"
+  const usedX=new Set();
+  const xLbls=hh.time.map((t,i)=>{
+    const hr=+t.slice(11,13);
+    const isNow=i===nowIdx, is6h=hr%6===0;
+    if(!isNow&&!is6h) return '';
+    const xKey=Math.round(xf(i));
+    if(usedX.has(xKey)) return ''; usedX.add(xKey);
+    const lbl=isNow?'Now':hr===0?'Mid':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
+    const extra=isNow?` font-weight="700" fill="#15171a"`:'';
+    return `<text x="${xf(i).toFixed(1)}" y="${H-4}" class="ca" text-anchor="middle"${extra}>${lbl}</text>`;
+  }).join('');
+  _hourlyData={temps,histLine,pL,cW,n,nowIdx,times:hh.time};
+  return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="hourly">
+    ${ticks.join('')}
+    ${nowMark}
+    <line id="ttg-hourly" x1="${pL}" y1="${pT}" x2="${pL}" y2="${(pT+cH).toFixed(1)}" stroke="rgba(255,255,255,.18)" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>
+    <polyline points="${histPts}" class="cl-ytd-hist"/>
+    <polyline points="${pastPts}" class="cl cl-hot" stroke-dasharray="5,4" opacity="0.55"/>
+    <polyline points="${fcstPts}" class="cl cl-hot"/>
+    ${dots}
+    ${xLbls}
+  </svg>`;
+}
+
 // ── UI state helpers ───────────────────────────────────
 function showErr(msg){
   document.getElementById('loading').classList.add('hidden');
