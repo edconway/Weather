@@ -606,7 +606,10 @@ function makeTempChart(){
     const yHMax=yf(hMax),yHMin=yf(hMin);
     const bTop=Math.min(yHMax,yHMin).toFixed(1);
     const bHt=Math.abs(yHMax-yHMin).toFixed(1);
-    return `<rect x="${pL}" y="${bTop}" width="${cW}" height="${bHt}" class="ch-band" rx="2"/>`;
+    // Label sits inside the band if tall enough, otherwise just above it
+    const lblY=(+bHt>12?(+bTop+10):(+bTop-3)).toFixed(1);
+    return `<rect x="${pL}" y="${bTop}" width="${cW}" height="${bHt}" class="ch-band" rx="2"/>` +
+      `<text x="${pL+4}" y="${lblY}" font-size="8.5" fill="#9ba3ae" text-anchor="start" opacity="0.8">${histData.month} avg range</text>`;
   })():'';
   // Vertical "Today" divider
   const todayX=xf(todayIdx).toFixed(1);
