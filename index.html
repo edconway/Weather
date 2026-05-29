@@ -715,6 +715,11 @@ function makeRainYTDChart(){
   const xLabels=monthMarks.map(m=>`<text x="${xf(m.i).toFixed(1)}" y="${H-4}" class="ca" text-anchor="middle">${m.label}</text>`).join('');
   const curPts=curV.map((v,i)=>`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
   const avgPts=avgV.map((v,i)=>`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
+  // Historical avg extension — connects from last avg point into forecast window
+  const avgExtPts=avgExtV.length?[
+    `${xf(n-1).toFixed(1)},${yf(avgV[n-1]).toFixed(1)}`,
+    ...avgExtV.map((v,i)=>`${xf(n+i).toFixed(1)},${yf(v).toFixed(1)}`)
+  ].join(' '):'';
   // Forecast polyline starts at the last actual point for a smooth join
   const fcstPts=fcV.length?[
     `${xf(n-1).toFixed(1)},${yf(curV[n-1]).toFixed(1)}`,
