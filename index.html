@@ -792,7 +792,7 @@ function renderContent(){
   const ytdSub=ytdData?`${ytdYear} actual vs. ${ytdStart}–${ytdYear-1} avg${ytdThrough?' · through '+ytdThrough:''}`:'Year-to-date comparison';
 
   document.getElementById('content').innerHTML=`
-  <section class="hero fu" style="--glow:${glowColor(d.weather_code[0])}">
+  <section class="hero fu" style="--glow:${glowColor(d.weather_code[t0])}">
     <div class="hero-top">
       <div class="hero-left">
         <div class="hero-temp">${fTn(tMax0)}<sup>${uT()}</sup></div>
