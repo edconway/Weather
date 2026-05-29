@@ -648,6 +648,13 @@ function makeTempChart(){
     <polyline points="${fcstMxPts}" class="cl cl-hot"/>
     <polyline points="${fcstMnPts}" class="cl cl-cold"/>
     ${mxDots}${mnDots}
+    ${(()=>{
+      const hv=maxV[n-1],lv=minV[n-1];
+      if(hv==null||lv==null) return '';
+      const lx=(xf(n-1)+5).toFixed(1);
+      return `<text x="${lx}" y="${(yf(hv)+4).toFixed(1)}" font-size="9" font-weight="700" fill="#c0392b">High</text>` +
+             `<text x="${lx}" y="${(yf(lv)+4).toFixed(1)}" font-size="9" font-weight="700" fill="#2980b9">Low</text>`;
+    })()}
     ${xLbls}
   </svg>`;
 }
