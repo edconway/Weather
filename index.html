@@ -664,12 +664,30 @@ function makeRainYTDChart(){
   const{labels,cumCurrentYear,cumHistAvg,thisYear}=ytdData;
   const n=labels.length;
   if(!n) return '';
+  // Build 7-day forecast extension (days strictly after the last archive date)
+  const fcstExtCum=[], fcstDates=[];
+  if(fcData?.daily){
+    const fd=fcData.daily;
+    const si=fd.time.findIndex(t=>t>ytdData.latestDate);
+    if(si>=0){
+      let cum=cumCurrentYear[n-1];
+      fd.time.slice(si,si+7).forEach((date,j)=>{
+        cum+=(fd.precipitation_sum[si+j]??0);
+        fcstExtCum.push(cum);
+        fcstDates.push(date);
+      });
+    }
+  }
+  const numFc=fcstExtCum.length;
+  const totalN=n+numFc;
   const curV=cumCurrentYear.map(nP);
   const avgV=cumHistAvg.map(nP);
+  const fcV=fcstExtCum.map(nP);
   const W=580,H=200,pL=52,pR=14,pT=20,pB=36;
   const cW=W-pL-pR,cH=H-pT-pB;
-  const yMax=Math.max(...curV,...avgV,.01)*1.1;
-  const xf=i=>pL+(i/Math.max(n-1,1))*cW;
+  const yMax=Math.max(...curV,...avgV,...(fcV.length?fcV:[0]),.01)*1.1;
+  // x maps over the full totalN range so forecast extends naturally to the right
+  const xf=i=>pL+(i/Math.max(totalN-1,1))*cW;
   const yf=v=>pT+(1-v/yMax)*cH;
   // Nice Y-axis ticks
   const niceSteps=imp?[0.1,0.25,0.5,1,2,5,10,20,25,50]:[1,2,5,10,20,25,50,100,200,250,500];
@@ -682,7 +700,7 @@ function makeRainYTDChart(){
     ticks.push(`<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" class="cg"/>` +
       `<text x="${pL-5}" y="${+y+4}" class="ca" text-anchor="end">${fmtY(v)}</text>`);
   }
-  // Month boundary markers
+  // Month boundary markers (based on YTD labels only)
   const monthMarks=[];
   let lastMo=-1;
   labels.forEach((mmdd,i)=>{
@@ -696,14 +714,22 @@ function makeRainYTDChart(){
   const xLabels=monthMarks.map(m=>`<text x="${xf(m.i).toFixed(1)}" y="${H-4}" class="ca" text-anchor="middle">${m.label}</text>`).join('');
   const curPts=curV.map((v,i)=>`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
   const avgPts=avgV.map((v,i)=>`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
-  const lx=xf(n-1).toFixed(1),ly=yf(curV[n-1]).toFixed(1);
-  _rainData={labels,curV,avgV,thisYear,pL,cW,n};
+  // Forecast polyline starts at the last actual point for a smooth join
+  const fcstPts=fcV.length?[
+    `${xf(n-1).toFixed(1)},${yf(curV[n-1]).toFixed(1)}`,
+    ...fcV.map((v,i)=>`${xf(n+i).toFixed(1)},${yf(v).toFixed(1)}`)
+  ].join(' '):'';
+  // End dot moves to the forecast tip if present, otherwise stays on last actual
+  const lx=xf(totalN-1).toFixed(1);
+  const ly=yf(fcV.length?fcV[fcV.length-1]:curV[n-1]).toFixed(1);
+  _rainData={labels,curV,avgV,thisYear,pL,cW,n,fcV,numFc,totalN,fcstDates};
   return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="rain">
     ${ticks.join('')}
     ${xGrid}
     <line id="ttg-rain" x1="${pL}" y1="${pT}" x2="${pL}" y2="${(pT+cH).toFixed(1)}" stroke="rgba(255,255,255,.18)" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>
     <polyline points="${avgPts}" class="cl-ytd-hist"/>
     <polyline points="${curPts}" class="cl-ytd-cur"/>
+    ${fcstPts?`<polyline points="${fcstPts}" stroke="rgba(102,126,234,.9)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5,4"/>`:''}
     <circle cx="${lx}" cy="${ly}" r="4" fill="rgba(102,126,234,.9)" stroke="rgba(15,12,41,.9)" stroke-width="1.5"/>
     ${xLabels}
   </svg>`;
