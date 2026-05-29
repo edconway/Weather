@@ -792,11 +792,6 @@ function renderContent(){
       <span class="sec-ttl">14-Day Temperature</span>
       <p class="sec-sub">Dashed = last 7 days observed · Solid = next 7 days forecast</p>
     </div>
-    <div class="chart-leg">
-      <div class="cli"><svg width="28" height="4" style="flex-shrink:0"><line x1="0" y1="2" x2="11" y2="2" stroke="#ff7b7b" stroke-width="2.5" stroke-dasharray="4,3" opacity="0.55"/><line x1="16" y1="2" x2="28" y2="2" stroke="#ff7b7b" stroke-width="2.5"/></svg>High</div>
-      <div class="cli"><svg width="28" height="4" style="flex-shrink:0"><line x1="0" y1="2" x2="11" y2="2" stroke="#74c0fc" stroke-width="2.5" stroke-dasharray="4,3" opacity="0.55"/><line x1="16" y1="2" x2="28" y2="2" stroke="#74c0fc" stroke-width="2.5"/></svg>Low</div>
-      <div class="cli"><svg width="20" height="10" style="flex-shrink:0"><rect x="0" y="0" width="20" height="10" fill="rgba(255,255,255,.1)" rx="2"/></svg>${h.month} historical range</div>
-    </div>
     ${makeTempChart()}
   </div>
 
