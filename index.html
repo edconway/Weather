@@ -884,7 +884,8 @@ async function geocode(lat,lon){
 async function getForecast(lat,lon){
   const p=new URLSearchParams({
     latitude:lat,longitude:lon,timezone:'auto',forecast_days:7,past_days:7,
-    daily:'weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max'
+    daily:'weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max',
+    past_hours:24,forecast_hours:24,hourly:'temperature_2m'
   });
   const r=await fetch(`https://api.open-meteo.com/v1/forecast?${p}`);
   if(!r.ok) throw new Error('Forecast API error.');
