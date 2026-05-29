@@ -734,6 +734,7 @@ function makeRainYTDChart(){
     ${xGrid}
     <line id="ttg-rain" x1="${pL}" y1="${pT}" x2="${pL}" y2="${(pT+cH).toFixed(1)}" stroke="rgba(255,255,255,.18)" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>
     <polyline points="${avgPts}" class="cl-ytd-hist"/>
+    ${avgExtPts?`<polyline points="${avgExtPts}" class="cl-ytd-hist"/>`:''}
     <polyline points="${curPts}" class="cl-ytd-cur"/>
     ${fcstPts?`<polyline points="${fcstPts}" stroke="rgba(102,126,234,.9)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5,4"/>`:''}
     <circle cx="${lx}" cy="${ly}" r="4" fill="rgba(102,126,234,.9)" stroke="rgba(15,12,41,.9)" stroke-width="1.5"/>
