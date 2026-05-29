@@ -751,12 +751,15 @@ function barHtml(histVal,fcstVal,fmtFn,numFn){
 function renderContent(){
   if(!fcData||!histData) return;
   const d=fcData.daily, h=histData;
-  const w0=wmo(d.weather_code[0]);
-  const tMax0=d.temperature_2m_max[0], tMin0=d.temperature_2m_min[0];
-  const app0=d.apparent_temperature_max[0];
-  const pop0=d.precipitation_probability_max[0];
-  const wind0=d.wind_speed_10m_max[0];
-  const uv0=d.uv_index_max[0];
+  // With past_days:7 the array starts 7 days ago — find today's index
+  const _todayStr=new Date().toISOString().slice(0,10);
+  const t0=Math.max(0,d.time.findIndex(t=>t===_todayStr));
+  const w0=wmo(d.weather_code[t0]);
+  const tMax0=d.temperature_2m_max[t0], tMin0=d.temperature_2m_min[t0];
+  const app0=d.apparent_temperature_max[t0];
+  const pop0=d.precipitation_probability_max[t0];
+  const wind0=d.wind_speed_10m_max[t0];
+  const uv0=d.uv_index_max[t0];
   const ytdYear=ytdData?.thisYear||new Date().getFullYear();
   const ytdStart=ytdData?.startYear||2000;
   const ytdThrough=ytdData?.latestDate?ytdData.latestDate.slice(5).replace('-','/'):'';
