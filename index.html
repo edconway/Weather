@@ -824,14 +824,6 @@ function renderContent(){
 
   <div class="chart-card fu">
     <div class="sec-hdr" style="margin-bottom:6px">
-      <span class="sec-ttl">14-Day Temperature</span>
-      <p class="sec-sub">Dashed = last 7 days observed · Solid = next 7 days forecast</p>
-    </div>
-    ${makeTempChart()}
-  </div>
-
-  <div class="chart-card fu">
-    <div class="sec-hdr" style="margin-bottom:6px">
       <span class="sec-ttl">48-Hour Temperature</span>
       <p class="sec-sub">Dashed = past 24h actual · Solid = next 24h forecast</p>
     </div>
@@ -840,6 +832,14 @@ function renderContent(){
       <div class="cli"><svg width="20" height="4" style="flex-shrink:0"><line x1="0" y1="2" x2="20" y2="2" stroke="#9ba3ae" stroke-width="1.5" stroke-dasharray="6,4"/></svg>5-yr avg (this week)</div>
     </div>
     ${makeHourlyTempChart()}
+  </div>
+
+  <div class="chart-card fu">
+    <div class="sec-hdr" style="margin-bottom:6px">
+      <span class="sec-ttl">14-Day Temperature</span>
+      <p class="sec-sub">Dashed = last 7 days observed · Solid = next 7 days forecast</p>
+    </div>
+    ${makeTempChart()}
   </div>
 
   <div class="chart-card fu">
