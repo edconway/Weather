@@ -585,7 +585,9 @@ function makeTempChart(){
   const minV=d.temperature_2m_min.map(v=>v!=null?nT(v):null);
   const hMax=histData.tMax!=null?nT(histData.tMax):null;
   const hMin=histData.tMin!=null?nT(histData.tMin):null;
-  const allV=[...maxV,...minV,...[hMax,hMin].filter(v=>v!=null)].filter(v=>v!=null&&!isNaN(v));
+  const nxMax=histData.nextMonth?.tMax!=null?nT(histData.nextMonth.tMax):null;
+  const nxMin=histData.nextMonth?.tMin!=null?nT(histData.nextMonth.tMin):null;
+  const allV=[...maxV,...minV,...[hMax,hMin,nxMax,nxMin].filter(v=>v!=null)].filter(v=>v!=null&&!isNaN(v));
   if(!allV.length) return '';
   const lo=Math.floor(Math.min(...allV))-2;
   const hi=Math.ceil(Math.max(...allV))+2;
