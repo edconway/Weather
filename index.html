@@ -727,9 +727,17 @@ function makeRainYTDChart(){
     `${xf(n-1).toFixed(1)},${yf(curV[n-1]).toFixed(1)}`,
     ...fcV.map((v,i)=>`${xf(n+i).toFixed(1)},${yf(v).toFixed(1)}`)
   ].join(' '):'';
-  // End dot moves to the forecast tip if present, otherwise stays on last actual
+  // End dot and end labels (replacing legend)
   const lx=xf(totalN-1).toFixed(1);
-  const ly=yf(fcV.length?fcV[fcV.length-1]:curV[n-1]).toFixed(1);
+  const endCurY=yf(fcV.length?fcV[fcV.length-1]:curV[n-1]);
+  const endAvgY=yf(avgExtV.length?avgExtV[avgExtV.length-1]:avgV[n-1]);
+  const ly=endCurY.toFixed(1);
+  // Separate labels if they're too close vertically
+  const _rSep=endCurY-endAvgY;
+  let _ryCur=endCurY, _ryAvg=endAvgY;
+  if(Math.abs(_rSep)<13){const bump=(13-Math.abs(_rSep))/2+1;_ryCur+=_rSep>=0?bump:-bump;_ryAvg+=_rSep>=0?-bump:bump;}
+  const endLabels=`<text x="${+lx+5}" y="${(_ryCur+4).toFixed(1)}" font-size="8.5" font-weight="700" fill="rgba(102,126,234,1)" text-anchor="start">${thisYear}</text>` +
+    `<text x="${+lx+5}" y="${(_ryAvg+4).toFixed(1)}" font-size="8.5" fill="#9ba3ae" text-anchor="start">Hist. avg</text>`;
   _rainData={labels,curV,avgV,thisYear,pL,cW,n,fcV,numFc,totalN,fcstDates};
   return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="rain">
     ${ticks.join('')}
@@ -740,6 +748,7 @@ function makeRainYTDChart(){
     <polyline points="${curPts}" class="cl-ytd-cur"/>
     ${fcstPts?`<polyline points="${fcstPts}" stroke="rgba(102,126,234,.9)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5,4"/>`:''}
     <circle cx="${lx}" cy="${ly}" r="4" fill="rgba(102,126,234,.9)" stroke="rgba(15,12,41,.9)" stroke-width="1.5"/>
+    ${endLabels}
     ${xLabels}
   </svg>`;
 }
