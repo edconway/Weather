@@ -615,7 +615,8 @@ function makeTempChart(){
   })():'';
   // Vertical "Today" divider
   const todayX=xf(todayIdx).toFixed(1);
-  const todayMark=`<line x1="${todayX}" y1="${pT}" x2="${todayX}" y2="${(pT+cH).toFixed(1)}" stroke="#9ba3ae" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>`;
+  const todayMark=`<line x1="${todayX}" y1="${pT}" x2="${todayX}" y2="${(pT+cH).toFixed(1)}" stroke="#9ba3ae" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
+    `<text x="${todayX}" y="${pT-4}" font-size="8" font-weight="700" fill="#9ba3ae" text-anchor="middle">Today</text>`;
   // Lines: past segment (dashed, index 0..todayIdx inclusive for continuity) and forecast segment (solid)
   const pastMxPts=maxV.slice(0,todayIdx+1).map((v,i)=>`${xf(i).toFixed(1)},${yf(v??lo).toFixed(1)}`).join(' ');
   const pastMnPts=minV.slice(0,todayIdx+1).map((v,i)=>`${xf(i).toFixed(1)},${yf(v??lo).toFixed(1)}`).join(' ');
