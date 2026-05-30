@@ -1025,7 +1025,7 @@ async function getHourlyHistorical(lat,lon){
       sums[hr]+=v; counts[hr]++;
     });
   });
-  return{avgByHour:sums.map((s,h)=>counts[h]?s/counts[h]:null)};
+  return{avgByHour:sums.map((s,h)=>counts[h]?s/counts[h]:null),yearStart:thisYear-5,yearEnd:thisYear-1};
 }
 
 function makeHourlyTempChart(){
