@@ -718,6 +718,10 @@ function makeRainYTDChart(){
   const xLabels=monthMarks.map(m=>`<text x="${xf(m.i).toFixed(1)}" y="${H-4}" class="ca" text-anchor="middle">${m.label}</text>`).join('');
   const curPts=curV.map((v,i)=>`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
   const avgPts=avgV.map((v,i)=>`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
+  // "Today" divider at the point where actual data ends and forecast begins
+  const rainTodayX=xf(n-1).toFixed(1);
+  const rainTodayMark=numFc>0?`<line x1="${rainTodayX}" y1="${pT}" x2="${rainTodayX}" y2="${(pT+cH).toFixed(1)}" stroke="#9ba3ae" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
+    `<text x="${rainTodayX}" y="${pT-4}" font-size="8" font-weight="700" fill="#9ba3ae" text-anchor="middle">Today</text>`:''  ;
   // Historical avg extension — connects from last avg point into forecast window
   const avgExtPts=avgExtV.length?[
     `${xf(n-1).toFixed(1)},${yf(avgV[n-1]).toFixed(1)}`,
