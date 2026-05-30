@@ -686,7 +686,7 @@ function makeRainYTDChart(){
   const avgV=cumHistAvg.map(nP);
   const fcV=fcstExtCum.map(nP);
   const avgExtV=(ytdData.cumHistAvgExt||[]).slice(0,numFc).map(nP);
-  const W=580,H=200,pL=52,pR=14,pT=20,pB=36;
+  const W=580,H=222,pL=52,pR=14,pT=20,pB=36;
   const cW=W-pL-pR,cH=H-pT-pB;
   const yMax=Math.max(...curV,...avgV,...(fcV.length?fcV:[0]),...(avgExtV.length?avgExtV:[0]),.01)*1.1;
   // x maps over the full totalN range so forecast extends naturally to the right
