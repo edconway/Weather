@@ -791,7 +791,12 @@ function renderContent(){
   const t0=Math.max(0,d.time.findIndex(t=>t===_todayStr));
   const w0=wmo(d.weather_code[t0]);
   const tMax0=d.temperature_2m_max[t0], tMin0=d.temperature_2m_min[t0];
-  const app0=d.apparent_temperature_max[t0];
+  // Current hour from hourly data
+  const _pad=n=>String(n).padStart(2,'0');
+  const _nowHourStr=`${_todayStr}T${_pad(new Date().getHours())}:00`;
+  const _nowHourIdx=Math.max(0,(fcData.hourly?.time||[]).findIndex(t=>t>=_nowHourStr));
+  const tNow=fcData.hourly?.temperature_2m?.[_nowHourIdx]??tMax0;
+  const app0=fcData.hourly?.apparent_temperature?.[_nowHourIdx]??d.apparent_temperature_max[t0];
   const pop0=d.precipitation_probability_max[t0];
   const wind0=d.wind_speed_10m_max[t0];
   const uv0=d.uv_index_max[t0];
