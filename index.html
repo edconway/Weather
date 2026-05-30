@@ -927,25 +927,49 @@ async function getForecast(lat,lon){
 
 async function getHistorical(lat,lon){
   const now=new Date();
-  const mo=String(now.getMonth()+1).padStart(2,'0');
-  const lastDay=String(new Date(now.getFullYear(),now.getMonth()+1,0).getDate()).padStart(2,'0');
+  const pad=n=>String(n).padStart(2,'0');
+  const mo=now.getMonth();           // 0-indexed
+  const moStr=pad(mo+1);
+  const lastDay=new Date(2024,mo+1,0).getDate();
+  // Does the 7-day forecast window cross into the next month?
+  const windowEnd=new Date(now); windowEnd.setDate(windowEnd.getDate()+6);
+  const nextMo=windowEnd.getMonth();
+  const crossesMonth=nextMo!==mo && windowEnd.getFullYear()===now.getFullYear();
+  // Build query covering current month, and next month if needed
+  let endDate=`2024-${moStr}-${pad(lastDay)}`;
+  if(crossesMonth){
+    const nextMoStr=pad(nextMo+1);
+    const nextLastDay=new Date(2024,nextMo+1,0).getDate();
+    endDate=`2024-${nextMoStr}-${pad(nextLastDay)}`;
+  }
   const p=new URLSearchParams({
     latitude:lat,longitude:lon,timezone:'auto',
-    start_date:`2020-${mo}-01`,end_date:`2024-${mo}-${lastDay}`,
+    start_date:`2020-${moStr}-01`,end_date:endDate,
     daily:'temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max'
   });
   const r=await fetch(`https://archive-api.open-meteo.com/v1/archive?${p}`);
   if(!r.ok) throw new Error('Historical API error.');
   const d=await r.json();
-  const idx=d.daily.time.map((t,i)=>t.slice(5,7)===mo?i:-1).filter(i=>i>=0);
-  return{
+  const idx=d.daily.time.map((t,i)=>t.slice(5,7)===moStr?i:-1).filter(i=>i>=0);
+  const result={
     tMax:avg(d.daily.temperature_2m_max,idx),
     tMin:avg(d.daily.temperature_2m_min,idx),
     precip:avg(d.daily.precipitation_sum,idx),
     wind:avg(d.daily.wind_speed_10m_max,idx),
     month:now.toLocaleString('en-US',{month:'long'}),
-    histYearStart:2020, histYearEnd:2024
+    histYearStart:2020, histYearEnd:2024,
+    nextMonth:null
   };
+  if(crossesMonth){
+    const nextMoStr=pad(nextMo+1);
+    const nIdx=d.daily.time.map((t,i)=>t.slice(5,7)===nextMoStr?i:-1).filter(i=>i>=0);
+    if(nIdx.length) result.nextMonth={
+      tMax:avg(d.daily.temperature_2m_max,nIdx),
+      tMin:avg(d.daily.temperature_2m_min,nIdx),
+      month:windowEnd.toLocaleString('en-US',{month:'long'})
+    };
+  }
+  return result;
 }
 
 async function getRainYTD(lat,lon){
