@@ -1055,7 +1055,7 @@ function makeHourlyTempChart(){
   const allV=[...temps,...histLine].filter(v=>v!=null&&!isNaN(v));
   if(!allV.length) return '';
   const lo=Math.floor(Math.min(...allV))-1, hi=Math.ceil(Math.max(...allV))+1;
-  const W=580,H=175,pL=46,pR=14,pT=20,pB=32;
+  const W=580,H=198,pL=46,pR=14,pT=20,pB=32;
   const cW=W-pL-pR,cH=H-pT-pB;
   const n=temps.length;
   const xf=i=>pL+i/(n-1)*cW;
