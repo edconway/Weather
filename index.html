@@ -809,13 +809,13 @@ function renderContent(){
   <section class="hero fu" style="--glow:${glowColor(d.weather_code[t0])}">
     <div class="hero-top">
       <div class="hero-left">
-        <div class="hero-temp">${fTn(tMax0)}<sup>${uT()}</sup></div>
+        <div class="hero-temp">${fTn(tNow)}<sup>${uT()}</sup></div>
         <div class="hero-cond">${w0.l}</div>
         <div class="hero-range">
-          <span class="hi">${fT(tMax0)}</span>
+          ${app0!=null?`<span style="color:var(--subtle)">Feels like ${fT(app0)}</span><span style="color:var(--subtle)"> · </span>`:''}
+          <span class="hi">↑${fT(tMax0)}</span>
           <span style="color:var(--subtle)"> / </span>
-          <span class="lo">${fT(tMin0)}</span>
-          ${app0!=null?`<span style="color:var(--subtle)"> · feels like ${fT(app0)}</span>`:''}
+          <span class="lo">↓${fT(tMin0)}</span>
         </div>
       </div>
       <div class="hero-icon">${w0.i}</div>
