@@ -748,6 +748,7 @@ function makeRainYTDChart(){
     ${ticks.join('')}
     ${xGrid}
     <line id="ttg-rain" x1="${pL}" y1="${pT}" x2="${pL}" y2="${(pT+cH).toFixed(1)}" stroke="rgba(255,255,255,.18)" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>
+    ${rainTodayMark}
     <polyline points="${avgPts}" class="cl-ytd-hist"/>
     ${avgExtPts?`<polyline points="${avgExtPts}" class="cl-ytd-hist"/>`:''}
     <polyline points="${curPts}" class="cl-ytd-cur"/>
