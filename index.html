@@ -929,7 +929,8 @@ async function getHistorical(lat,lon){
     tMin:avg(d.daily.temperature_2m_min,idx),
     precip:avg(d.daily.precipitation_sum,idx),
     wind:avg(d.daily.wind_speed_10m_max,idx),
-    month:now.toLocaleString('en-US',{month:'long'})
+    month:now.toLocaleString('en-US',{month:'long'}),
+    histYearStart:2020, histYearEnd:2024
   };
 }
 
