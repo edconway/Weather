@@ -1102,6 +1102,19 @@ function makeHourlyTempChart(){
     const extra=isNow?` font-weight="700" fill="#15171a"`:'';
     return `<text x="${xf(i).toFixed(1)}" y="${H-4}" class="ca" text-anchor="middle"${extra}>${lbl}</text>`;
   }).join('');
+  // End labels (replacing legend) — separate vertically if lines converge
+  const endX=(xf(n-1)+5).toFixed(1);
+  const endTmpY=temps[n-1]!=null?yf(temps[n-1]):null;
+  const endAvgY=histLine[n-1]!=null?yf(histLine[n-1]):null;
+  let _heTmp=endTmpY, _heAvg=endAvgY;
+  if(_heTmp!=null&&_heAvg!=null){
+    const _heSep=_heTmp-_heAvg;
+    if(Math.abs(_heSep)<13){const bump=(13-Math.abs(_heSep))/2+1;_heTmp+=_heSep>=0?bump:-bump;_heAvg+=_heSep>=0?-bump:bump;}
+  }
+  const endLbls=[
+    _heTmp!=null?`<text x="${endX}" y="${(_heTmp+4).toFixed(1)}" font-size="8.5" font-weight="700" fill="#c0392b">Forecast</text>`:'',
+    _heAvg!=null?`<text x="${endX}" y="${(_heAvg+4).toFixed(1)}" font-size="8.5" fill="#9ba3ae">5-yr avg</text>`:''
+  ].join('');
   _hourlyData={temps,histLine,pL,cW,n,nowIdx,times:hh.time};
   return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="hourly">
     ${ticks.join('')}
@@ -1111,6 +1124,7 @@ function makeHourlyTempChart(){
     <polyline points="${pastPts}" class="cl cl-hot" stroke-dasharray="5,4" opacity="0.55"/>
     <polyline points="${fcstPts}" class="cl cl-hot"/>
     ${dots}
+    ${endLbls}
     ${xLbls}
   </svg>`;
 }
