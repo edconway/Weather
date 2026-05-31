@@ -1143,10 +1143,17 @@ function makeHourlyTempChart(){
   const nowStr=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:00`;
   const rawNow=hh.time.findIndex(t=>t>=nowStr);
   const nowIdx=rawNow<1?1:rawNow;
+  // Slice to past 24h + next 48h regardless of how large the full array is
+  // (past_days:7 in the forecast call overrides past_hours:24 and returns 168h each side)
+  const startIdx=Math.max(0,nowIdx-24);
+  const endIdx=Math.min(hh.time.length,nowIdx+48);
+  const slicedTime=hh.time.slice(startIdx,endIdx);
+  const slicedTemp=hh.temperature_2m.slice(startIdx,endIdx);
+  const relNow=nowIdx-startIdx;
   // Map temps and historical avg, carrying last known value over nulls
   let lastT=null, lastA=null;
-  const temps=hh.temperature_2m.map(v=>{if(v!=null)lastT=nT(v);return lastT;});
-  const histLine=hh.time.map(t=>{
+  const temps=slicedTemp.map(v=>{if(v!=null)lastT=nT(v);return lastT;});
+  const histLine=slicedTime.map(t=>{
     const v=hourlyHistData.avgByHour[+t.slice(11,13)];
     if(v!=null)lastA=nT(v); return lastA;
   });
