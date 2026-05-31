@@ -525,7 +525,7 @@ async function switchSource(src){
   activeSource=src; geoName=name;
   renderHeader();
   setLoad('Loading weather…');
-  ytdData=null; hourlyHistData=null;
+  ytdData=null; hourlyHistData=null; hourlyRainHistData=null; dailyRainHistData=null;
   try{
     const[fc,hist]=await Promise.all([getForecast(lat,lon),getHistorical(lat,lon)]);
     fcData=fc; histData=hist;
@@ -535,6 +535,8 @@ async function switchSource(src){
   }catch(e){showErr(e.message||'Failed to load weather.');return;}
   getRainYTD(lat,lon).then(ytd=>{ytdData=ytd;if(fcData)renderContent();}).catch(()=>{});
   getHourlyHistorical(lat,lon).then(d=>{hourlyHistData=d;if(fcData)renderContent();}).catch(()=>{});
+  getHourlyRainHistorical(lat,lon).then(d=>{hourlyRainHistData=d;if(fcData)renderContent();}).catch(()=>{});
+  getDailyRainHistorical(lat,lon).then(d=>{dailyRainHistData=d;if(fcData)renderContent();}).catch(()=>{});
 }
 
 // ── Render header ──────────────────────────────────────
