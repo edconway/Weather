@@ -1621,23 +1621,20 @@ function setLoad(msg){
         <div class="tt-row"><span class="tt-lbl">Precip</span><span class="tt-cur">${fmtMm(pv)}</span></div>
         ${!isPast&&pct!=='—'?`<div class="tt-row"><span class="tt-lbl">Probability</span><span class="tt-muted">${pct}</span></div>`:''}`;
     } else if(chartType==='daily-rain'&&_dailyRainData){
-      const{data,pL,slotW,n}=_dailyRainData;
+      const{dates,precip,probs,pL,slotW,n,todayIdx}=_dailyRainData;
       const i=Math.max(0,Math.min(n-1,Math.floor((svgX-pL)/slotW)));
-      const d=data[i];
-      const dl=i===0?'Today':new Date(d.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+      const isPast=i<todayIdx, isToday=i===todayIdx;
+      const tag=isPast?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · actual</span>':'';
+      const dl=isToday?'Today':new Date(dates[i]+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
       const fmtMm=v=>imp?(v<0.1?'—':v.toFixed(2)+'"'):(v<0.1?'—':v.toFixed(1)+'mm');
-      const diff=d.forecastMm-d.histMeanMm, dc=diff>0.5?'tt-pos':diff<-0.5?'tt-neg':'tt-muted';
+      const mm=precip[i]??0, prob=probs[i];
       const gx=(pL+(i+0.5)*slotW).toFixed(1);
       document.getElementById('ttg-daily-rain')?.setAttribute('x1',gx);
       document.getElementById('ttg-daily-rain')?.setAttribute('x2',gx);
       document.getElementById('ttg-daily-rain')?.setAttribute('visibility','visible');
-      html=`<div class="tt-title">${dl}</div>
-        <div class="tt-row"><span class="tt-lbl">Forecast</span><span class="tt-cur">${fmtMm(d.forecastMm)}</span></div>
-        ${d.probabilityMax!=null?`<div class="tt-row"><span class="tt-lbl">Probability</span><span class="tt-muted">${d.probabilityMax}%</span></div>`:''}
-        <div class="tt-row"><span class="tt-lbl">Hist. mean</span><span class="tt-muted">${fmtMm(d.histMeanMm)}</span></div>
-        <div class="tt-row"><span class="tt-lbl">Hist. p90</span><span class="tt-muted">${fmtMm(d.p90Mm)}</span></div>
-        <div class="tt-row"><span class="tt-lbl">Wet-day freq</span><span class="tt-muted">${Math.round(d.wetDayProbability*100)}%</span></div>
-        ${d.histMeanMm>0.05?`<div class="tt-row"><span class="tt-lbl">Delta</span><span class="${dc}">${(diff>=0?'+':'')+fmtMm(Math.abs(diff))}</span></div>`:''}`;
+      html=`<div class="tt-title">${dl}${tag}</div>
+        <div class="tt-row"><span class="tt-lbl">${isPast?'Actual':'Forecast'}</span><span class="tt-cur">${fmtMm(mm)}</span></div>
+        ${!isPast&&prob!=null?`<div class="tt-row"><span class="tt-lbl">Probability</span><span class="tt-muted">${prob}%</span></div>`:''}`;
     } else return;
     tt.innerHTML=html;
     const tW=170,mg=14;
