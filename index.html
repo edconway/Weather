@@ -848,19 +848,18 @@ function renderContent(){
     if(!_histEntry?.tMax||!_histEntry?.tMin) return '';
     const fMean=(tMax0+tMin0)/2, hMean=(_histEntry.tMax+_histEntry.tMin)/2;
     const delta=fMean-hMean, abs=Math.abs(delta);
-    if(abs<1) return 'Near the recent average temperature';
+    if(abs<1) return 'Near normal';
     const disp=imp?Math.round(abs*9/5):Math.round(abs);
-    return `${disp}${uT()} ${delta>0?'warmer':'colder'} than the recent average`;
+    return `${disp}${uT()} ${delta>0?'warmer':'colder'} than normal`;
   })();
   const _rainAnomaly=(()=>{
     if(!dailyRainHistData?.[0]) return '';
     const dr=dailyRainHistData[0];
-    const fmt=v=>imp?(v<0.1?'—':v.toFixed(2)+'"'):(v<0.1?'—':v.toFixed(1)+'mm');
-    if(dr.forecastMm<0.1) return dr.histMeanMm>=1?`Drier than usual · typically ${fmt(dr.histMeanMm)}`:'Little or no rain expected';
-    if(dr.p90Mm>0&&dr.forecastMm>=dr.p90Mm) return `Unusually wet · ${fmt(dr.forecastMm)} forecast`;
-    if(dr.forecastMm>dr.histMeanMm*1.5&&dr.forecastMm-dr.histMeanMm>=1) return `Wetter than usual · ${fmt(dr.forecastMm)} vs avg ${fmt(dr.histMeanMm)}`;
-    if(dr.histMeanMm>0.5&&dr.forecastMm<dr.histMeanMm*0.5) return `Drier than usual · ${fmt(dr.forecastMm)} vs avg ${fmt(dr.histMeanMm)}`;
-    return `Near normal rainfall · ${fmt(dr.forecastMm)} forecast`;
+    if(dr.forecastMm<0.1) return dr.histMeanMm>=1?'Drier than normal':'Dry day expected';
+    if(dr.p90Mm>0&&dr.forecastMm>=dr.p90Mm) return 'Unusually wet';
+    if(dr.forecastMm>dr.histMeanMm*1.5&&dr.forecastMm-dr.histMeanMm>=1) return 'Wetter than normal';
+    if(dr.histMeanMm>0.5&&dr.forecastMm<dr.histMeanMm*0.5) return 'Drier than normal';
+    return 'Near normal rainfall';
   })();
 
   document.getElementById('content').innerHTML=`
