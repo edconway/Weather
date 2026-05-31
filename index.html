@@ -866,13 +866,7 @@ function renderContent(){
   <section class="hero fu" style="--glow:${glowColor(d.weather_code[t0])}">
     <div class="hero-top">
       <div class="hero-left">
-        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-          <div class="hero-temp">${fTn(tNow)}<sup>${uT()}</sup></div>
-          ${(_tempAnomaly||_rainAnomaly)?`<div style="display:flex;flex-direction:column;gap:3px;align-items:center;text-align:center">
-            ${_tempAnomaly?`<span class="hero-anomaly" style="margin:0">${_tempAnomaly}</span>`:''}
-            ${_rainAnomaly?`<span class="hero-anomaly" style="margin:0">${_rainAnomaly}</span>`:''}
-          </div>`:''}
-        </div>
+        <div class="hero-temp">${fTn(tNow)}<sup>${uT()}</sup></div>
         <div class="hero-cond">${w0.l}</div>
         <div class="hero-range">
           ${app0!=null?`<span style="color:var(--subtle)">Feels like ${fT(app0)}</span><span style="color:var(--subtle)"> · </span>`:''}
