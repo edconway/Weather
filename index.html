@@ -1219,7 +1219,7 @@ function makeHourlyTempChart(){
     _heTmp!=null?`<text x="${endX}" y="${(_heTmp+4).toFixed(1)}" font-size="8.5" font-weight="700" fill="#c0392b">Forecast</text>`:'',
     _heAvg!=null?`<text x="${endX}" y="${(_heAvg+4).toFixed(1)}" font-size="8.5" fill="#9ba3ae">5-yr avg</text>`:''
   ].join('');
-  _hourlyData={temps,histLine,pL,cW,n,nowIdx,times:hh.time};
+  _hourlyData={temps,histLine,pL,cW,n,nowIdx:relNow,times:slicedTime};
   return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="hourly">
     ${ticks.join('')}
     ${nowMark}
