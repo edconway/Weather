@@ -1590,9 +1590,10 @@ function setLoad(msg){
         <div class="tt-row"><span class="tt-lbl">Temp</span><span class="tt-hot">${tv}${tv!=='—'?u:''}</span></div>
         <div class="tt-row"><span class="tt-lbl">5-yr avg</span><span class="tt-muted">${hv}${hv!=='—'?u:''}</span></div>`;
     } else if(chartType==='hourly-rain'&&_hourlyRainData){
-      const{precip,prob,pL,slotW,n,times}=_hourlyRainData;
+      const{precip,prob,pL,slotW,n,relNow,times}=_hourlyRainData;
       const i=Math.max(0,Math.min(n-1,Math.floor((svgX-pL)/slotW)));
-      const t=times[i], hr=+t.slice(11,13);
+      const t=times[i], hr=+t.slice(11,13), isPast=relNow!=null&&i<relNow;
+      const tag=isPast?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · actual</span>':'';
       const lbl=hr===0?'Midnight':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
       const dl=new Date(t.slice(0,10)+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
       const fmtMm=v=>imp?(v<0.01?'—':v.toFixed(2)+'"'):(v<0.1?'—':v.toFixed(1)+'mm');
@@ -1602,9 +1603,9 @@ function setLoad(msg){
       document.getElementById('ttg-hourly-rain')?.setAttribute('x1',gx);
       document.getElementById('ttg-hourly-rain')?.setAttribute('x2',gx);
       document.getElementById('ttg-hourly-rain')?.setAttribute('visibility','visible');
-      html=`<div class="tt-title">${dl} ${lbl}</div>
+      html=`<div class="tt-title">${dl} ${lbl}${tag}</div>
         <div class="tt-row"><span class="tt-lbl">Precip</span><span class="tt-cur">${fmtMm(pv)}</span></div>
-        <div class="tt-row"><span class="tt-lbl">Probability</span><span class="tt-muted">${pct}</span></div>`;
+        ${!isPast&&pct!=='—'?`<div class="tt-row"><span class="tt-lbl">Probability</span><span class="tt-muted">${pct}</span></div>`:''}`;
     } else if(chartType==='daily-rain'&&_dailyRainData){
       const{data,pL,slotW,n}=_dailyRainData;
       const i=Math.max(0,Math.min(n-1,Math.floor((svgX-pL)/slotW)));
