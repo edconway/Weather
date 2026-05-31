@@ -1433,7 +1433,7 @@ function makeDailyRainChart(){
   if(!dailyRainHistData) return '<p class="search-msg" style="padding:20px 0">⏳ Loading daily rain history…</p>';
   const data=dailyRainHistData;
   const n=data.length;
-  const W=580,H=195,pL=46,pR=14,pT=20,pB=50;
+  const W=580,H=185,pL=46,pR=14,pT=20,pB=38;
   const cW=W-pL-pR,cH=H-pT-pB;
   const yMax=Math.max(...data.map(d=>d.forecastMm),1)*1.2;
   const slotW=cW/n;
