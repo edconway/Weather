@@ -1391,18 +1391,21 @@ function makeHourlyRainChart(){
     ticks.push(`<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" class="cg"/>` +
       `<text x="${pL-5}" y="${+y+4}" class="ca" text-anchor="end">${fmtY(v)}</text>`);
   }
-  // "Now" label at left edge (all data is forecast from this point)
-  const nowMark=`<text x="${pL}" y="${pT-4}" font-size="8" font-weight="700" fill="#9ba3ae" text-anchor="middle">Now</text>`;
-  // Bars
+  // "Now" divider in the middle, same as temp chart
+  const nowX=xCx(relNow).toFixed(1);
+  const nowMark=`<line x1="${nowX}" y1="${pT}" x2="${nowX}" y2="${(pT+cH).toFixed(1)}" stroke="#9ba3ae" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
+    `<text x="${nowX}" y="${pT-4}" font-size="8" font-weight="700" fill="#9ba3ae" text-anchor="middle">Now</text>`;
+  // Bars — past faded, forecast solid
   const bars=precip.map((v,i)=>{
     const bx=xBL(i).toFixed(1);
     const bH=Math.max(0,yf(0)-yf(v));
     if(bH<0.5) return '';
-    return `<rect x="${bx}" y="${yf(v).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="rgba(102,126,234,0.8)" rx="1"/>`;
+    const fill=i<relNow?'rgba(102,126,234,0.3)':`rgba(102,126,234,0.8)`;
+    return `<rect x="${bx}" y="${yf(v).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${fill}" rx="1"/>`;
   }).join('');
-  // Probability text above bars (>=20%)
+  // Probability text above forecast bars only (>=20%)
   const probLbls=prob.map((p,i)=>{
-    if(p==null||p<20) return '';
+    if(i<relNow||p==null||p<20) return '';
     const ty=(yf(precip[i]??0)-4).toFixed(1);
     return `<text x="${xCx(i).toFixed(1)}" y="${ty}" font-size="7" fill="rgba(41,128,185,0.85)" text-anchor="middle">${p}%</text>`;
   }).join('');
@@ -1415,7 +1418,7 @@ function makeHourlyRainChart(){
     const lbl=hr===0?'Mid':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
     return `<text x="${xCx(i).toFixed(1)}" y="${H-6}" class="ca" text-anchor="middle">${lbl}</text>`;
   }).join('');
-  _hourlyRainData={precip,prob,pL,slotW,n,times};
+  _hourlyRainData={precip,prob,pL,slotW,n,relNow,times};
   return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="hourly-rain">
     ${ticks.join('')}
     ${nowMark}
