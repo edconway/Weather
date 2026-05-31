@@ -1193,13 +1193,11 @@ function makeHourlyTempChart(){
   const usedX=new Set();
   const xLbls=hh.time.map((t,i)=>{
     const hr=+t.slice(11,13);
-    const isNow=i===nowIdx, is6h=hr%6===0;
-    if(!isNow&&!is6h) return '';
+    if(hr%6!==0) return '';
     const xKey=Math.round(xf(i));
     if(usedX.has(xKey)) return ''; usedX.add(xKey);
-    const lbl=isNow?'Now':hr===0?'Mid':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
-    const extra=isNow?` font-weight="700" fill="#15171a"`:'';
-    return `<text x="${xf(i).toFixed(1)}" y="${H-4}" class="ca" text-anchor="middle"${extra}>${lbl}</text>`;
+    const lbl=hr===0?'Mid':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
+    return `<text x="${xf(i).toFixed(1)}" y="${H-4}" class="ca" text-anchor="middle">${lbl}</text>`;
   }).join('');
   // End labels (replacing legend) — separate vertically if lines converge
   const endX=(xf(n-1)+5).toFixed(1);
