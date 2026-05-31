@@ -583,11 +583,10 @@ function makeTempChart(){
   const labels=d.time.map((t,i)=>i===todayIdx?'Today':fDay(t));
   const maxV=d.temperature_2m_max.map(v=>v!=null?nT(v):null);
   const minV=d.temperature_2m_min.map(v=>v!=null?nT(v):null);
-  const hMax=histData.tMax!=null?nT(histData.tMax):null;
-  const hMin=histData.tMin!=null?nT(histData.tMin):null;
-  const nxMax=histData.nextMonth?.tMax!=null?nT(histData.nextMonth.tMax):null;
-  const nxMin=histData.nextMonth?.tMin!=null?nT(histData.nextMonth.tMin):null;
-  const allV=[...maxV,...minV,...[hMax,hMin,nxMax,nxMin].filter(v=>v!=null)].filter(v=>v!=null&&!isNaN(v));
+  const dailyAvg=histData.dailyAvg||[];
+  const bandMaxes=dailyAvg.map(a=>a.tMax!=null?nT(a.tMax):null).filter(v=>v!=null);
+  const bandMins=dailyAvg.map(a=>a.tMin!=null?nT(a.tMin):null).filter(v=>v!=null);
+  const allV=[...maxV,...minV,...bandMaxes,...bandMins].filter(v=>v!=null&&!isNaN(v));
   if(!allV.length) return '';
   const lo=Math.floor(Math.min(...allV))-2;
   const hi=Math.ceil(Math.max(...allV))+2;
