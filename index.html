@@ -868,6 +868,8 @@ function renderContent(){
     <div class="hero-top">
       <div class="hero-left">
         <div class="hero-temp">${fTn(tNow)}<sup>${uT()}</sup></div>
+        ${_tempAnomaly?`<div class="hero-anomaly">${_tempAnomaly}</div>`:''}
+        ${_rainAnomaly?`<div class="hero-anomaly">${_rainAnomaly}</div>`:''}
         <div class="hero-cond">${w0.l}</div>
         <div class="hero-range">
           ${app0!=null?`<span style="color:var(--subtle)">Feels like ${fT(app0)}</span><span style="color:var(--subtle)"> · </span>`:''}
@@ -875,8 +877,6 @@ function renderContent(){
           <span style="color:var(--subtle)"> / </span>
           <span class="lo">↓${fT(tMin0)}</span>
         </div>
-        ${_tempAnomaly?`<div class="hero-anomaly">${_tempAnomaly}</div>`:''}
-        ${_rainAnomaly?`<div class="hero-anomaly">${_rainAnomaly}</div>`:''}
       </div>
       <div class="hero-icon">${w0.i}</div>
     </div>
