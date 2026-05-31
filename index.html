@@ -1360,24 +1360,21 @@ function classifyRain(forecastMm,histMeanMm,p90Mm){
 
 function makeHourlyRainChart(){
   if(!fcData?.hourly?.time) return '';
-  if(!hourlyRainHistData) return '<p class="search-msg" style="padding:20px 0">⏳ Loading hourly rain history…</p>';
   const hh=fcData.hourly;
   const now=new Date();
   const pad=n=>String(n).padStart(2,'0');
   const nowStr=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:00`;
   const rawNow=hh.time.findIndex(t=>t>=nowStr);
   const nowIdx=rawNow<1?1:rawNow;
-  // Show past 6h actual + next 48h forecast
-  const startIdx=Math.max(0,nowIdx-6);
+  // Exactly 48 hours of forecast from now — same explicit clamp as the temp chart
+  const startIdx=nowIdx;
   const endIdx=Math.min(hh.time.length,nowIdx+48);
   const times=hh.time.slice(startIdx,endIdx);
   const precip=(hh.precipitation||[]).slice(startIdx,endIdx).map(v=>v??0);
   const prob=(hh.precipitation_probability||[]).slice(startIdx,endIdx);
   const n=times.length;
   if(!n) return '';
-  const relNow=nowIdx-startIdx;
-  const histLine=times.map(t=>hourlyRainHistData.avgByHour[+t.slice(11,13)]??0);
-  const yMax=Math.max(...precip,...histLine,0.5)*1.25;
+  const yMax=Math.max(...precip,0.5)*1.25;
   const W=580,H=185,pL=46,pR=14,pT=20,pB=36;
   const cW=W-pL-pR,cH=H-pT-pB;
   const slotW=cW/n;
