@@ -605,34 +605,18 @@ function makeTempChart(){
     ticks.push(`<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" class="cg"/>` +
       `<text x="${pL-5}" y="${+y+4}" class="ca" text-anchor="end">${v}°</text>`);
   }
-  // Band: one segment per month in the window, stepping at the month boundary
+  // Rolling-average band — polygon whose edges follow per-day ±3-day avg highs and lows
   const band=(()=>{
-    if(hMax==null||hMin==null) return '';
-    // Find where the month changes in the 14-day array (first date in a different month)
-    const curMoStr=d.time[todayIdx]?.slice(5,7);
-    const boundaryIdx=histData.nextMonth
-      ? d.time.findIndex((t,i)=>i>todayIdx&&t.slice(5,7)!==curMoStr)
-      : -1;
-    const drawSeg=(x1,x2,nMax,nMin,label)=>{
-      if(nMax==null||nMin==null) return '';
-      const yA=yf(nMax),yB=yf(nMin);
-      const bTop=Math.min(yA,yB).toFixed(1);
-      const bHt=Math.abs(yA-yB).toFixed(1);
-      const segW=(x2-x1).toFixed(1);
-      const lblY=(+bHt>12?(+bTop+10):(+bTop-3)).toFixed(1);
-      return `<rect x="${x1.toFixed(1)}" y="${bTop}" width="${segW}" height="${bHt}" class="ch-band" rx="2"/>` +
-        `<text x="${(x1+4).toFixed(1)}" y="${lblY}" font-size="8.5" fill="#9ba3ae" text-anchor="start" opacity="0.8">${label} avg</text>`;
-    };
-    if(boundaryIdx<0){
-      // Single-month window
-      return drawSeg(pL,pL+cW,hMax,hMin,histData.month);
-    }
-    // Two-month window: split band at the boundary
-    const bx=xf(boundaryIdx);
-    const nm=histData.nextMonth;
-    const nMax=nm.tMax!=null?nT(nm.tMax):null;
-    const nMin=nm.tMin!=null?nT(nm.tMin):null;
-    return drawSeg(pL,bx,hMax,hMin,histData.month)+drawSeg(bx,pL+cW,nMax,nMin,nm.month);
+    if(!dailyAvg.length) return '';
+    const topPts=dailyAvg.map((a,i)=>a.tMax!=null?`${xf(i).toFixed(1)},${yf(nT(a.tMax)).toFixed(1)}`:null).filter(Boolean);
+    const botPts=dailyAvg.map((a,i)=>a.tMin!=null?`${xf(i).toFixed(1)},${yf(nT(a.tMin)).toFixed(1)}`:null).filter(Boolean);
+    if(!topPts.length||!botPts.length) return '';
+    const poly=[...topPts,...[...botPts].reverse()].join(' ');
+    // Label near left edge, vertically centred on the band at the first data point
+    const f=dailyAvg[0];
+    const lblY=f.tMax!=null&&f.tMin!=null?((yf(nT(f.tMax))+yf(nT(f.tMin)))/2).toFixed(1):null;
+    const lbl=lblY?`<text x="${pL+4}" y="${(+lblY+4).toFixed(1)}" font-size="8.5" fill="#9ba3ae" opacity="0.8">Hist. avg</text>`:'';
+    return `<polygon points="${poly}" class="ch-band"/>${lbl}`;
   })();
   // Vertical "Today" divider
   const todayX=xf(todayIdx).toFixed(1);
