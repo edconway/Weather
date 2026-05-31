@@ -837,6 +837,27 @@ function renderContent(){
     ?`Cumulative rainfall${_locFor} · ${ytdYear} actual & 7-day forecast vs ${ytdStart}–${ytdYear-1} avg${ytdThrough?' · through '+ytdThrough:''}`
     :`Cumulative rainfall${_locFor}`;
 
+  // ── Hero anomaly context ──────────────────────────────
+  const _histEntry=histData?.dailyAvg?.[7];
+  const _tempAnomaly=(()=>{
+    if(!_histEntry?.tMax||!_histEntry?.tMin) return '';
+    const fMean=(tMax0+tMin0)/2, hMean=(_histEntry.tMax+_histEntry.tMin)/2;
+    const delta=fMean-hMean, abs=Math.abs(delta);
+    if(abs<1) return 'Near the recent average temperature';
+    const disp=imp?Math.round(abs*9/5):Math.round(abs);
+    return `${disp}${uT()} ${delta>0?'warmer':'colder'} than the recent average`;
+  })();
+  const _rainAnomaly=(()=>{
+    if(!dailyRainHistData?.[0]) return '';
+    const dr=dailyRainHistData[0];
+    const fmt=v=>imp?(v<0.1?'—':v.toFixed(2)+'"'):(v<0.1?'—':v.toFixed(1)+'mm');
+    if(dr.forecastMm<0.1) return dr.histMeanMm>=1?`Drier than usual · typically ${fmt(dr.histMeanMm)}`:'Little or no rain expected';
+    if(dr.p90Mm>0&&dr.forecastMm>=dr.p90Mm) return `Unusually wet · ${fmt(dr.forecastMm)} forecast`;
+    if(dr.forecastMm>dr.histMeanMm*1.5&&dr.forecastMm-dr.histMeanMm>=1) return `Wetter than usual · ${fmt(dr.forecastMm)} vs avg ${fmt(dr.histMeanMm)}`;
+    if(dr.histMeanMm>0.5&&dr.forecastMm<dr.histMeanMm*0.5) return `Drier than usual · ${fmt(dr.forecastMm)} vs avg ${fmt(dr.histMeanMm)}`;
+    return `Near normal rainfall · ${fmt(dr.forecastMm)} forecast`;
+  })();
+
   document.getElementById('content').innerHTML=`
   <section class="hero fu" style="--glow:${glowColor(d.weather_code[t0])}">
     <div class="hero-top">
@@ -849,6 +870,8 @@ function renderContent(){
           <span style="color:var(--subtle)"> / </span>
           <span class="lo">↓${fT(tMin0)}</span>
         </div>
+        ${_tempAnomaly?`<div class="hero-anomaly">${_tempAnomaly}</div>`:''}
+        ${_rainAnomaly?`<div class="hero-anomaly">${_rainAnomaly}</div>`:''}
       </div>
       <div class="hero-icon">${w0.i}</div>
     </div>
