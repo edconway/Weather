@@ -1229,12 +1229,13 @@ function setLoad(msg){
     if(!tt) return;
     let html='';
     if(chartType==='temp'&&_tempData){
-      const{labels,maxV,minV,hMax,hMin,pL,cW,n,todayIdx}=_tempData;
+      const{labels,maxV,minV,dailyAvg,pL,cW,n,todayIdx}=_tempData;
       const i=Math.max(0,Math.min(n-1,Math.round((svgX-pL)/cW*(n-1))));
       const u=uT();
       const hi=maxV[i]!=null?Math.round(maxV[i]):'—';
       const lo=minV[i]!=null?Math.round(minV[i]):'—';
-      const hr=hMax!=null&&hMin!=null?`${Math.round(hMin)}–${Math.round(hMax)}°`:'—';
+      const da=dailyAvg?.[i];
+      const hr=da?.tMax!=null&&da?.tMin!=null?`${Math.round(nT(da.tMin))}–${Math.round(nT(da.tMax))}°`:'—';
       const isActual=todayIdx!=null&&i<todayIdx;
       const tag=isActual?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · actual</span>':'';
       const gx=(pL+i/(n-1)*cW).toFixed(1);
