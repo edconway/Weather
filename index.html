@@ -1461,9 +1461,8 @@ function makeDailyRainChart(){
     const valLbl=d.forecastMm>=0.1?`<text x="${cx}" y="${(yf(d.forecastMm)-5).toFixed(1)}" font-size="8" fill="rgba(102,126,234,0.9)" text-anchor="middle">${fmtMm(d.forecastMm)}</text>`:''
     const isToday=i===0;
     return bar+valLbl+
-      `<text x="${cx}" y="${H-36}" class="ca" font-weight="${isToday?700:400}" text-anchor="middle">${isToday?'Today':fDay(d.date)}</text>`+
-      (d.probabilityMax!=null?`<text x="${cx}" y="${H-22}" font-size="7.5" fill="rgba(41,128,185,0.8)" text-anchor="middle">${d.probabilityMax}%</text>`:'')+
-      `<text x="${cx}" y="${H-8}" font-size="7" fill="${anom.color}" text-anchor="middle">${anom.text}</text>`;
+      `<text x="${cx}" y="${H-22}" class="ca" font-weight="${isToday?700:400}" text-anchor="middle">${isToday?'Today':fDay(d.date)}</text>`+
+      (d.probabilityMax!=null?`<text x="${cx}" y="${H-8}" font-size="7.5" fill="rgba(41,128,185,0.8)" text-anchor="middle">${d.probabilityMax}%</text>`:'');
   }).join('');
   _dailyRainData={data,pL,slotW,n};
   return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="daily-rain">
