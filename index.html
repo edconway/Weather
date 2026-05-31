@@ -876,12 +876,12 @@ function renderContent(){
           <span class="lo">↓${fT(tMin0)}</span>
         </div>
       </div>
+      ${(_tempAnomaly||_rainAnomaly)?`<div class="hero-anomaly-col">
+        ${_tempAnomaly?`<p class="hero-anomaly">${_tempAnomaly}</p>`:''}
+        ${_rainAnomaly?`<p class="hero-anomaly">${_rainAnomaly}</p>`:''}
+      </div>`:''}
       <div class="hero-icon">${w0.i}</div>
     </div>
-    ${(_tempAnomaly||_rainAnomaly)?`<div style="text-align:center;margin:10px 0 4px">
-      ${_tempAnomaly?`<p class="hero-anomaly" style="margin:0">${_tempAnomaly}</p>`:''}
-      ${_rainAnomaly?`<p class="hero-anomaly" style="margin:0;margin-top:3px">${_rainAnomaly}</p>`:''}
-    </div>`:''}
     <div class="hero-stats">
       <div class="stat"><span class="stat-ico">🌧️</span><span class="stat-lbl">Rain chance</span><span class="stat-val">${pop0!=null?pop0+'%':'—'}</span></div>
       <div class="stat"><span class="stat-ico">💨</span><span class="stat-lbl">Wind</span><span class="stat-val">${fW(wind0)}</span></div>
