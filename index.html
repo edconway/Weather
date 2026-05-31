@@ -1457,16 +1457,10 @@ function makeDailyRainChart(){
     const cx=xCx(i).toFixed(1), bx=xBL(i).toFixed(1);
     const bH=Math.max(0,yf(0)-yf(d.forecastMm)), bY=yf(d.forecastMm).toFixed(1);
     const bar=`<rect x="${bx}" y="${bY}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="rgba(102,126,234,0.8)" rx="2"/>`;
-    // Historical mean dashed line across bar
-    const hmY=yf(d.histMeanMm).toFixed(1);
-    const hmLine=d.histMeanMm>0.05?`<line x1="${(+bx+2).toFixed(1)}" y1="${hmY}" x2="${(+bx+barW-2).toFixed(1)}" y2="${hmY}" stroke="#9ba3ae" stroke-width="1.5" stroke-dasharray="3,2"/>`:''
-    // P90 small circle
-    const p90Mark=d.p90Mm>0.1?`<circle cx="${cx}" cy="${yf(d.p90Mm).toFixed(1)}" r="2.2" fill="none" stroke="#9ba3ae" stroke-width="1.2"/>`:''
     // Value above bar
     const valLbl=d.forecastMm>=0.1?`<text x="${cx}" y="${(yf(d.forecastMm)-5).toFixed(1)}" font-size="8" fill="rgba(102,126,234,0.9)" text-anchor="middle">${fmtMm(d.forecastMm)}</text>`:''
-    const anom=classifyRain(d.forecastMm,d.histMeanMm,d.p90Mm);
     const isToday=i===0;
-    return bar+hmLine+p90Mark+valLbl+
+    return bar+valLbl+
       `<text x="${cx}" y="${H-36}" class="ca" font-weight="${isToday?700:400}" text-anchor="middle">${isToday?'Today':fDay(d.date)}</text>`+
       (d.probabilityMax!=null?`<text x="${cx}" y="${H-22}" font-size="7.5" fill="rgba(41,128,185,0.8)" text-anchor="middle">${d.probabilityMax}%</text>`:'')+
       `<text x="${cx}" y="${H-8}" font-size="7" fill="${anom.color}" text-anchor="middle">${anom.text}</text>`;
