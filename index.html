@@ -1401,7 +1401,7 @@ function makeHourlyRainChart(){
     const bx=xBL(i).toFixed(1);
     const bH=Math.max(0,yf(0)-yf(v));
     if(bH<0.5) return '';
-    const fill=i<relNow?'rgba(102,126,234,0.3)':`rgba(102,126,234,0.8)`;
+    const fill=i<relNow?'rgba(102,126,234,0.3)':'rgba(102,126,234,0.8)';
     return `<rect x="${bx}" y="${yf(v).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${fill}" rx="1"/>`;
   }).join('');
   // Probability text above forecast bars only (>=20%)
