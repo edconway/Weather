@@ -1181,6 +1181,263 @@ function makeHourlyTempChart(){
   </svg>`;
 }
 
+// ── Rain history & forecast functions ─────────────────
+async function getHourlyRainHistorical(lat,lon){
+  const now=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  const thisYear=now.getFullYear();
+  const mo=now.getMonth(), dy=now.getDate();
+  const fetches=[];
+  for(let i=1;i<=5;i++){
+    const yr=thisYear-i;
+    const s=new Date(yr,mo,dy-7), e=new Date(yr,mo,dy+7);
+    const p=new URLSearchParams({
+      latitude:lat,longitude:lon,timezone:'auto',
+      start_date:`${s.getFullYear()}-${pad(s.getMonth()+1)}-${pad(s.getDate())}`,
+      end_date:`${e.getFullYear()}-${pad(e.getMonth()+1)}-${pad(e.getDate())}`,
+      hourly:'precipitation'
+    });
+    fetches.push(fetch(`https://archive-api.open-meteo.com/v1/archive?${p}`)
+      .then(r=>r.ok?r.json():null).catch(()=>null));
+  }
+  const results=await Promise.all(fetches);
+  const sums=new Array(24).fill(0), counts=new Array(24).fill(0);
+  const wetCounts=new Array(24).fill(0);
+  const allVals=Array.from({length:24},()=>[]);
+  results.forEach(data=>{
+    if(!data?.hourly?.time) return;
+    data.hourly.time.forEach((t,i)=>{
+      const v=data.hourly.precipitation[i];
+      if(v==null) return;
+      const hr=+t.slice(11,13);
+      sums[hr]+=v; counts[hr]++;
+      if(v>=0.1) wetCounts[hr]++;
+      allVals[hr].push(v);
+    });
+  });
+  const avgByHour=sums.map((s,h)=>counts[h]?s/counts[h]:0);
+  const wetHourProbabilityByHour=counts.map((c,h)=>c?wetCounts[h]/c:0);
+  const p90ByHour=allVals.map(vals=>{
+    if(!vals.length) return 0;
+    const sorted=[...vals].sort((a,b)=>a-b);
+    return sorted[Math.floor(sorted.length*0.9)]??0;
+  });
+  return{avgByHour,wetHourProbabilityByHour,p90ByHour,yearStart:thisYear-5,yearEnd:thisYear-1};
+}
+
+async function getDailyRainHistorical(lat,lon){
+  if(!fcData?.daily) return null;
+  const pad=n=>String(n).padStart(2,'0');
+  const now=new Date();
+  const thisYear=now.getFullYear();
+  const mo=now.getMonth(), dy=now.getDate();
+  // With past_days:7, index 7 is today in the API's local timezone — use it to avoid UTC issues
+  const t0=Math.min(7,fcData.daily.time.length-1);
+  const fcDates=fcData.daily.time.slice(t0,t0+7);
+  const fetches=[];
+  for(let i=1;i<=5;i++){
+    const yr=thisYear-i;
+    const s=new Date(yr,mo,dy-3), e=new Date(yr,mo,dy+9);
+    const p=new URLSearchParams({
+      latitude:lat,longitude:lon,timezone:'auto',
+      start_date:`${s.getFullYear()}-${pad(s.getMonth()+1)}-${pad(s.getDate())}`,
+      end_date:`${e.getFullYear()}-${pad(e.getMonth()+1)}-${pad(e.getDate())}`,
+      daily:'precipitation_sum'
+    });
+    fetches.push(fetch(`https://archive-api.open-meteo.com/v1/archive?${p}`)
+      .then(r=>r.ok?r.json():null).catch(()=>null));
+  }
+  const results=await Promise.all(fetches);
+  const byMMDD={};
+  results.forEach(data=>{
+    if(!data?.daily?.time) return;
+    data.daily.time.forEach((t,i)=>{
+      const mmdd=t.slice(5);
+      if(!byMMDD[mmdd]) byMMDD[mmdd]=[];
+      const v=data.daily.precipitation_sum[i];
+      if(v!=null) byMMDD[mmdd].push(v);
+    });
+  });
+  const dayDiff=(a,b)=>{
+    const da=new Date(2020,+a.slice(0,2)-1,+a.slice(3));
+    const db=new Date(2020,+b.slice(0,2)-1,+b.slice(3));
+    let d=Math.round((da-db)/86400000);
+    if(d>182) d-=365; if(d<-182) d+=365;
+    return Math.abs(d);
+  };
+  const arrAvg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:0;
+  const arrMedian=arr=>{
+    if(!arr.length) return 0;
+    const s=[...arr].sort((a,b)=>a-b), m=Math.floor(s.length/2);
+    return s.length%2?s[m]:(s[m-1]+s[m])/2;
+  };
+  const arrP90=arr=>{
+    if(!arr.length) return 0;
+    const s=[...arr].sort((a,b)=>a-b);
+    return s[Math.floor(s.length*0.9)]??0;
+  };
+  return fcDates.map((dateStr,idx)=>{
+    const mmdd=dateStr.slice(5);
+    const vals=[];
+    Object.entries(byMMDD).forEach(([archMmdd,vs])=>{
+      if(dayDiff(mmdd,archMmdd)<=3) vals.push(...vs);
+    });
+    return{
+      date:dateStr,
+      forecastMm:fcData.daily.precipitation_sum[t0+idx]??0,
+      probabilityMax:fcData.daily.precipitation_probability_max[t0+idx]??null,
+      histMeanMm:arrAvg(vals),
+      histMedianMm:arrMedian(vals),
+      wetDayProbability:vals.length?vals.filter(v=>v>=0.1).length/vals.length:0,
+      p90Mm:arrP90(vals)
+    };
+  });
+}
+
+function classifyRain(forecastMm,histMeanMm,p90Mm){
+  if(forecastMm<0.1) return histMeanMm>=1?{text:'Dry',color:'#2980b9'}:{text:'Dry',color:'#9ba3ae'};
+  if(p90Mm>0&&forecastMm>=p90Mm) return{text:'Heavy',color:'#c0392b'};
+  if(forecastMm>histMeanMm*1.5&&forecastMm-histMeanMm>=1) return{text:'Wetter',color:'#2980b9'};
+  if(histMeanMm>0.5&&forecastMm<histMeanMm*0.5) return{text:'Drier',color:'#9ba3ae'};
+  return{text:'Near avg',color:'#6c7079'};
+}
+
+function makeHourlyRainChart(){
+  if(!fcData?.hourly?.time) return '';
+  if(!hourlyRainHistData) return '<p class="search-msg" style="padding:20px 0">⏳ Loading hourly rain history…</p>';
+  const hh=fcData.hourly;
+  const now=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  const nowStr=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:00`;
+  const rawNow=hh.time.findIndex(t=>t>=nowStr);
+  const nowIdx=rawNow<1?1:rawNow;
+  // Show past 6h actual + next 48h forecast
+  const startIdx=Math.max(0,nowIdx-6);
+  const endIdx=Math.min(hh.time.length,nowIdx+48);
+  const times=hh.time.slice(startIdx,endIdx);
+  const precip=(hh.precipitation||[]).slice(startIdx,endIdx).map(v=>v??0);
+  const prob=(hh.precipitation_probability||[]).slice(startIdx,endIdx);
+  const n=times.length;
+  if(!n) return '';
+  const relNow=nowIdx-startIdx;
+  const histLine=times.map(t=>hourlyRainHistData.avgByHour[+t.slice(11,13)]??0);
+  const yMax=Math.max(...precip,...histLine,0.5)*1.25;
+  const W=580,H=185,pL=46,pR=14,pT=20,pB=36;
+  const cW=W-pL-pR,cH=H-pT-pB;
+  const slotW=cW/n;
+  const barW=Math.max(2,slotW*0.72);
+  const xCx=i=>pL+(i+0.5)*slotW;
+  const xBL=i=>pL+i*slotW+(slotW-barW)/2;
+  const yf=v=>pT+(1-Math.min(v,yMax)/yMax)*cH;
+  // Y ticks
+  const niceSteps=imp?[0.01,0.05,0.1,0.25,0.5,1,2]:[0.1,0.2,0.5,1,2,5,10];
+  const rawStep=yMax/4;
+  const tickStep=niceSteps.find(s=>s>=rawStep*0.7)||Math.ceil(rawStep*10)/10;
+  const fmtY=v=>imp?(v<0.1?v.toFixed(2):v.toFixed(1))+'"':v<1?v.toFixed(1)+'mm':Math.round(v)+'mm';
+  const ticks=[];
+  for(let v=0;v<=yMax*1.05;v+=tickStep){
+    const y=yf(v).toFixed(1);
+    ticks.push(`<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" class="cg"/>` +
+      `<text x="${pL-5}" y="${+y+4}" class="ca" text-anchor="end">${fmtY(v)}</text>`);
+  }
+  // Now marker
+  const nowX=xCx(relNow).toFixed(1);
+  const nowMark=`<line x1="${nowX}" y1="${pT}" x2="${nowX}" y2="${(pT+cH).toFixed(1)}" stroke="#9ba3ae" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
+    `<text x="${nowX}" y="${pT-4}" font-size="8" font-weight="700" fill="#9ba3ae" text-anchor="middle">Now</text>`;
+  // Bars
+  const bars=precip.map((v,i)=>{
+    const bx=xBL(i).toFixed(1);
+    const bH=Math.max(0,yf(0)-yf(v));
+    if(bH<0.5) return '';
+    const fill=i<relNow?'rgba(102,126,234,0.35)':'rgba(102,126,234,0.8)';
+    return `<rect x="${bx}" y="${yf(v).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${fill}" rx="1"/>`;
+  }).join('');
+  // Probability text above bars (forecast only, >=20%)
+  const probLbls=prob.map((p,i)=>{
+    if(i<relNow||p==null||p<20) return '';
+    const ty=(yf(precip[i]??0)-4).toFixed(1);
+    return `<text x="${xCx(i).toFixed(1)}" y="${ty}" font-size="7" fill="rgba(41,128,185,0.85)" text-anchor="middle">${p}%</text>`;
+  }).join('');
+  // Hist avg line
+  const histPts=histLine.map((v,i)=>`${xCx(i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
+  // End label on hist line
+  const histEndX=(xCx(n-1)+5).toFixed(1);
+  const histEndY=(yf(histLine[n-1])+4).toFixed(1);
+  const endLbl=`<text x="${histEndX}" y="${histEndY}" font-size="8.5" fill="#9ba3ae">Hist. avg</text>`;
+  // X labels every 6h
+  const usedX=new Set();
+  const xLbls=times.map((t,i)=>{
+    const hr=+t.slice(11,13);
+    if(hr%6!==0) return '';
+    const xKey=Math.round(xCx(i)); if(usedX.has(xKey)) return ''; usedX.add(xKey);
+    const lbl=hr===0?'Mid':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
+    return `<text x="${xCx(i).toFixed(1)}" y="${H-6}" class="ca" text-anchor="middle">${lbl}</text>`;
+  }).join('');
+  _hourlyRainData={precip,prob,histLine,pL,slotW,n,relNow,times};
+  return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="hourly-rain">
+    ${ticks.join('')}
+    ${nowMark}
+    <line id="ttg-hourly-rain" x1="${pL}" y1="${pT}" x2="${pL}" y2="${(pT+cH).toFixed(1)}" stroke="rgba(255,255,255,.18)" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>
+    <polyline points="${histPts}" class="cl-ytd-hist" opacity="0.7"/>
+    ${bars}
+    ${probLbls}
+    ${endLbl}
+    ${xLbls}
+  </svg>`;
+}
+
+function makeDailyRainChart(){
+  if(!fcData?.daily) return '';
+  if(!dailyRainHistData) return '<p class="search-msg" style="padding:20px 0">⏳ Loading daily rain history…</p>';
+  const data=dailyRainHistData;
+  const n=data.length;
+  const W=580,H=195,pL=46,pR=14,pT=20,pB=50;
+  const cW=W-pL-pR,cH=H-pT-pB;
+  const allMm=[...data.map(d=>d.forecastMm),...data.map(d=>d.histMeanMm),...data.map(d=>d.p90Mm)];
+  const yMax=Math.max(...allMm,1)*1.2;
+  const slotW=cW/n;
+  const barW=slotW*0.55;
+  const xCx=i=>pL+(i+0.5)*slotW;
+  const xBL=i=>pL+i*slotW+(slotW-barW)/2;
+  const yf=v=>pT+(1-Math.min(v,yMax)/yMax)*cH;
+  // Y ticks
+  const niceSteps=imp?[0.05,0.1,0.25,0.5,1,2,5]:[0.5,1,2,5,10,20,50];
+  const rawStep=yMax/4;
+  const tickStep=niceSteps.find(s=>s>=rawStep*0.7)||1;
+  const fmtY=v=>imp?(v<0.1?v.toFixed(2):v.toFixed(1))+'"':(v<1?v.toFixed(1):Math.round(v))+'mm';
+  const ticks=[];
+  for(let v=0;v<=yMax*1.05;v+=tickStep){
+    const y=yf(v).toFixed(1);
+    ticks.push(`<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" class="cg"/>` +
+      `<text x="${pL-5}" y="${+y+4}" class="ca" text-anchor="end">${fmtY(v)}</text>`);
+  }
+  const fmtMm=v=>imp?(v<0.1?'—':v.toFixed(2)+'"'):(v<0.1?'—':v.toFixed(1)+'mm');
+  const els=data.map((d,i)=>{
+    const cx=xCx(i).toFixed(1), bx=xBL(i).toFixed(1);
+    const bH=Math.max(0,yf(0)-yf(d.forecastMm)), bY=yf(d.forecastMm).toFixed(1);
+    const bar=`<rect x="${bx}" y="${bY}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="rgba(102,126,234,0.8)" rx="2"/>`;
+    // Historical mean dashed line across bar
+    const hmY=yf(d.histMeanMm).toFixed(1);
+    const hmLine=d.histMeanMm>0.05?`<line x1="${(+bx+2).toFixed(1)}" y1="${hmY}" x2="${(+bx+barW-2).toFixed(1)}" y2="${hmY}" stroke="#9ba3ae" stroke-width="1.5" stroke-dasharray="3,2"/>`:''
+    // P90 small circle
+    const p90Mark=d.p90Mm>0.1?`<circle cx="${cx}" cy="${yf(d.p90Mm).toFixed(1)}" r="2.2" fill="none" stroke="#9ba3ae" stroke-width="1.2"/>`:''
+    // Value above bar
+    const valLbl=d.forecastMm>=0.1?`<text x="${cx}" y="${(yf(d.forecastMm)-5).toFixed(1)}" font-size="8" fill="rgba(102,126,234,0.9)" text-anchor="middle">${fmtMm(d.forecastMm)}</text>`:''
+    const anom=classifyRain(d.forecastMm,d.histMeanMm,d.p90Mm);
+    const isToday=i===0;
+    return bar+hmLine+p90Mark+valLbl+
+      `<text x="${cx}" y="${H-36}" class="ca" font-weight="${isToday?700:400}" text-anchor="middle">${isToday?'Today':fDay(d.date)}</text>`+
+      (d.probabilityMax!=null?`<text x="${cx}" y="${H-22}" font-size="7.5" fill="rgba(41,128,185,0.8)" text-anchor="middle">${d.probabilityMax}%</text>`:'')+
+      `<text x="${cx}" y="${H-8}" font-size="7" fill="${anom.color}" text-anchor="middle">${anom.text}</text>`;
+  }).join('');
+  _dailyRainData={data,pL,slotW,n};
+  return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="daily-rain">
+    ${ticks.join('')}
+    <line id="ttg-daily-rain" x1="${pL}" y1="${pT}" x2="${pL}" y2="${(pT+cH).toFixed(1)}" stroke="rgba(255,255,255,.18)" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>
+    ${els}
+  </svg>`;
+}
+
 // ── UI state helpers ───────────────────────────────────
 function showErr(msg){
   document.getElementById('loading').classList.add('hidden');
