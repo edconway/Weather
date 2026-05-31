@@ -830,6 +830,9 @@ function renderContent(){
   // Chart subtitles
   const subHourly=`Hourly temperature${_locFor} · actual & forecast vs ${hourlyHistData?`${hourlyHistData.yearStart}–${hourlyHistData.yearEnd} avg`:'historical avg'}`;
   const subDaily=`14-day high/low${_locFor} · vs 7-day rolling avg ${h.histYearStart}–${h.histYearEnd}`;
+  const _thisYr=new Date().getFullYear();
+  const subHourlyRain=`Hourly precipitation${_locFor}${hourlyRainHistData?` · vs ${hourlyRainHistData.yearStart}–${hourlyRainHistData.yearEnd} avg`:''}`;
+  const subDailyRain=`Daily rainfall${_locFor} · forecast vs 7-day rolling avg (${_thisYr-5}–${_thisYr-1})`;
   const subRain=ytdData
     ?`Cumulative rainfall${_locFor} · ${ytdYear} actual & 7-day forecast vs ${ytdStart}–${ytdYear-1} avg${ytdThrough?' · through '+ytdThrough:''}`
     :`Cumulative rainfall${_locFor}`;
