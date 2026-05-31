@@ -1588,25 +1588,21 @@ function setLoad(msg){
         <div class="tt-row"><span class="tt-lbl">Temp</span><span class="tt-hot">${tv}${tv!=='—'?u:''}</span></div>
         <div class="tt-row"><span class="tt-lbl">5-yr avg</span><span class="tt-muted">${hv}${hv!=='—'?u:''}</span></div>`;
     } else if(chartType==='hourly-rain'&&_hourlyRainData){
-      const{precip,prob,histLine,pL,slotW,n,relNow,times}=_hourlyRainData;
+      const{precip,prob,pL,slotW,n,times}=_hourlyRainData;
       const i=Math.max(0,Math.min(n-1,Math.floor((svgX-pL)/slotW)));
-      const t=times[i], hr=+t.slice(11,13), isPast=i<relNow;
-      const tag=isPast?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · actual</span>':'';
+      const t=times[i], hr=+t.slice(11,13);
       const lbl=hr===0?'Midnight':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
       const dl=new Date(t.slice(0,10)+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
       const fmtMm=v=>imp?(v<0.01?'—':v.toFixed(2)+'"'):(v<0.1?'—':v.toFixed(1)+'mm');
-      const pv=precip[i]??0, hv=histLine[i]??0;
+      const pv=precip[i]??0;
       const pct=prob[i]!=null?`${prob[i]}%`:'—';
-      const diff=pv-hv, dc=diff>0.05?'tt-pos':diff<-0.05?'tt-neg':'tt-muted';
       const gx=(pL+(i+0.5)*slotW).toFixed(1);
       document.getElementById('ttg-hourly-rain')?.setAttribute('x1',gx);
       document.getElementById('ttg-hourly-rain')?.setAttribute('x2',gx);
       document.getElementById('ttg-hourly-rain')?.setAttribute('visibility','visible');
-      html=`<div class="tt-title">${dl} ${lbl}${tag}</div>
+      html=`<div class="tt-title">${dl} ${lbl}</div>
         <div class="tt-row"><span class="tt-lbl">Precip</span><span class="tt-cur">${fmtMm(pv)}</span></div>
-        <div class="tt-row"><span class="tt-lbl">Probability</span><span class="tt-muted">${pct}</span></div>
-        <div class="tt-row"><span class="tt-lbl">Hist. avg</span><span class="tt-muted">${fmtMm(hv)}</span></div>
-        ${hv>0.01?`<div class="tt-row"><span class="tt-lbl">Delta</span><span class="${dc}">${(diff>=0?'+':'')+fmtMm(Math.abs(diff))}</span></div>`:''}`;
+        <div class="tt-row"><span class="tt-lbl">Probability</span><span class="tt-muted">${pct}</span></div>`;
     } else if(chartType==='daily-rain'&&_dailyRainData){
       const{data,pL,slotW,n}=_dailyRainData;
       const i=Math.max(0,Math.min(n-1,Math.floor((svgX-pL)/slotW)));
