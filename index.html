@@ -838,7 +838,7 @@ function renderContent(){
   const subDaily=`14-day high/low${_locFor} · vs 7-day rolling avg ${h.histYearStart}–${h.histYearEnd}`;
   const _thisYr=new Date().getFullYear();
   const subHourlyRain=`Hourly precipitation${_locFor}${hourlyRainHistData?` · vs ${hourlyRainHistData.yearStart}–${hourlyRainHistData.yearEnd} avg`:''}`;
-  const subDailyRain=`Daily rainfall${_locFor} · forecast vs 7-day rolling avg (${_thisYr-5}–${_thisYr-1})`;
+  const subDailyRain=`14-day precipitation${_locFor} · past 7 days actual, next 7 days forecast`;
   const subRain=ytdData
     ?`Cumulative rainfall${_locFor} · ${ytdYear} actual & 7-day forecast vs ${ytdStart}–${ytdYear-1} avg${ytdThrough?' · through '+ytdThrough:''}`
     :`Cumulative rainfall${_locFor}`;
