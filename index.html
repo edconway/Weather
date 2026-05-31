@@ -1176,29 +1176,29 @@ function makeHourlyTempChart(){
       `<text x="${pL-5}" y="${+y+4}" class="ca" text-anchor="end">${v}°</text>`);
   }
   // Now marker
-  const nowX=xf(nowIdx).toFixed(1);
+  const nowX=xf(relNow).toFixed(1);
   const nowMark=`<line x1="${nowX}" y1="${pT}" x2="${nowX}" y2="${(pT+cH).toFixed(1)}" stroke="#9ba3ae" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
     `<text x="${nowX}" y="${pT-4}" font-size="8" font-weight="700" fill="#9ba3ae" text-anchor="middle">Now</text>`;
   // Polylines
   const histPts=histLine.map((v,i)=>`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
-  const pastPts=temps.slice(0,nowIdx+1).map((v,i)=>`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
-  const fcstPts=temps.slice(nowIdx).map((v,i)=>`${xf(nowIdx+i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
-  // Dots at 6-hour marks + now; value labels on forecast 6h marks only
+  const pastPts=temps.slice(0,relNow+1).map((v,i)=>`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
+  const fcstPts=temps.slice(relNow).map((v,i)=>`${xf(relNow+i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
+  // Dots at 6-hour marks; value labels on forecast 6h marks only
   const dots=temps.map((v,i)=>{
     if(v==null) return '';
-    const hr=+hh.time[i].slice(11,13);
-    const isNow=i===nowIdx, is6h=hr%6===0;
-    if(!isNow&&!is6h) return '';
-    const isPast=i<nowIdx;
+    const hr=+slicedTime[i].slice(11,13);
+    const is6h=hr%6===0;
+    if(!is6h) return '';
+    const isPast=i<relNow;
     const cx=xf(i).toFixed(1),cy=yf(v).toFixed(1);
     const fill=isPast?'rgba(255,100,100,0.45)':'#ff7b7b';
     const r=isPast?2.5:3;
     const lbl=!isPast&&is6h?`<text x="${cx}" y="${(yf(v)-8).toFixed(1)}" class="cv cv-hot" text-anchor="middle">${Math.round(v)}°</text>`:'';
     return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="rgba(15,12,41,.9)" stroke-width="1.5"/>${lbl}`;
   }).join('');
-  // X-axis labels every 6h + "Now"
+  // X-axis labels every 6h
   const usedX=new Set();
-  const xLbls=hh.time.map((t,i)=>{
+  const xLbls=slicedTime.map((t,i)=>{
     const hr=+t.slice(11,13);
     if(hr%6!==0) return '';
     const xKey=Math.round(xf(i));
