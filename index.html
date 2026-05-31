@@ -1431,15 +1431,18 @@ function makeHourlyRainChart(){
 }
 
 function makeDailyRainChart(){
-  if(!fcData?.daily) return '';
-  if(!dailyRainHistData) return '<p class="search-msg" style="padding:20px 0">⏳ Loading daily rain history…</p>';
-  const data=dailyRainHistData;
-  const n=data.length;
+  if(!fcData?.daily?.time) return '';
+  const daily=fcData.daily;
+  // With past_days:7, index 7 is today — all 14 days are already in fcData
+  const todayIdx=Math.min(7,daily.time.length-1);
+  const n=daily.time.length; // 14
+  const precip=(daily.precipitation_sum||[]).map(v=>v??0);
+  const probs=daily.precipitation_probability_max||[];
   const W=580,H=185,pL=46,pR=14,pT=20,pB=38;
   const cW=W-pL-pR,cH=H-pT-pB;
-  const yMax=Math.max(...data.map(d=>d.forecastMm),1)*1.2;
+  const yMax=Math.max(...precip,1)*1.2;
   const slotW=cW/n;
-  const barW=slotW*0.55;
+  const barW=slotW*0.6;
   const xCx=i=>pL+(i+0.5)*slotW;
   const xBL=i=>pL+i*slotW+(slotW-barW)/2;
   const yf=v=>pT+(1-Math.min(v,yMax)/yMax)*cH;
@@ -1448,27 +1451,37 @@ function makeDailyRainChart(){
   const rawStep=yMax/4;
   const tickStep=niceSteps.find(s=>s>=rawStep*0.7)||1;
   const fmtY=v=>imp?(v<0.1?v.toFixed(2):v.toFixed(1))+'"':(v<1?v.toFixed(1):Math.round(v))+'mm';
+  const fmtMm=v=>imp?(v<0.1?'—':v.toFixed(2)+'"'):(v<0.1?'—':v.toFixed(1)+'mm');
   const ticks=[];
   for(let v=0;v<=yMax*1.05;v+=tickStep){
     const y=yf(v).toFixed(1);
     ticks.push(`<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" class="cg"/>` +
       `<text x="${pL-5}" y="${+y+4}" class="ca" text-anchor="end">${fmtY(v)}</text>`);
   }
-  const fmtMm=v=>imp?(v<0.1?'—':v.toFixed(2)+'"'):(v<0.1?'—':v.toFixed(1)+'mm');
-  const els=data.map((d,i)=>{
-    const cx=xCx(i).toFixed(1), bx=xBL(i).toFixed(1);
-    const bH=Math.max(0,yf(0)-yf(d.forecastMm)), bY=yf(d.forecastMm).toFixed(1);
-    const bar=`<rect x="${bx}" y="${bY}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="rgba(102,126,234,0.8)" rx="2"/>`;
-    // Value above bar
-    const valLbl=d.forecastMm>=0.1?`<text x="${cx}" y="${(yf(d.forecastMm)-5).toFixed(1)}" font-size="8" fill="rgba(102,126,234,0.9)" text-anchor="middle">${fmtMm(d.forecastMm)}</text>`:''
-    const isToday=i===0;
+  // Today divider
+  const todayX=xCx(todayIdx).toFixed(1);
+  const todayMark=`<line x1="${todayX}" y1="${pT}" x2="${todayX}" y2="${(pT+cH).toFixed(1)}" stroke="#9ba3ae" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
+    `<text x="${todayX}" y="${pT-4}" font-size="8" font-weight="700" fill="#9ba3ae" text-anchor="middle">Today</text>`;
+  // Bars and labels
+  const els=daily.time.map((dateStr,i)=>{
+    const mm=precip[i], cx=xCx(i).toFixed(1), bx=xBL(i).toFixed(1);
+    const bH=Math.max(0,yf(0)-yf(mm));
+    const isPast=i<todayIdx;
+    const fill=isPast?'rgba(102,126,234,0.3)':'rgba(102,126,234,0.8)';
+    const bar=bH>0.5?`<rect x="${bx}" y="${yf(mm).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${fill}" rx="2"/>`:''
+    const valLbl=mm>=0.1?`<text x="${cx}" y="${(yf(mm)-5).toFixed(1)}" font-size="8" fill="rgba(102,126,234,0.9)" text-anchor="middle">${fmtMm(mm)}</text>`:''
+    const isToday=i===todayIdx;
+    const dayLbl=isToday?'Today':fDay(dateStr);
+    const prob=probs[i];
+    const probLbl=!isPast&&prob!=null?`<text x="${cx}" y="${H-8}" font-size="7.5" fill="rgba(41,128,185,0.8)" text-anchor="middle">${prob}%</text>`:'';
     return bar+valLbl+
-      `<text x="${cx}" y="${H-22}" class="ca" font-weight="${isToday?700:400}" text-anchor="middle">${isToday?'Today':fDay(d.date)}</text>`+
-      (d.probabilityMax!=null?`<text x="${cx}" y="${H-8}" font-size="7.5" fill="rgba(41,128,185,0.8)" text-anchor="middle">${d.probabilityMax}%</text>`:'');
+      `<text x="${cx}" y="${H-22}" class="ca" font-weight="${isToday?700:400}" text-anchor="middle">${dayLbl}</text>`+
+      probLbl;
   }).join('');
-  _dailyRainData={data,pL,slotW,n};
+  _dailyRainData={dates:daily.time,precip,probs,pL,slotW,n,todayIdx};
   return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="daily-rain">
     ${ticks.join('')}
+    ${todayMark}
     <line id="ttg-daily-rain" x1="${pL}" y1="${pT}" x2="${pL}" y2="${(pT+cH).toFixed(1)}" stroke="rgba(255,255,255,.18)" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>
     ${els}
   </svg>`;
