@@ -503,7 +503,7 @@ async function pickResult(lat,lon,name){
   customLat=lat; customLon=lon; customName=name;
   activeSource='custom'; geoName=name;
   renderHeader(); setLoad('Loading weather…');
-  ytdData=null; hourlyHistData=null; hourlyRainHistData=null; dailyRainHistData=null;
+  ytdData=null; hourlyHistData=null; hourlyRainHistData=null; dailyRainHistData=null; climatologyData=null;
   try{
     const[fc,hist]=await Promise.all([getForecast(lat,lon),getHistorical(lat,lon)]);
     fcData=fc; histData=hist;
@@ -527,7 +527,7 @@ async function switchSource(src){
   activeSource=src; geoName=name;
   renderHeader();
   setLoad('Loading weather…');
-  ytdData=null; hourlyHistData=null; hourlyRainHistData=null; dailyRainHistData=null;
+  ytdData=null; hourlyHistData=null; hourlyRainHistData=null; dailyRainHistData=null; climatologyData=null;
   try{
     const[fc,hist]=await Promise.all([getForecast(lat,lon),getHistorical(lat,lon)]);
     fcData=fc; histData=hist;
@@ -1812,7 +1812,7 @@ async function init(){
     setLoad('Loading weather data…');
     const[fc,hist,name]=await Promise.all([getForecast(lat,lon),getHistorical(lat,lon),geocode(lat,lon)]);
     fcData=fc; histData=hist; geoName=name; myName=name;
-    ytdData=null; hourlyHistData=null; hourlyRainHistData=null; dailyRainHistData=null;
+    ytdData=null; hourlyHistData=null; hourlyRainHistData=null; dailyRainHistData=null; climatologyData=null;
     activeSource='geo';
     render();
     getRainYTD(lat,lon).then(ytd=>{ytdData=ytd;if(fcData)renderContent();}).catch(()=>{});
