@@ -1757,6 +1757,17 @@ function setLoad(msg){
       html=`<div class="tt-title">${dl}${tag}</div>
         <div class="tt-row"><span class="tt-lbl">${isPast?'Actual':'Forecast'}</span><span class="tt-cur">${fmtMm(mm)}</span></div>
         ${!isPast&&prob!=null?`<div class="tt-row"><span class="tt-lbl">Probability</span><span class="tt-muted">${prob}%</span></div>`:''}`;
+    } else if(chartType==='climate'&&_climateData){
+      const{data,pL,slotW,n}=_climateData;
+      const i=Math.max(0,Math.min(n-1,Math.floor((svgX-pL)/slotW)));
+      const MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
+      const d=data[i];
+      const fmtT=v=>v!=null?`${Math.round(nT(v))}${uT()}`:'—';
+      const fmtR=v=>v!=null?(imp?(v*0.0393701).toFixed(1)+'"':Math.round(v)+'mm'):'—';
+      html=`<div class="tt-title">${MON[i]}</div>
+        <div class="tt-row"><span class="tt-lbl">Avg high</span><span class="tt-hot">${fmtT(d.tMax)}</span></div>
+        <div class="tt-row"><span class="tt-lbl">Avg low</span><span class="tt-cold">${fmtT(d.tMin)}</span></div>
+        <div class="tt-row"><span class="tt-lbl">Avg rainfall</span><span class="tt-muted">${fmtR(d.rain)}</span></div>`;
     } else return;
     tt.innerHTML=html;
     const tW=170,mg=14;
