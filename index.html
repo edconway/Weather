@@ -1486,6 +1486,119 @@ function makeDailyRainChart(){
   </svg>`;
 }
 
+// ── Climatology ────────────────────────────────────────
+async function getClimatology(lat,lon){
+  const thisYear=new Date().getFullYear();
+  const startYear=thisYear-15;
+  const p=new URLSearchParams({
+    latitude:lat,longitude:lon,timezone:'auto',
+    start_date:`${startYear}-01-01`,
+    end_date:`${thisYear-1}-12-31`,
+    monthly:'temperature_2m_max,temperature_2m_min,precipitation_sum'
+  });
+  const r=await fetch(`https://archive-api.open-meteo.com/v1/archive?${p}`);
+  if(!r.ok) throw new Error('Climate fetch failed');
+  const data=await r.json();
+  if(!data.monthly?.time) return null;
+  const byMonth=Array.from({length:12},()=>({tMax:[],tMin:[],rain:[]}));
+  data.monthly.time.forEach((t,i)=>{
+    const mo=+t.slice(5,7)-1;
+    const mx=data.monthly.temperature_2m_max[i];
+    const mn=data.monthly.temperature_2m_min[i];
+    const rn=data.monthly.precipitation_sum[i];
+    if(mx!=null) byMonth[mo].tMax.push(mx);
+    if(mn!=null) byMonth[mo].tMin.push(mn);
+    if(rn!=null) byMonth[mo].rain.push(rn);
+  });
+  const avg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;
+  return{
+    months:byMonth.map(m=>({tMax:avg(m.tMax),tMin:avg(m.tMin),rain:avg(m.rain)})),
+    yearStart:startYear,yearEnd:thisYear-1
+  };
+}
+
+function makeClimateChart(){
+  if(!climatologyData) return '<p class="search-msg" style="padding:20px 0">⏳ Loading climate data…</p>';
+  const{months:data,yearStart,yearEnd}=climatologyData;
+  const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const curMo=new Date().getMonth();
+  const n=12;
+  const W=580,H=200,pL=46,pR=54,pT=24,pB=28;
+  const cW=W-pL-pR,cH=H-pT-pB;
+  // Temperature axis (left) — store in °C, display in user units
+  const tMaxes=data.map(d=>d.tMax).filter(v=>v!=null);
+  const tMins=data.map(d=>d.tMin).filter(v=>v!=null);
+  const tLoC=Math.min(...tMins)-2, tHiC=Math.max(...tMaxes)+2;
+  const dispLoT=nT(tLoC), dispHiT=nT(tHiC);
+  const yfT=v=>pT+(1-(nT(v)-dispLoT)/(dispHiT-dispLoT))*cH;
+  // Rainfall axis (right)
+  const rains=data.map(d=>d.rain).filter(v=>v!=null);
+  const rMaxMm=Math.max(...rains,imp?25.4:10)*1.15;
+  const dispR=v=>imp?(v*0.0393701).toFixed(1)+'"':Math.round(v)+'mm';
+  const yfR=v=>pT+(1-v/rMaxMm)*cH;
+  const slotW=cW/n;
+  const barW=slotW*0.65;
+  const xCx=i=>pL+(i+0.5)*slotW;
+  const xBL=i=>pL+i*slotW+(slotW-barW)/2;
+  // Left (temp) axis ticks
+  const tRange=dispHiT-dispLoT;
+  const tStepOpts=imp?[5,10,20]:[2,5,10,20];
+  const tStep=tStepOpts.find(s=>tRange/s>=2&&tRange/s<=7)||10;
+  const tTicks=[];
+  for(let v=Math.ceil(dispLoT/tStep)*tStep;v<=dispHiT;v+=tStep){
+    const y=(pT+(1-(v-dispLoT)/(dispHiT-dispLoT))*cH).toFixed(1);
+    tTicks.push(`<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" class="cg"/>` +
+      `<text x="${pL-5}" y="${+y+4}" class="ca" text-anchor="end">${Math.round(v)}°</text>`);
+  }
+  // Right (rain) axis ticks
+  const rStepOpts=imp?[0.5,1,2,5]:[10,20,50,100,200];
+  const rStep=rStepOpts.find(s=>rMaxMm/s>=2&&rMaxMm/s<=6)||(imp?1:20);
+  const rTicks=[];
+  for(let v=0;v<=rMaxMm;v+=rStep){
+    const y=yfR(v).toFixed(1);
+    rTicks.push(`<text x="${W-pR+6}" y="${+y+4}" class="ca" text-anchor="start">${dispR(v)}</text>`);
+  }
+  // Current month highlight
+  const curHL=`<rect x="${xBL(curMo).toFixed(1)}" y="${pT}" width="${barW.toFixed(1)}" height="${cH}" fill="rgba(255,200,50,0.09)" rx="1"/>`;
+  // Rainfall bars
+  const bars=data.map((d,i)=>{
+    if(d.rain==null) return '';
+    const bH=Math.max(0,yfR(0)-yfR(d.rain));
+    if(bH<0.5) return '';
+    return `<rect x="${xBL(i).toFixed(1)}" y="${yfR(d.rain).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="rgba(102,126,234,0.45)" rx="2"/>`;
+  }).join('');
+  // Temperature polylines
+  const hotPts=data.map((d,i)=>d.tMax!=null?`${xCx(i).toFixed(1)},${yfT(d.tMax).toFixed(1)}`:null).filter(Boolean).join(' ');
+  const coldPts=data.map((d,i)=>d.tMin!=null?`${xCx(i).toFixed(1)},${yfT(d.tMin).toFixed(1)}`:null).filter(Boolean).join(' ');
+  // Dots at each month
+  const dots=data.map((d,i)=>{
+    const cx=xCx(i).toFixed(1), r=i===curMo?4:3;
+    return (d.tMax!=null?`<circle cx="${cx}" cy="${yfT(d.tMax).toFixed(1)}" r="${r}" fill="#ff7b7b" stroke="rgba(15,12,41,.9)" stroke-width="1.5"/>`:'') +
+           (d.tMin!=null?`<circle cx="${cx}" cy="${yfT(d.tMin).toFixed(1)}" r="${r}" fill="#74c0fc" stroke="rgba(15,12,41,.9)" stroke-width="1.5"/>`:'');
+  }).join('');
+  // End-of-line labels
+  const endX=(xCx(11)+5).toFixed(1);
+  const lastHot=data[11]?.tMax, lastCold=data[11]?.tMin;
+  const endLbls=(lastHot!=null?`<text x="${endX}" y="${(yfT(lastHot)+4).toFixed(1)}" font-size="8.5" font-weight="600" fill="#c0392b">High</text>`:'')+
+    (lastCold!=null?`<text x="${endX}" y="${(yfT(lastCold)+4).toFixed(1)}" font-size="8.5" font-weight="600" fill="#4a9eda">Low</text>`:'');
+  // X axis
+  const xLbls=MON.map((m,i)=>
+    `<text x="${xCx(i).toFixed(1)}" y="${H-6}" class="ca" text-anchor="middle" font-weight="${i===curMo?700:400}">${m}</text>`
+  ).join('');
+  _climateData={data,pL,slotW,n};
+  return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="climate">
+    ${tTicks.join('')}
+    ${rTicks.join('')}
+    ${curHL}
+    ${bars}
+    <polyline points="${hotPts}" fill="none" stroke="#ff7b7b" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <polyline points="${coldPts}" fill="none" stroke="#74c0fc" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    ${dots}
+    ${endLbls}
+    ${xLbls}
+  </svg>`;
+}
+
 // ── UI state helpers ───────────────────────────────────
 function showErr(msg){
   document.getElementById('loading').classList.add('hidden');
