@@ -955,6 +955,34 @@ function render(){
 function toggleUnit(){imp=!imp; renderHeader(); renderContent();}
 
 // ── API calls ──────────────────────────────────────────
+// Throttled archive fetcher — Open-Meteo rate-limits bursts (HTTP 429),
+// so cap concurrency and retry with backoff. Keeps load light & reliable.
+const _archiveQueue=[]; let _archiveActive=0; const ARCHIVE_MAX=3;
+function archiveFetch(url){
+  return new Promise((resolve,reject)=>{
+    _archiveQueue.push({url,resolve,reject,tries:0});
+    _drainArchive();
+  });
+}
+function _drainArchive(){
+  while(_archiveActive<ARCHIVE_MAX && _archiveQueue.length){
+    const job=_archiveQueue.shift();
+    _archiveActive++;
+    fetch(job.url).then(r=>{
+      if(r.status===429 && job.tries<4){
+        job.tries++;
+        const delay=400*Math.pow(2,job.tries); // 800, 1600, 3200, 6400ms
+        setTimeout(()=>{_archiveQueue.unshift(job);_drainArchive();},delay);
+      } else {
+        job.resolve(r);
+      }
+    }).catch(job.reject).finally(()=>{
+      _archiveActive--;
+      _drainArchive();
+    });
+  }
+}
+
 async function getPos(){
   return new Promise((res,rej)=>{
     if(!navigator.geolocation)return rej(new Error('Geolocation not supported by this browser.'));
