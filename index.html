@@ -1035,7 +1035,7 @@ async function getHistorical(lat,lon){
       end_date:`${e.getFullYear()}-${pad(e.getMonth()+1)}-${pad(e.getDate())}`,
       daily:'temperature_2m_max,temperature_2m_min'
     });
-    fetches.push(fetch(`https://archive-api.open-meteo.com/v1/archive?${p}`)
+    fetches.push(archiveFetch(`https://archive-api.open-meteo.com/v1/archive?${p}`)
       .then(r=>r.ok?r.json():null).catch(()=>null));
   }
   const results=await Promise.all(fetches);
@@ -1091,7 +1091,7 @@ async function getRainYTD(lat,lon){
     start_date:`${startYear}-01-01`,end_date:todayStr,
     daily:'precipitation_sum'
   });
-  const r=await fetch(`https://archive-api.open-meteo.com/v1/archive?${p}`);
+  const r=await archiveFetch(`https://archive-api.open-meteo.com/v1/archive?${p}`);
   if(!r.ok) throw new Error('YTD API error.');
   const data=await r.json();
   // Group by year -> MM-DD -> precip value
@@ -1157,7 +1157,7 @@ async function getHourlyHistorical(lat,lon){
       end_date:`${e.getFullYear()}-${pad(e.getMonth()+1)}-${pad(e.getDate())}`,
       hourly:'temperature_2m'
     });
-    fetches.push(fetch(`https://archive-api.open-meteo.com/v1/archive?${p}`)
+    fetches.push(archiveFetch(`https://archive-api.open-meteo.com/v1/archive?${p}`)
       .then(r=>r.ok?r.json():null).catch(()=>null));
   }
   const results=await Promise.all(fetches);
@@ -1289,7 +1289,7 @@ async function getHourlyRainHistorical(lat,lon){
       end_date:`${e.getFullYear()}-${pad(e.getMonth()+1)}-${pad(e.getDate())}`,
       hourly:'precipitation'
     });
-    fetches.push(fetch(`https://archive-api.open-meteo.com/v1/archive?${p}`)
+    fetches.push(archiveFetch(`https://archive-api.open-meteo.com/v1/archive?${p}`)
       .then(r=>r.ok?r.json():null).catch(()=>null));
   }
   const results=await Promise.all(fetches);
@@ -1336,7 +1336,7 @@ async function getDailyRainHistorical(lat,lon){
       end_date:`${e.getFullYear()}-${pad(e.getMonth()+1)}-${pad(e.getDate())}`,
       daily:'precipitation_sum'
     });
-    fetches.push(fetch(`https://archive-api.open-meteo.com/v1/archive?${p}`)
+    fetches.push(archiveFetch(`https://archive-api.open-meteo.com/v1/archive?${p}`)
       .then(r=>r.ok?r.json():null).catch(()=>null));
   }
   const results=await Promise.all(fetches);
@@ -1535,7 +1535,7 @@ async function getClimatology(lat,lon){
     end_date:`${thisYear-1}-12-31`,
     daily:'temperature_2m_max,temperature_2m_min,precipitation_sum'
   });
-  const r=await fetch(`https://archive-api.open-meteo.com/v1/archive?${p}`);
+  const r=await archiveFetch(`https://archive-api.open-meteo.com/v1/archive?${p}`);
   if(!r.ok) throw new Error('Climate fetch failed');
   const data=await r.json();
   if(!data.daily?.time) return null;
