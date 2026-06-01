@@ -515,6 +515,7 @@ async function pickResult(lat,lon,name){
   getHourlyHistorical(lat,lon).then(d=>{hourlyHistData=d;if(fcData)renderContent();}).catch(()=>{});
   getHourlyRainHistorical(lat,lon).then(d=>{hourlyRainHistData=d;if(fcData)renderContent();}).catch(()=>{});
   getDailyRainHistorical(lat,lon).then(d=>{dailyRainHistData=d;if(fcData)renderContent();}).catch(()=>{});
+  getClimatology(lat,lon).then(d=>{climatologyData=d;if(fcData)renderContent();}).catch(()=>{});
 }
 
 async function switchSource(src){
@@ -538,6 +539,7 @@ async function switchSource(src){
   getHourlyHistorical(lat,lon).then(d=>{hourlyHistData=d;if(fcData)renderContent();}).catch(()=>{});
   getHourlyRainHistorical(lat,lon).then(d=>{hourlyRainHistData=d;if(fcData)renderContent();}).catch(()=>{});
   getDailyRainHistorical(lat,lon).then(d=>{dailyRainHistData=d;if(fcData)renderContent();}).catch(()=>{});
+  getClimatology(lat,lon).then(d=>{climatologyData=d;if(fcData)renderContent();}).catch(()=>{});
 }
 
 // ── Render header ──────────────────────────────────────
@@ -1817,6 +1819,7 @@ async function init(){
     getHourlyHistorical(lat,lon).then(d=>{hourlyHistData=d;if(fcData)renderContent();}).catch(()=>{});
     getHourlyRainHistorical(lat,lon).then(d=>{hourlyRainHistData=d;if(fcData)renderContent();}).catch(()=>{});
     getDailyRainHistorical(lat,lon).then(d=>{dailyRainHistData=d;if(fcData)renderContent();}).catch(()=>{});
+  getClimatology(lat,lon).then(d=>{climatologyData=d;if(fcData)renderContent();}).catch(()=>{});
   }catch(e){
     // Geolocation denied/unavailable — skip the error wall and go straight to search
     if(!fcData) showSearchFirst(e.message);
