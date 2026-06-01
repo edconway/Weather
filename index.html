@@ -526,17 +526,14 @@ async function switchSource(src){
   setLoad('Loading weather…');
   ytdData=null; hourlyHistData=null; hourlyRainHistData=null; dailyRainHistData=null; climatologyData=null;
   try{
-    const[fc,hist]=await Promise.all([getForecast(lat,lon),getHistorical(lat,lon)]);
-    fcData=fc; histData=hist;
+    const[fc,climate]=await Promise.all([getForecast(lat,lon),getClimatology(lat,lon)]);
+    fcData=fc; climatologyData=climate;
+    histData=deriveTempBand(climate); dailyRainHistData=deriveDailyRain(climate);
     renderContent();
     document.getElementById('main').classList.remove('hidden');
     document.getElementById('loading').classList.add('hidden');
   }catch(e){showErr(e.message||'Failed to load weather.');return;}
-  getRainYTD(lat,lon).then(ytd=>{ytdData=ytd;if(fcData)renderContent();}).catch(()=>{});
-  getHourlyHistorical(lat,lon).then(d=>{hourlyHistData=d;if(fcData)renderContent();}).catch(()=>{});
-  getHourlyRainHistorical(lat,lon).then(d=>{hourlyRainHistData=d;if(fcData)renderContent();}).catch(()=>{});
-  getDailyRainHistorical(lat,lon).then(d=>{dailyRainHistData=d;if(fcData)renderContent();}).catch(()=>{});
-  getClimatology(lat,lon).then(d=>{climatologyData=d;if(fcData)renderContent();}).catch(()=>{});
+  loadBackground(lat,lon);
 }
 
 // ── Render header ──────────────────────────────────────
