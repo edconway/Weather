@@ -498,6 +498,16 @@ function onSearchKey(e){
   }
 }
 
+// Fire the non-blocking secondary fetches: YTD rainfall (1 req) + merged hourly
+// normals (5 reqs). Kept small so we stay well under Open-Meteo's rate limit.
+function loadBackground(lat,lon){
+  getRainYTD(lat,lon).then(ytd=>{ytdData=ytd;if(fcData)renderContent();}).catch(()=>{});
+  getHourlyNormals(lat,lon).then(d=>{
+    hourlyHistData=d.temp; hourlyRainHistData=d.rain;
+    if(fcData)renderContent();
+  }).catch(()=>{});
+}
+
 async function pickResult(lat,lon,name){
   closeSearch();
   customLat=lat; customLon=lon; customName=name;
