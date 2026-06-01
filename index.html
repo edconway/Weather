@@ -929,6 +929,14 @@ function renderContent(){
     ${makeRainYTDChart()}
   </div>
 
+  <div class="chart-card fu">
+    <div class="sec-hdr" style="margin-bottom:6px">
+      <span class="sec-ttl">Climate Overview</span>
+      <p class="sec-sub">${climatologyData?`Avg monthly high/low °${uT().slice(1)} (lines) & total rainfall (bars)${_locFor} · ${climatologyData.yearStart}–${climatologyData.yearEnd}`:`Climate normals${_locFor}`}</p>
+    </div>
+    ${makeClimateChart()}
+  </div>
+
   <footer class="footer fu">
     <p>Forecast & historical data from <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> · Geocoding by <a href="https://nominatim.openstreetmap.org" target="_blank" rel="noopener">Nominatim / OSM</a></p>
   </footer>`;
