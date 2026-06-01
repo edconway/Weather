@@ -1769,16 +1769,13 @@ async function init(){
     const{latitude:lat,longitude:lon}=pos.coords;
     myLat=lat; myLon=lon;
     setLoad('Loading weather data…');
-    const[fc,hist,name]=await Promise.all([getForecast(lat,lon),getHistorical(lat,lon),geocode(lat,lon)]);
-    fcData=fc; histData=hist; geoName=name; myName=name;
-    ytdData=null; hourlyHistData=null; hourlyRainHistData=null; dailyRainHistData=null; climatologyData=null;
+    const[fc,climate,name]=await Promise.all([getForecast(lat,lon),getClimatology(lat,lon),geocode(lat,lon)]);
+    fcData=fc; climatologyData=climate; geoName=name; myName=name;
+    histData=deriveTempBand(climate); dailyRainHistData=deriveDailyRain(climate);
+    ytdData=null; hourlyHistData=null; hourlyRainHistData=null;
     activeSource='geo';
     render();
-    getRainYTD(lat,lon).then(ytd=>{ytdData=ytd;if(fcData)renderContent();}).catch(()=>{});
-    getHourlyHistorical(lat,lon).then(d=>{hourlyHistData=d;if(fcData)renderContent();}).catch(()=>{});
-    getHourlyRainHistorical(lat,lon).then(d=>{hourlyRainHistData=d;if(fcData)renderContent();}).catch(()=>{});
-    getDailyRainHistorical(lat,lon).then(d=>{dailyRainHistData=d;if(fcData)renderContent();}).catch(()=>{});
-  getClimatology(lat,lon).then(d=>{climatologyData=d;if(fcData)renderContent();}).catch(()=>{});
+    loadBackground(lat,lon);
   }catch(e){
     // Geolocation denied/unavailable — skip the error wall and go straight to search
     if(!fcData) showSearchFirst(e.message);
