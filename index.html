@@ -1526,7 +1526,9 @@ function makeDailyRainChart(){
 
 // ── Climatology ────────────────────────────────────────
 async function getClimatology(lat,lon){
-  // Archive API has no monthly param — fetch 10 years of daily data and aggregate
+  // ONE archive request fetches 10 years of daily temp+precip. From this single
+  // dataset we derive: monthly climate normals, the 14-day temp band, and daily
+  // rain normals — avoiding ~10 extra requests that previously triggered rate limits.
   const thisYear=new Date().getFullYear();
   const startYear=thisYear-10;
   const p=new URLSearchParams({
@@ -1539,19 +1541,25 @@ async function getClimatology(lat,lon){
   if(!r.ok) throw new Error('Climate fetch failed');
   const data=await r.json();
   if(!data.daily?.time) return null;
-  // Accumulate per month-year bucket, then average across years
+  const arrAvg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;
+  // Monthly aggregation for the climate chart
   const byMonthYear={};
+  // Per-calendar-day lookups (MM-DD) for deriving rolling temp & rain normals
+  const byMMDD={}; // {mmdd:{maxes:[],mins:[],rains:[]}}
   data.daily.time.forEach((t,i)=>{
-    const key=t.slice(0,7); // "YYYY-MM"
-    if(!byMonthYear[key]) byMonthYear[key]={tMax:[],tMin:[],rain:0};
     const mx=data.daily.temperature_2m_max[i];
     const mn=data.daily.temperature_2m_min[i];
     const rn=data.daily.precipitation_sum[i];
-    if(mx!=null) byMonthYear[key].tMax.push(mx);
-    if(mn!=null) byMonthYear[key].tMin.push(mn);
-    if(rn!=null) byMonthYear[key].rain+=rn;
+    const mKey=t.slice(0,7), mmdd=t.slice(5);
+    if(!byMonthYear[mKey]) byMonthYear[mKey]={tMax:[],tMin:[],rain:0};
+    if(mx!=null) byMonthYear[mKey].tMax.push(mx);
+    if(mn!=null) byMonthYear[mKey].tMin.push(mn);
+    if(rn!=null) byMonthYear[mKey].rain+=rn;
+    if(!byMMDD[mmdd]) byMMDD[mmdd]={maxes:[],mins:[],rains:[]};
+    if(mx!=null) byMMDD[mmdd].maxes.push(mx);
+    if(mn!=null) byMMDD[mmdd].mins.push(mn);
+    if(rn!=null) byMMDD[mmdd].rains.push(rn);
   });
-  const arrAvg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;
   const byMonth=Array.from({length:12},()=>({tMax:[],tMin:[],rain:[]}));
   Object.entries(byMonthYear).forEach(([key,v])=>{
     const mo=+key.slice(5,7)-1;
@@ -1561,8 +1569,71 @@ async function getClimatology(lat,lon){
   });
   return{
     months:byMonth.map(m=>({tMax:arrAvg(m.tMax),tMin:arrAvg(m.tMin),rain:arrAvg(m.rain)})),
+    byMMDD,
     yearStart:startYear,yearEnd:thisYear-1
   };
+}
+
+// Calendar-day distance between two MM-DD strings, year-wrap aware
+function _mmddDist(a,b){
+  const da=new Date(2020,+a.slice(0,2)-1,+a.slice(3));
+  const db=new Date(2020,+b.slice(0,2)-1,+b.slice(3));
+  let d=Math.round((da-db)/86400000);
+  if(d>182) d-=365; if(d<-182) d+=365;
+  return Math.abs(d);
+}
+
+// Derive 14-day temp band (today-7 … today+6) from climatology's daily lookups.
+// Replaces the old getHistorical (which fired 5 separate archive requests).
+function deriveTempBand(climate){
+  if(!climate?.byMMDD) return null;
+  const now=new Date(), pad=n=>String(n).padStart(2,'0');
+  const thisYear=now.getFullYear(), mo=now.getMonth(), dy=now.getDate();
+  const arrAvg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;
+  const entries=Object.entries(climate.byMMDD);
+  const dailyAvg=[];
+  for(let i=-7;i<=6;i++){
+    const tmp=new Date(thisYear,mo,dy+i);
+    const mmdd=`${pad(tmp.getMonth()+1)}-${pad(tmp.getDate())}`;
+    const maxes=[],mins=[];
+    entries.forEach(([am,v])=>{
+      if(_mmddDist(mmdd,am)<=3){maxes.push(...v.maxes);mins.push(...v.mins);}
+    });
+    dailyAvg.push({tMax:arrAvg(maxes),tMin:arrAvg(mins)});
+  }
+  return{
+    dailyAvg,
+    tMax:dailyAvg[7]?.tMax??null, tMin:dailyAvg[7]?.tMin??null,
+    precip:null, wind:null, nextMonth:null,
+    month:now.toLocaleString('en-US',{month:'long'}),
+    histYearStart:climate.yearStart, histYearEnd:climate.yearEnd
+  };
+}
+
+// Derive per-forecast-day rain normals from climatology's daily lookups.
+// Replaces the old getDailyRainHistorical (which fired 5 separate archive requests).
+function deriveDailyRain(climate){
+  if(!climate?.byMMDD||!fcData?.daily) return null;
+  const t0=Math.min(7,fcData.daily.time.length-1);
+  const fcDates=fcData.daily.time.slice(t0,t0+7);
+  const entries=Object.entries(climate.byMMDD);
+  const arrAvg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:0;
+  const arrMedian=arr=>{if(!arr.length)return 0;const s=[...arr].sort((a,b)=>a-b),m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2;};
+  const arrP90=arr=>{if(!arr.length)return 0;const s=[...arr].sort((a,b)=>a-b);return s[Math.floor(s.length*0.9)]??0;};
+  return fcDates.map((dateStr,idx)=>{
+    const mmdd=dateStr.slice(5);
+    const vals=[];
+    entries.forEach(([am,v])=>{ if(_mmddDist(mmdd,am)<=3) vals.push(...v.rains); });
+    return{
+      date:dateStr,
+      forecastMm:fcData.daily.precipitation_sum[t0+idx]??0,
+      probabilityMax:fcData.daily.precipitation_probability_max[t0+idx]??null,
+      histMeanMm:arrAvg(vals),
+      histMedianMm:arrMedian(vals),
+      wetDayProbability:vals.length?vals.filter(v=>v>=0.1).length/vals.length:0,
+      p90Mm:arrP90(vals)
+    };
+  });
 }
 
 function makeClimateChart(){
