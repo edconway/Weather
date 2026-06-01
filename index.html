@@ -1141,12 +1141,13 @@ async function getRainYTD(lat,lon){
   return{labels,cumCurrentYear,cumHistAvg,cumHistAvgExt,thisYear,startYear,histYears:histYears.length,latestDate};
 }
 
-async function getHourlyHistorical(lat,lon){
+// Merged hourly normals — fetches BOTH temperature & precipitation per request
+// (5 requests total, down from 10). Returns temp-shaped and rain-shaped objects.
+async function getHourlyNormals(lat,lon){
   const now=new Date();
   const pad=n=>String(n).padStart(2,'0');
   const thisYear=now.getFullYear();
   const mo=now.getMonth(), dy=now.getDate();
-  // 5 parallel requests: ±7-day window around today for each of the past 5 years
   const fetches=[];
   for(let i=1;i<=5;i++){
     const yr=thisYear-i;
@@ -1155,23 +1156,35 @@ async function getHourlyHistorical(lat,lon){
       latitude:lat,longitude:lon,timezone:'auto',
       start_date:`${s.getFullYear()}-${pad(s.getMonth()+1)}-${pad(s.getDate())}`,
       end_date:`${e.getFullYear()}-${pad(e.getMonth()+1)}-${pad(e.getDate())}`,
-      hourly:'temperature_2m'
+      hourly:'temperature_2m,precipitation'
     });
     fetches.push(archiveFetch(`https://archive-api.open-meteo.com/v1/archive?${p}`)
       .then(r=>r.ok?r.json():null).catch(()=>null));
   }
   const results=await Promise.all(fetches);
-  const sums=new Array(24).fill(0), counts=new Array(24).fill(0);
+  // Temperature accumulators
+  const tSums=new Array(24).fill(0), tCounts=new Array(24).fill(0);
+  // Precip accumulators
+  const rSums=new Array(24).fill(0), rCounts=new Array(24).fill(0), wetCounts=new Array(24).fill(0);
+  const rVals=Array.from({length:24},()=>[]);
   results.forEach(data=>{
     if(!data?.hourly?.time) return;
     data.hourly.time.forEach((t,i)=>{
-      const v=data.hourly.temperature_2m[i];
-      if(v==null) return;
       const hr=+t.slice(11,13);
-      sums[hr]+=v; counts[hr]++;
+      const tv=data.hourly.temperature_2m?.[i];
+      if(tv!=null){tSums[hr]+=tv;tCounts[hr]++;}
+      const rv=data.hourly.precipitation?.[i];
+      if(rv!=null){rSums[hr]+=rv;rCounts[hr]++;if(rv>=0.1)wetCounts[hr]++;rVals[hr].push(rv);}
     });
   });
-  return{avgByHour:sums.map((s,h)=>counts[h]?s/counts[h]:null),yearStart:thisYear-5,yearEnd:thisYear-1};
+  const temp={avgByHour:tSums.map((s,h)=>tCounts[h]?s/tCounts[h]:null),yearStart:thisYear-5,yearEnd:thisYear-1};
+  const rain={
+    avgByHour:rSums.map((s,h)=>rCounts[h]?s/rCounts[h]:0),
+    wetHourProbabilityByHour:rCounts.map((c,h)=>c?wetCounts[h]/c:0),
+    p90ByHour:rVals.map(vals=>{if(!vals.length)return 0;const s=[...vals].sort((a,b)=>a-b);return s[Math.floor(s.length*0.9)]??0;}),
+    yearStart:thisYear-5,yearEnd:thisYear-1
+  };
+  return{temp,rain};
 }
 
 function makeHourlyTempChart(){
