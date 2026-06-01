@@ -1498,31 +1498,41 @@ function makeDailyRainChart(){
 
 // ── Climatology ────────────────────────────────────────
 async function getClimatology(lat,lon){
+  // Archive API has no monthly param — fetch 10 years of daily data and aggregate
   const thisYear=new Date().getFullYear();
-  const startYear=thisYear-15;
+  const startYear=thisYear-10;
   const p=new URLSearchParams({
     latitude:lat,longitude:lon,timezone:'auto',
     start_date:`${startYear}-01-01`,
     end_date:`${thisYear-1}-12-31`,
-    monthly:'temperature_2m_max,temperature_2m_min,precipitation_sum'
+    daily:'temperature_2m_max,temperature_2m_min,precipitation_sum'
   });
   const r=await fetch(`https://archive-api.open-meteo.com/v1/archive?${p}`);
   if(!r.ok) throw new Error('Climate fetch failed');
   const data=await r.json();
-  if(!data.monthly?.time) return null;
-  const byMonth=Array.from({length:12},()=>({tMax:[],tMin:[],rain:[]}));
-  data.monthly.time.forEach((t,i)=>{
-    const mo=+t.slice(5,7)-1;
-    const mx=data.monthly.temperature_2m_max[i];
-    const mn=data.monthly.temperature_2m_min[i];
-    const rn=data.monthly.precipitation_sum[i];
-    if(mx!=null) byMonth[mo].tMax.push(mx);
-    if(mn!=null) byMonth[mo].tMin.push(mn);
-    if(rn!=null) byMonth[mo].rain.push(rn);
+  if(!data.daily?.time) return null;
+  // Accumulate per month-year bucket, then average across years
+  const byMonthYear={};
+  data.daily.time.forEach((t,i)=>{
+    const key=t.slice(0,7); // "YYYY-MM"
+    if(!byMonthYear[key]) byMonthYear[key]={tMax:[],tMin:[],rain:0};
+    const mx=data.daily.temperature_2m_max[i];
+    const mn=data.daily.temperature_2m_min[i];
+    const rn=data.daily.precipitation_sum[i];
+    if(mx!=null) byMonthYear[key].tMax.push(mx);
+    if(mn!=null) byMonthYear[key].tMin.push(mn);
+    if(rn!=null) byMonthYear[key].rain+=rn;
   });
-  const avg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;
+  const arrAvg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;
+  const byMonth=Array.from({length:12},()=>({tMax:[],tMin:[],rain:[]}));
+  Object.entries(byMonthYear).forEach(([key,v])=>{
+    const mo=+key.slice(5,7)-1;
+    if(v.tMax.length) byMonth[mo].tMax.push(arrAvg(v.tMax));
+    if(v.tMin.length) byMonth[mo].tMin.push(arrAvg(v.tMin));
+    byMonth[mo].rain.push(v.rain);
+  });
   return{
-    months:byMonth.map(m=>({tMax:avg(m.tMax),tMin:avg(m.tMin),rain:avg(m.rain)})),
+    months:byMonth.map(m=>({tMax:arrAvg(m.tMax),tMin:arrAvg(m.tMin),rain:arrAvg(m.rain)})),
     yearStart:startYear,yearEnd:thisYear-1
   };
 }
