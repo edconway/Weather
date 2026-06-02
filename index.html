@@ -1869,6 +1869,35 @@ function setLoad(msg){
       html=`<div class="tt-title">${dl}${tag}</div>
         <div class="tt-row"><span class="tt-lbl">${isPast?'Actual':'Forecast'}</span><span class="tt-cur">${fmtMm(mm)}</span></div>
         ${!isPast&&prob!=null?`<div class="tt-row"><span class="tt-lbl">Probability</span><span class="tt-muted">${prob}%</span></div>`:''}`;
+    } else if(chartType==='hourly-humid'&&_hourlyHumidData){
+      const{hVals,aVals,pL,cW,n,relNow,times}=_hourlyHumidData;
+      const i=Math.max(0,Math.min(n-1,Math.round((svgX-pL)/cW*(n-1))));
+      const t=times[i], hr=+t.slice(11,13), isPast=i<relNow;
+      const tag=isPast?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · actual</span>':'';
+      const lbl=hr===0?'Midnight':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
+      const dl=new Date(t.slice(0,10)+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+      const hv=hVals[i], av=aVals[i];
+      const gx=(pL+i/(n-1)*cW).toFixed(1);
+      document.getElementById('ttg-hourly-humid')?.setAttribute('x1',gx);
+      document.getElementById('ttg-hourly-humid')?.setAttribute('x2',gx);
+      document.getElementById('ttg-hourly-humid')?.setAttribute('visibility','visible');
+      html=`<div class="tt-title">${dl} ${lbl}${tag}</div>
+        <div class="tt-row"><span class="tt-lbl">Humidity</span><span class="tt-cur">${hv!=null?Math.round(hv)+'%':'—'}</span></div>
+        ${av!=null?`<div class="tt-row"><span class="tt-lbl">5-yr avg</span><span class="tt-muted">${Math.round(av)}%</span></div>`:''}`;
+    } else if(chartType==='daily-humid'&&_dailyHumidData){
+      const{dailyMean,histMean,dates,pL,slotW,n,todayIdx}=_dailyHumidData;
+      const i=Math.max(0,Math.min(n-1,Math.floor((svgX-pL)/slotW)));
+      const isPast=i<todayIdx, isToday=i===todayIdx;
+      const tag=isPast?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · actual</span>':'';
+      const dl=isToday?'Today':new Date(dates[i]+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+      const mm=dailyMean[i];
+      const gx=(pL+(i+0.5)*slotW).toFixed(1);
+      document.getElementById('ttg-daily-humid')?.setAttribute('x1',gx);
+      document.getElementById('ttg-daily-humid')?.setAttribute('x2',gx);
+      document.getElementById('ttg-daily-humid')?.setAttribute('visibility','visible');
+      html=`<div class="tt-title">${dl}${tag}</div>
+        <div class="tt-row"><span class="tt-lbl">Mean humidity</span><span class="tt-cur">${mm!=null?Math.round(mm)+'%':'—'}</span></div>
+        ${histMean!=null?`<div class="tt-row"><span class="tt-lbl">Seasonal avg</span><span class="tt-muted">${Math.round(histMean)}%</span></div>`:''}`;
     } else if(chartType==='climate'&&_climateData){
       const{data,pL,slotW,n}=_climateData;
       const i=Math.max(0,Math.min(n-1,Math.floor((svgX-pL)/slotW)));
