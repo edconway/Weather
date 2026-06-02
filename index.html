@@ -1475,11 +1475,15 @@ function makeDailyHumidChart(){
     if(v!=null) dayMap[d].push(v);
   });
   const avg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;
-  // Use today + next 6 days (7 bars) — past humidity is unreliable from the forecast API
+  // Show all days that have enough hourly readings (≥6h), plus today and future
   const todayIdx=Math.min(7,fcData.daily.time.length-1);
-  const dates=fcData.daily.time.slice(todayIdx,todayIdx+7);
+  const dates=fcData.daily.time;
   const n=dates.length;
-  const dailyMean=dates.map(d=>avg(dayMap[d]||[]));
+  // Only include a day if it has ≥6 valid hourly readings (actual or forecast)
+  const dailyMean=dates.map((d,i)=>{
+    const vals=dayMap[d]||[];
+    return vals.length>=6?avg(vals):null;
+  });
   // Historical mean = seasonal baseline from hourly normals
   const histAvgs=hourlyHumidData.avgByHour.filter(v=>v!=null);
   const histMean=histAvgs.length?histAvgs.reduce((a,b)=>a+b,0)/histAvgs.length:null;
