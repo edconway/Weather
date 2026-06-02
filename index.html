@@ -513,7 +513,7 @@ async function pickResult(lat,lon,name){
   customLat=lat; customLon=lon; customName=name;
   activeSource='custom'; geoName=name;
   renderHeader(); setLoad('Loading weather…');
-  ytdData=null; hourlyHistData=null; hourlyRainHistData=null; dailyRainHistData=null; climatologyData=null;
+  ytdData=null; hourlyHistData=null; hourlyRainHistData=null; dailyRainHistData=null; climatologyData=null; hourlyHumidData=null;
   try{
     const[fc,climate]=await Promise.all([getForecast(lat,lon),getClimatology(lat,lon)]);
     fcData=fc; climatologyData=climate;
@@ -534,7 +534,7 @@ async function switchSource(src){
   activeSource=src; geoName=name;
   renderHeader();
   setLoad('Loading weather…');
-  ytdData=null; hourlyHistData=null; hourlyRainHistData=null; dailyRainHistData=null; climatologyData=null;
+  ytdData=null; hourlyHistData=null; hourlyRainHistData=null; dailyRainHistData=null; climatologyData=null; hourlyHumidData=null;
   try{
     const[fc,climate]=await Promise.all([getForecast(lat,lon),getClimatology(lat,lon)]);
     fcData=fc; climatologyData=climate;
