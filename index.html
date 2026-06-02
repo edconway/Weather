@@ -503,7 +503,7 @@ function onSearchKey(e){
 function loadBackground(lat,lon){
   getRainYTD(lat,lon).then(ytd=>{ytdData=ytd;if(fcData)renderContent();}).catch(()=>{});
   getHourlyNormals(lat,lon).then(d=>{
-    hourlyHistData=d.temp; hourlyRainHistData=d.rain;
+    hourlyHistData=d.temp; hourlyRainHistData=d.rain; hourlyHumidData=d.humidity;
     if(fcData)renderContent();
   }).catch(()=>{});
 }
