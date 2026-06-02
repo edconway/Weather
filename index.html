@@ -1475,12 +1475,13 @@ function makeDailyHumidChart(){
     if(v!=null) dayMap[d].push(v);
   });
   const avg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;
-  // Show all days that have enough hourly readings (≥6h), plus today and future
+  // 4 bars only: yesterday, today, tomorrow, day+2
   const todayIdx=Math.min(7,fcData.daily.time.length-1);
-  const dates=fcData.daily.time;
+  const sliceStart=Math.max(0,todayIdx-1);
+  const dates=fcData.daily.time.slice(sliceStart,sliceStart+4);
   const n=dates.length;
-  // Only include a day if it has ≥6 valid hourly readings (actual or forecast)
-  const dailyMean=dates.map((d,i)=>{
+  const relToday=todayIdx-sliceStart; // position of "today" within the 4-bar slice
+  const dailyMean=dates.map(d=>{
     const vals=dayMap[d]||[];
     return vals.length>=6?avg(vals):null;
   });
