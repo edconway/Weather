@@ -1524,7 +1524,7 @@ function makeDailyHumidChart(){
     const bar=bH>0.5?`<rect x="${bx}" y="${yf(mm).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${fill}" rx="2"/>`:''
     return bar+dayLabel;
   }).join('');
-  _dailyHumidData={dailyMean,histMean,dates,pL,slotW,n,todayIdx};
+  _dailyHumidData={dailyMean,histMean,dates,pL,slotW,n,todayIdx:relToday};
   return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="daily-humid">
     ${ticks.join('')}
     ${todayMark}
