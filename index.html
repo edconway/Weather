@@ -1465,7 +1465,7 @@ function makeDailyHumidChart(){
   if(!fcData?.hourly?.time) return '';
   if(!hourlyHumidData) return '<p class="search-msg" style="padding:20px 0">⏳ Loading humidity history…</p>';
   const hh=fcData.hourly;
-  // Derive daily mean humidity from hourly data (covers past 7 + next 7 days)
+  // Build day→hourly values map from the full hourly array
   const dayMap={};
   hh.time.forEach((t,i)=>{
     const d=t.slice(0,10);
@@ -1474,20 +1474,18 @@ function makeDailyHumidChart(){
     if(v!=null) dayMap[d].push(v);
   });
   const avg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;
+  // Use today + next 6 days (7 bars) — past humidity is unreliable from the forecast API
   const todayIdx=Math.min(7,fcData.daily.time.length-1);
-  const dates=fcData.daily.time;
-  const n=dates.length; // 14
+  const dates=fcData.daily.time.slice(todayIdx,todayIdx+7);
+  const n=dates.length;
   const dailyMean=dates.map(d=>avg(dayMap[d]||[]));
-  // Historical mean = grand mean across all 24 hourly averages (seasonal baseline)
+  // Historical mean = seasonal baseline from hourly normals
   const histAvgs=hourlyHumidData.avgByHour.filter(v=>v!=null);
   const histMean=histAvgs.length?histAvgs.reduce((a,b)=>a+b,0)/histAvgs.length:null;
-  // For days where the forecast API returned no humidity, use histMean as a fallback
-  // so all 14 bars are always visible
-  const effective=dates.map((_,i)=>dailyMean[i]??histMean);
-  const allV=effective.filter(v=>v!=null);
+  const allV=dailyMean.filter(v=>v!=null);
   if(!allV.length) return '';
-  const lo=Math.max(0,Math.floor(Math.min(...allV)/10)*10-10);
-  const hi=Math.min(100,Math.ceil(Math.max(...allV)/10)*10+5);
+  const lo=Math.max(0,Math.floor(Math.min(...allV,(histMean??100))/10)*10-10);
+  const hi=Math.min(100,Math.ceil(Math.max(...allV,(histMean??0))/10)*10+5);
   const W=580,H=185,pL=46,pR=14,pT=20,pB=38;
   const cW=W-pL-pR,cH=H-pT-pB;
   const slotW=cW/n;
@@ -1501,32 +1499,21 @@ function makeDailyHumidChart(){
     ticks.push(`<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" class="cg"/>` +
       `<text x="${pL-5}" y="${+y+4}" class="ca" text-anchor="end">${v}%</text>`);
   }
-  // Today divider
-  const todayX=xCx(todayIdx).toFixed(1);
-  const todayMark=`<line x1="${todayX}" y1="${pT}" x2="${todayX}" y2="${(pT+cH).toFixed(1)}" stroke="#9ba3ae" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
-    `<text x="${todayX}" y="${pT-4}" font-size="8" font-weight="700" fill="#9ba3ae" text-anchor="middle">Today</text>`;
-  // Historical mean line
+  // Seasonal avg reference line
   const histY=histMean!=null?yf(histMean).toFixed(1):null;
   const histLine=histY?`<line x1="${pL}" y1="${histY}" x2="${W-pR}" y2="${histY}" class="cl-ytd-hist"/>` +
     `<text x="${(W-pR+5).toFixed(1)}" y="${(+histY+4).toFixed(1)}" font-size="8.5" fill="#9ba3ae">Avg</text>`:'';
-  // Bars — use actual data where available, seasonal avg as faint fallback
   const els=dates.map((dateStr,i)=>{
-    const mm=dailyMean[i];
-    const eff=mm??histMean; // actual or fallback
-    const isPast=i<todayIdx, isToday=i===todayIdx;
+    const mm=dailyMean[i]; if(mm==null) return '';
+    const isToday=i===0;
     const bx=xBL(i).toFixed(1), cx=xCx(i).toFixed(1);
-    const dayLabel=`<text x="${cx}" y="${H-22}" class="ca" font-weight="${isToday?700:400}" text-anchor="middle">${isToday?'Today':fDay(dateStr)}</text>`;
-    if(eff==null) return dayLabel;
-    const bH=Math.max(0,yf(lo)-yf(eff));
-    // Faint bar if fallback (no actual data), normal colours if actual
-    const fill=mm==null?'rgba(75,198,185,0.12)':(isPast?'rgba(75,198,185,0.3)':'rgba(75,198,185,0.8)');
-    const bar=bH>0.5?`<rect x="${bx}" y="${yf(eff).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${fill}" rx="2"/>`:''
-    return bar+dayLabel;
+    const bH=Math.max(0,yf(lo)-yf(mm));
+    const bar=bH>0.5?`<rect x="${bx}" y="${yf(mm).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="rgba(75,198,185,0.8)" rx="2"/>`:''
+    return bar+`<text x="${cx}" y="${H-22}" class="ca" font-weight="${isToday?700:400}" text-anchor="middle">${isToday?'Today':fDay(dateStr)}</text>`;
   }).join('');
-  _dailyHumidData={dailyMean,histMean,dates,pL,slotW,n,todayIdx};
+  _dailyHumidData={dailyMean,histMean,dates,pL,slotW,n,todayIdx:0};
   return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="daily-humid">
     ${ticks.join('')}
-    ${todayMark}
     ${histLine}
     <line id="ttg-daily-humid" x1="${pL}" y1="${pT}" x2="${pL}" y2="${(pT+cH).toFixed(1)}" stroke="rgba(255,255,255,.18)" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>
     ${els}
