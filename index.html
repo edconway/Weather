@@ -1372,6 +1372,143 @@ function makeDailyRainChart(){
   </svg>`;
 }
 
+// ── Humidity charts ────────────────────────────────────
+function makeHourlyHumidChart(){
+  if(!fcData?.hourly?.time) return '';
+  if(!hourlyHumidData) return '<p class="search-msg" style="padding:20px 0">⏳ Loading humidity history…</p>';
+  const hh=fcData.hourly;
+  const now=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  const nowStr=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:00`;
+  const rawNow=hh.time.findIndex(t=>t>=nowStr);
+  const nowIdx=rawNow<1?1:rawNow;
+  const startIdx=Math.max(0,nowIdx-24), endIdx=Math.min(hh.time.length,nowIdx+24);
+  const times=hh.time.slice(startIdx,endIdx);
+  const humid=(hh.relative_humidity_2m||[]).slice(startIdx,endIdx);
+  const n=times.length; if(!n) return '';
+  const relNow=nowIdx-startIdx;
+  const histLine=times.map(t=>hourlyHumidData.avgByHour[+t.slice(11,13)]??null);
+  // carry forward any nulls
+  let lastH=null, lastA=null;
+  const hVals=humid.map(v=>{if(v!=null)lastH=v; return lastH;});
+  const aVals=histLine.map(v=>{if(v!=null)lastA=v; return lastA;});
+  const allV=[...hVals,...aVals].filter(v=>v!=null);
+  if(!allV.length) return '';
+  const lo=Math.max(0,Math.floor(Math.min(...allV)/10)*10-10);
+  const hi=Math.min(100,Math.ceil(Math.max(...allV)/10)*10+5);
+  const W=580,H=185,pL=46,pR=14,pT=20,pB=32;
+  const cW=W-pL-pR,cH=H-pT-pB;
+  const xf=i=>pL+i/(n-1)*cW;
+  const yf=v=>pT+(1-(v-lo)/(hi-lo))*cH;
+  // Y ticks every 10%
+  const ticks=[];
+  for(let v=Math.ceil(lo/10)*10;v<=hi;v+=10){
+    const y=yf(v).toFixed(1);
+    ticks.push(`<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" class="cg"/>` +
+      `<text x="${pL-5}" y="${+y+4}" class="ca" text-anchor="end">${v}%</text>`);
+  }
+  // Now divider
+  const nowX=xf(relNow).toFixed(1);
+  const nowMark=`<line x1="${nowX}" y1="${pT}" x2="${nowX}" y2="${(pT+cH).toFixed(1)}" stroke="#9ba3ae" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
+    `<text x="${nowX}" y="${pT-4}" font-size="8" font-weight="700" fill="#9ba3ae" text-anchor="middle">Now</text>`;
+  // Polylines
+  const histPts=aVals.map((v,i)=>v!=null?`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`:null).filter(Boolean).join(' ');
+  const pastPts=hVals.slice(0,relNow+1).map((v,i)=>v!=null?`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`:null).filter(Boolean).join(' ');
+  const fcstPts=hVals.slice(relNow).map((v,i)=>v!=null?`${xf(relNow+i).toFixed(1)},${yf(v).toFixed(1)}`:null).filter(Boolean).join(' ');
+  // End labels
+  const endX=(xf(n-1)+5).toFixed(1);
+  const eFC=hVals[n-1], eHI=aVals[n-1];
+  let yFC=eFC!=null?yf(eFC):null, yHI=eHI!=null?yf(eHI):null;
+  if(yFC!=null&&yHI!=null&&Math.abs(yFC-yHI)<12){const b=(12-Math.abs(yFC-yHI))/2+1;yFC+=(yFC>=yHI?b:-b);yHI+=(yHI>yFC?b:-b);}
+  const endLbls=(yFC!=null?`<text x="${endX}" y="${(yFC+4).toFixed(1)}" font-size="8.5" font-weight="700" fill="#4bc6b9">Forecast</text>`:'')+
+    (yHI!=null?`<text x="${endX}" y="${(yHI+4).toFixed(1)}" font-size="8.5" fill="#9ba3ae">5-yr avg</text>`:'');
+  // X labels every 6h
+  const usedX=new Set();
+  const xLbls=times.map((t,i)=>{
+    const hr=+t.slice(11,13); if(hr%6!==0) return '';
+    const xk=Math.round(xf(i)); if(usedX.has(xk))return ''; usedX.add(xk);
+    const lbl=hr===0?'Midnight':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
+    return `<text x="${xf(i).toFixed(1)}" y="${H-4}" class="ca" text-anchor="middle">${lbl}</text>`;
+  }).join('');
+  _hourlyHumidData={hVals,aVals,pL,cW,n,relNow,times};
+  return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="hourly-humid">
+    ${ticks.join('')}
+    ${nowMark}
+    <line id="ttg-hourly-humid" x1="${pL}" y1="${pT}" x2="${pL}" y2="${(pT+cH).toFixed(1)}" stroke="rgba(255,255,255,.18)" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>
+    <polyline points="${histPts}" class="cl-ytd-hist"/>
+    <polyline points="${pastPts}" fill="none" stroke="rgba(75,198,185,0.5)" stroke-width="2" stroke-dasharray="5,4" stroke-linejoin="round" stroke-linecap="round"/>
+    <polyline points="${fcstPts}" fill="none" stroke="#4bc6b9" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    ${endLbls}
+    ${xLbls}
+  </svg>`;
+}
+
+function makeDailyHumidChart(){
+  if(!fcData?.hourly?.time) return '';
+  if(!hourlyHumidData) return '<p class="search-msg" style="padding:20px 0">⏳ Loading humidity history…</p>';
+  const hh=fcData.hourly;
+  // Derive daily mean humidity from hourly data (covers past 7 + next 7 days)
+  const dayMap={};
+  hh.time.forEach((t,i)=>{
+    const d=t.slice(0,10);
+    if(!dayMap[d]) dayMap[d]=[];
+    const v=hh.relative_humidity_2m?.[i];
+    if(v!=null) dayMap[d].push(v);
+  });
+  const avg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;
+  const todayIdx=Math.min(7,fcData.daily.time.length-1);
+  const dates=fcData.daily.time;
+  const n=dates.length; // 14
+  const dailyMean=dates.map(d=>avg(dayMap[d]||[]));
+  // Historical mean = grand mean across all 24 hourly averages (seasonal baseline)
+  const histAvgs=hourlyHumidData.avgByHour.filter(v=>v!=null);
+  const histMean=histAvgs.length?histAvgs.reduce((a,b)=>a+b,0)/histAvgs.length:null;
+  const allV=dailyMean.filter(v=>v!=null);
+  if(!allV.length) return '';
+  const lo=Math.max(0,Math.floor(Math.min(...allV,(histMean??100))/10)*10-10);
+  const hi=Math.min(100,Math.ceil(Math.max(...allV,(histMean??0))/10)*10+5);
+  const W=580,H=185,pL=46,pR=14,pT=20,pB=38;
+  const cW=W-pL-pR,cH=H-pT-pB;
+  const slotW=cW/n;
+  const barW=slotW*0.6;
+  const xCx=i=>pL+(i+0.5)*slotW;
+  const xBL=i=>pL+i*slotW+(slotW-barW)/2;
+  const yf=v=>pT+(1-(v-lo)/(hi-lo))*cH;
+  const ticks=[];
+  for(let v=Math.ceil(lo/10)*10;v<=hi;v+=10){
+    const y=yf(v).toFixed(1);
+    ticks.push(`<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" class="cg"/>` +
+      `<text x="${pL-5}" y="${+y+4}" class="ca" text-anchor="end">${v}%</text>`);
+  }
+  // Today divider
+  const todayX=xCx(todayIdx).toFixed(1);
+  const todayMark=`<line x1="${todayX}" y1="${pT}" x2="${todayX}" y2="${(pT+cH).toFixed(1)}" stroke="#9ba3ae" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
+    `<text x="${todayX}" y="${pT-4}" font-size="8" font-weight="700" fill="#9ba3ae" text-anchor="middle">Today</text>`;
+  // Historical mean line
+  const histY=histMean!=null?yf(histMean).toFixed(1):null;
+  const histLine=histY?`<line x1="${pL}" y1="${histY}" x2="${W-pR}" y2="${histY}" class="cl-ytd-hist"/>` +
+    `<text x="${(W-pR+5).toFixed(1)}" y="${(+histY+4).toFixed(1)}" font-size="8.5" fill="#9ba3ae">Avg</text>`:'';
+  // Bars
+  const els=dates.map((dateStr,i)=>{
+    const mm=dailyMean[i]; if(mm==null) return '';
+    const isPast=i<todayIdx, isToday=i===todayIdx;
+    const bx=xBL(i).toFixed(1), cx=xCx(i).toFixed(1);
+    const bH=Math.max(0,yf(lo)-yf(mm));
+    const fill=isPast?'rgba(75,198,185,0.3)':'rgba(75,198,185,0.8)';
+    const bar=bH>0.5?`<rect x="${bx}" y="${yf(mm).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${fill}" rx="2"/>`:''
+    return bar+
+      `<text x="${cx}" y="${H-22}" class="ca" font-weight="${isToday?700:400}" text-anchor="middle">${isToday?'Today':fDay(dateStr)}</text>`;
+  }).join('');
+  _dailyHumidData={dailyMean,histMean,dates,pL,slotW,n,todayIdx};
+  return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="daily-humid">
+    ${ticks.join('')}
+    ${todayMark}
+    ${histLine}
+    <line id="ttg-daily-humid" x1="${pL}" y1="${pT}" x2="${pL}" y2="${(pT+cH).toFixed(1)}" stroke="rgba(255,255,255,.18)" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>
+    ${els}
+  </svg>`;
+}
+
 // ── Climatology ────────────────────────────────────────
 async function getClimatology(lat,lon){
   // ONE archive request fetches 10 years of daily temp+precip. From this single
