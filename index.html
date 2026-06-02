@@ -1510,12 +1510,12 @@ function makeDailyHumidChart(){
   const histLine=histY?`<line x1="${pL}" y1="${histY}" x2="${W-pR}" y2="${histY}" class="cl-ytd-hist"/>` +
     `<text x="${(W-pR+5).toFixed(1)}" y="${(+histY+4).toFixed(1)}" font-size="8.5" fill="#9ba3ae">Avg</text>`:'';
   // Today divider
-  const todayX=xCx(todayIdx).toFixed(1);
+  const todayX=xCx(relToday).toFixed(1);
   const todayMark=`<line x1="${todayX}" y1="${pT}" x2="${todayX}" y2="${(pT+cH).toFixed(1)}" stroke="#9ba3ae" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
     `<text x="${todayX}" y="${pT-4}" font-size="8" font-weight="700" fill="#9ba3ae" text-anchor="middle">Today</text>`;
   const els=dates.map((dateStr,i)=>{
     const mm=dailyMean[i];
-    const isPast=i<todayIdx, isToday=i===todayIdx;
+    const isPast=i<relToday, isToday=i===relToday;
     const bx=xBL(i).toFixed(1), cx=xCx(i).toFixed(1);
     const dayLabel=`<text x="${cx}" y="${H-22}" class="ca" font-weight="${isToday?700:400}" text-anchor="middle">${isToday?'Today':fDay(dateStr)}</text>`;
     if(mm==null) return ''; // skip days with insufficient data
