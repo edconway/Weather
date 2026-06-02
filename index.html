@@ -1099,7 +1099,7 @@ async function getHourlyNormals(lat,lon){
       latitude:lat,longitude:lon,timezone:'auto',
       start_date:`${s.getFullYear()}-${pad(s.getMonth()+1)}-${pad(s.getDate())}`,
       end_date:`${e.getFullYear()}-${pad(e.getMonth()+1)}-${pad(e.getDate())}`,
-      hourly:'temperature_2m,precipitation'
+      hourly:'temperature_2m,precipitation,relative_humidity_2m'
     });
     fetches.push(archiveFetch(`https://archive-api.open-meteo.com/v1/archive?${p}`)
       .then(r=>r.ok?r.json():null).catch(()=>null));
