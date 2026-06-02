@@ -1481,10 +1481,13 @@ function makeDailyHumidChart(){
   // Historical mean = grand mean across all 24 hourly averages (seasonal baseline)
   const histAvgs=hourlyHumidData.avgByHour.filter(v=>v!=null);
   const histMean=histAvgs.length?histAvgs.reduce((a,b)=>a+b,0)/histAvgs.length:null;
-  const allV=dailyMean.filter(v=>v!=null);
+  // For days where the forecast API returned no humidity, use histMean as a fallback
+  // so all 14 bars are always visible
+  const effective=dates.map((_,i)=>dailyMean[i]??histMean);
+  const allV=effective.filter(v=>v!=null);
   if(!allV.length) return '';
-  const lo=Math.max(0,Math.floor(Math.min(...allV,(histMean??100))/10)*10-10);
-  const hi=Math.min(100,Math.ceil(Math.max(...allV,(histMean??0))/10)*10+5);
+  const lo=Math.max(0,Math.floor(Math.min(...allV)/10)*10-10);
+  const hi=Math.min(100,Math.ceil(Math.max(...allV)/10)*10+5);
   const W=580,H=185,pL=46,pR=14,pT=20,pB=38;
   const cW=W-pL-pR,cH=H-pT-pB;
   const slotW=cW/n;
