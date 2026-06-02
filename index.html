@@ -1508,17 +1508,25 @@ function makeDailyHumidChart(){
   const histY=histMean!=null?yf(histMean).toFixed(1):null;
   const histLine=histY?`<line x1="${pL}" y1="${histY}" x2="${W-pR}" y2="${histY}" class="cl-ytd-hist"/>` +
     `<text x="${(W-pR+5).toFixed(1)}" y="${(+histY+4).toFixed(1)}" font-size="8.5" fill="#9ba3ae">Avg</text>`:'';
+  // Today divider
+  const todayX=xCx(todayIdx).toFixed(1);
+  const todayMark=`<line x1="${todayX}" y1="${pT}" x2="${todayX}" y2="${(pT+cH).toFixed(1)}" stroke="#9ba3ae" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
+    `<text x="${todayX}" y="${pT-4}" font-size="8" font-weight="700" fill="#9ba3ae" text-anchor="middle">Today</text>`;
   const els=dates.map((dateStr,i)=>{
-    const mm=dailyMean[i]; if(mm==null) return '';
-    const isToday=i===0;
+    const mm=dailyMean[i];
+    const isPast=i<todayIdx, isToday=i===todayIdx;
     const bx=xBL(i).toFixed(1), cx=xCx(i).toFixed(1);
+    const dayLabel=`<text x="${cx}" y="${H-22}" class="ca" font-weight="${isToday?700:400}" text-anchor="middle">${isToday?'Today':fDay(dateStr)}</text>`;
+    if(mm==null) return ''; // skip days with insufficient data
     const bH=Math.max(0,yf(lo)-yf(mm));
-    const bar=bH>0.5?`<rect x="${bx}" y="${yf(mm).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="rgba(75,198,185,0.8)" rx="2"/>`:''
-    return bar+`<text x="${cx}" y="${H-22}" class="ca" font-weight="${isToday?700:400}" text-anchor="middle">${isToday?'Today':fDay(dateStr)}</text>`;
+    const fill=isPast?'rgba(75,198,185,0.3)':'rgba(75,198,185,0.8)';
+    const bar=bH>0.5?`<rect x="${bx}" y="${yf(mm).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${fill}" rx="2"/>`:''
+    return bar+dayLabel;
   }).join('');
-  _dailyHumidData={dailyMean,histMean,dates,pL,slotW,n,todayIdx:0};
+  _dailyHumidData={dailyMean,histMean,dates,pL,slotW,n,todayIdx};
   return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="daily-humid">
     ${ticks.join('')}
+    ${todayMark}
     ${histLine}
     <line id="ttg-daily-humid" x1="${pL}" y1="${pT}" x2="${pL}" y2="${(pT+cH).toFixed(1)}" stroke="rgba(255,255,255,.18)" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>
     ${els}
