@@ -1509,16 +1509,19 @@ function makeDailyHumidChart(){
   const histY=histMean!=null?yf(histMean).toFixed(1):null;
   const histLine=histY?`<line x1="${pL}" y1="${histY}" x2="${W-pR}" y2="${histY}" class="cl-ytd-hist"/>` +
     `<text x="${(W-pR+5).toFixed(1)}" y="${(+histY+4).toFixed(1)}" font-size="8.5" fill="#9ba3ae">Avg</text>`:'';
-  // Bars
+  // Bars — use actual data where available, seasonal avg as faint fallback
   const els=dates.map((dateStr,i)=>{
-    const mm=dailyMean[i]; if(mm==null) return '';
+    const mm=dailyMean[i];
+    const eff=mm??histMean; // actual or fallback
     const isPast=i<todayIdx, isToday=i===todayIdx;
     const bx=xBL(i).toFixed(1), cx=xCx(i).toFixed(1);
-    const bH=Math.max(0,yf(lo)-yf(mm));
-    const fill=isPast?'rgba(75,198,185,0.3)':'rgba(75,198,185,0.8)';
-    const bar=bH>0.5?`<rect x="${bx}" y="${yf(mm).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${fill}" rx="2"/>`:''
-    return bar+
-      `<text x="${cx}" y="${H-22}" class="ca" font-weight="${isToday?700:400}" text-anchor="middle">${isToday?'Today':fDay(dateStr)}</text>`;
+    const dayLabel=`<text x="${cx}" y="${H-22}" class="ca" font-weight="${isToday?700:400}" text-anchor="middle">${isToday?'Today':fDay(dateStr)}</text>`;
+    if(eff==null) return dayLabel;
+    const bH=Math.max(0,yf(lo)-yf(eff));
+    // Faint bar if fallback (no actual data), normal colours if actual
+    const fill=mm==null?'rgba(75,198,185,0.12)':(isPast?'rgba(75,198,185,0.3)':'rgba(75,198,185,0.8)');
+    const bar=bH>0.5?`<rect x="${bx}" y="${yf(eff).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${fill}" rx="2"/>`:''
+    return bar+dayLabel;
   }).join('');
   _dailyHumidData={dailyMean,histMean,dates,pL,slotW,n,todayIdx};
   return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="daily-humid">
