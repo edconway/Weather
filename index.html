@@ -931,6 +931,22 @@ function renderContent(){
 
   <div class="chart-card fu">
     <div class="sec-hdr" style="margin-bottom:6px">
+      <span class="sec-ttl">48-Hour Humidity</span>
+      <p class="sec-sub">${subHourlyHumid}</p>
+    </div>
+    ${makeHourlyHumidChart()}
+  </div>
+
+  <div class="chart-card fu">
+    <div class="sec-hdr" style="margin-bottom:6px">
+      <span class="sec-ttl">14-Day Humidity</span>
+      <p class="sec-sub">${subDailyHumid}</p>
+    </div>
+    ${makeDailyHumidChart()}
+  </div>
+
+  <div class="chart-card fu">
+    <div class="sec-hdr" style="margin-bottom:6px">
       <span class="sec-ttl">Year-to-Date Rainfall</span>
       <p class="sec-sub">${subRain}</p>
     </div>
