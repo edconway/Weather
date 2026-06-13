@@ -1,5 +1,12 @@
 // ── Chart renderers ────────────────────────────────────
 
+function _narrow(){ return typeof window!=='undefined'&&window.innerWidth<=480; }
+function _chartPR(){ return _narrow()?42:14; }
+function _hourStep(){ return _narrow()?12:6; }
+function _hourLbl(hr){
+  return hr===0?'Midnight':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
+}
+
 function makeTempChart(){
   if(!fcData||!histData) return '';
   const d=fcData.daily;
@@ -16,7 +23,7 @@ function makeTempChart(){
   if(!allV.length) return '';
   const lo=Math.floor(Math.min(...allV))-2;
   const hi=Math.ceil(Math.max(...allV))+2;
-  const W=580,H=210,pL=46,pR=14,pT=24,pB=38;
+  const W=580,H=210,pL=46,pR=_chartPR(),pT=24,pB=38;
   const cW=W-pL-pR,cH=H-pT-pB;
   const n=labels.length;
   const xf=i=>pL+i/(n-1)*cW;
@@ -70,7 +77,10 @@ function makeTempChart(){
     const lbl=!isPast?`<text x="${cx}" y="${(yf(v)+15).toFixed(1)}" class="cv cv-cold" text-anchor="middle">${Math.round(v)}°</text>`:'';
     return `<circle cx="${cx}" cy="${cy}" r="${isPast?2.8:3.5}" fill="${fill}" stroke="rgba(15,12,41,.9)" stroke-width="1.5"/>${lbl}`;
   }).join('');
-  const xLbls=labels.map((l,i)=>`<text x="${xf(i).toFixed(1)}" y="${H-6}" class="ca" text-anchor="middle">${l}</text>`).join('');
+  const xLbls=labels.map((l,i)=>{
+    if(_narrow()&&i%2!==0&&i!==todayIdx) return '';
+    return `<text x="${xf(i).toFixed(1)}" y="${H-6}" class="ca" text-anchor="middle">${l}</text>`;
+  }).join('');
   _tempData={labels,maxV,minV,dailyAvg,pL,cW,n,todayIdx};
   return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="temp" tabindex="0" role="img">
     ${ticks.join('')}
@@ -118,7 +128,7 @@ function makeRainYTDChart(){
   const avgV=cumHistAvg.map(nP);
   const fcV=fcstExtCum.map(nP);
   const avgExtV=(ytdData.cumHistAvgExt||[]).slice(0,numFc).map(nP);
-  const W=580,H=222,pL=52,pR=14,pT=20,pB=36;
+  const W=580,H=222,pL=52,pR=_chartPR(),pT=20,pB=36;
   const cW=W-pL-pR,cH=H-pT-pB;
   const yMax=Math.max(...curV,...avgV,...(fcV.length?fcV:[0]),...(avgExtV.length?avgExtV:[0]),.01)*1.1;
   // x maps over the full totalN range so forecast extends naturally to the right
@@ -216,7 +226,7 @@ function makeHourlyTempChart(){
   const allV=[...temps,...histLine].filter(v=>v!=null&&!isNaN(v));
   if(!allV.length) return '';
   const lo=Math.floor(Math.min(...allV))-1, hi=Math.ceil(Math.max(...allV))+1;
-  const W=580,H=198,pL=46,pR=14,pT=20,pB=32;
+  const W=580,H=198,pL=46,pR=_chartPR(),pT=20,pB=32;
   const cW=W-pL-pR,cH=H-pT-pB;
   const n=temps.length;
   const xf=i=>pL+i/(n-1)*cW;
@@ -256,11 +266,11 @@ function makeHourlyTempChart(){
   const usedX=new Set();
   const xLbls=slicedTime.map((t,i)=>{
     const hr=+t.slice(11,13);
-    if(hr%6!==0) return '';
+    const step=_hourStep();
+    if(hr%step!==0) return '';
     const xKey=Math.round(xf(i));
     if(usedX.has(xKey)) return ''; usedX.add(xKey);
-    const lbl=hr===0?'Midnight':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
-    return `<text x="${xf(i).toFixed(1)}" y="${H-4}" class="ca" text-anchor="middle">${lbl}</text>`;
+    return `<text x="${xf(i).toFixed(1)}" y="${H-4}" class="ca" text-anchor="middle">${_hourLbl(hr)}</text>`;
   }).join('');
   // End labels (replacing legend) — separate vertically if lines converge
   const endX=(xf(n-1)+5).toFixed(1);
@@ -307,7 +317,7 @@ function makeHourlyRainChart(){
   if(!n) return '';
   const relNow=nowIdx-startIdx;
   const yMax=Math.max(...precip,0.5)*1.25;
-  const W=580,H=185,pL=46,pR=14,pT=20,pB=36;
+  const W=580,H=185,pL=46,pR=_chartPR(),pT=20,pB=36;
   const cW=W-pL-pR,cH=H-pT-pB;
   const slotW=cW/n;
   const barW=Math.max(2,slotW*0.72);
@@ -347,10 +357,10 @@ function makeHourlyRainChart(){
   const usedX=new Set();
   const xLbls=times.map((t,i)=>{
     const hr=+t.slice(11,13);
-    if(hr%6!==0) return '';
+    const step=_hourStep();
+    if(hr%step!==0) return '';
     const xKey=Math.round(xCx(i)); if(usedX.has(xKey)) return ''; usedX.add(xKey);
-    const lbl=hr===0?'Midnight':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
-    return `<text x="${xCx(i).toFixed(1)}" y="${H-6}" class="ca" text-anchor="middle">${lbl}</text>`;
+    return `<text x="${xCx(i).toFixed(1)}" y="${H-6}" class="ca" text-anchor="middle">${_hourLbl(hr)}</text>`;
   }).join('');
   _hourlyRainData={precip,prob,pL,slotW,n,relNow,times};
   return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="hourly-rain" tabindex="0" role="img">
@@ -370,7 +380,7 @@ function makeDailyRainChart(){
   const n=daily.time.length; // 14
   const precip=(daily.precipitation_sum||[]).map(v=>v??0);
   const probs=daily.precipitation_probability_max||[];
-  const W=580,H=185,pL=46,pR=14,pT=20,pB=38;
+  const W=580,H=185,pL=46,pR=_chartPR(),pT=20,pB=38;
   const cW=W-pL-pR,cH=H-pT-pB;
   const yMax=Math.max(...precip,1)*1.2;
   const slotW=cW/n;
@@ -403,11 +413,12 @@ function makeDailyRainChart(){
     const bar=bH>0.5?`<rect x="${bx}" y="${yf(mm).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${fill}" rx="2"/>`:''
     const valLbl=mm>=0.1?`<text x="${cx}" y="${(yf(mm)-5).toFixed(1)}" font-size="8" fill="rgba(102,126,234,0.9)" text-anchor="middle">${fmtMm(mm)}</text>`:''
     const isToday=i===todayIdx;
-    const dayLbl=isToday?'Today':fDay(dateStr);
+    const showDayLbl=isToday||!_narrow()||i%2===0;
+    const dayLbl=showDayLbl?(isToday?'Today':fDay(dateStr)):'';
     const prob=probs[i];
     const probLbl=!isPast&&prob!=null?`<text x="${cx}" y="${H-8}" font-size="7.5" fill="rgba(41,128,185,0.8)" text-anchor="middle">${prob}%</text>`:'';
     return bar+valLbl+
-      `<text x="${cx}" y="${H-22}" class="ca" font-weight="${isToday?700:400}" text-anchor="middle">${dayLbl}</text>`+
+      (dayLbl?`<text x="${cx}" y="${H-22}" class="ca" font-weight="${isToday?700:400}" text-anchor="middle">${dayLbl}</text>`:'')+
       probLbl;
   }).join('');
   _dailyRainData={dates:daily.time,precip,probs,pL,slotW,n,todayIdx};
@@ -442,7 +453,7 @@ function makeHourlyHumidChart(){
   if(!allV.length) return '';
   const lo=Math.max(0,Math.floor(Math.min(...allV)/10)*10-10);
   const hi=Math.min(100,Math.ceil(Math.max(...allV)/10)*10+5);
-  const W=580,H=185,pL=46,pR=14,pT=20,pB=32;
+  const W=580,H=185,pL=46,pR=_chartPR(),pT=20,pB=32;
   const cW=W-pL-pR,cH=H-pT-pB;
   const xf=i=>pL+i/(n-1)*cW;
   const yf=v=>pT+(1-(v-lo)/(hi-lo))*cH;
@@ -471,10 +482,11 @@ function makeHourlyHumidChart(){
   // X labels every 6h
   const usedX=new Set();
   const xLbls=times.map((t,i)=>{
-    const hr=+t.slice(11,13); if(hr%6!==0) return '';
+    const hr=+t.slice(11,13);
+    const step=_hourStep();
+    if(hr%step!==0) return '';
     const xk=Math.round(xf(i)); if(usedX.has(xk))return ''; usedX.add(xk);
-    const lbl=hr===0?'Midnight':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
-    return `<text x="${xf(i).toFixed(1)}" y="${H-4}" class="ca" text-anchor="middle">${lbl}</text>`;
+    return `<text x="${xf(i).toFixed(1)}" y="${H-4}" class="ca" text-anchor="middle">${_hourLbl(hr)}</text>`;
   }).join('');
   _hourlyHumidData={hVals,aVals,pL,cW,n,relNow,times};
   return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="hourly-humid" tabindex="0" role="img">
@@ -519,7 +531,7 @@ function makeDailyHumidChart(){
   if(!allV.length) return '';
   const lo=Math.max(0,Math.floor(Math.min(...allV,(histMean??100))/10)*10-10);
   const hi=Math.min(100,Math.ceil(Math.max(...allV,(histMean??0))/10)*10+5);
-  const W=580,H=185,pL=46,pR=14,pT=20,pB=38;
+  const W=580,H=185,pL=46,pR=_chartPR(),pT=20,pB=38;
   const cW=W-pL-pR,cH=H-pT-pB;
   const slotW=cW/n;
   const barW=slotW*0.6;
@@ -544,7 +556,7 @@ function makeDailyHumidChart(){
     const mm=dailyMean[i];
     const isPast=i<relToday, isToday=i===relToday;
     const bx=xBL(i).toFixed(1), cx=xCx(i).toFixed(1);
-    const dayLabel=`<text x="${cx}" y="${H-22}" class="ca" font-weight="${isToday?700:400}" text-anchor="middle">${isToday?'Today':fDay(dateStr)}</text>`;
+    const dayLabel=(!isToday&&_narrow()&&i%2!==0)?'':`<text x="${cx}" y="${H-22}" class="ca" font-weight="${isToday?700:400}" text-anchor="middle">${isToday?'Today':fDay(dateStr)}</text>`;
     if(mm==null) return ''; // skip days with insufficient data
     const bH=Math.max(0,yf(lo)-yf(mm));
     const fill=isPast?'rgba(75,198,185,0.3)':'rgba(75,198,185,0.8)';
@@ -567,7 +579,7 @@ function makeClimateChart(){
   const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const curMo=new Date().getMonth();
   const n=12;
-  const W=580,H=200,pL=46,pR=54,pT=24,pB=28;
+  const W=580,H=200,pL=46,pR=_narrow()?58:54,pT=24,pB=28;
   const cW=W-pL-pR,cH=H-pT-pB;
   // Temperature axis (left) — store in °C, display in user units
   const tMaxes=data.map(d=>d.tMax).filter(v=>v!=null);
