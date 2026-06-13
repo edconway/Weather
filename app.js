@@ -81,24 +81,6 @@ function secHdr(title, details) {
   </div>`;
 }
 
-function forecastGridHtml(d, t0) {
-  const cells = [];
-  for (let i = 0; i < 7; i++) {
-    const idx = t0 + i;
-    if (idx >= d.time.length) break;
-    const today = i === 0;
-    const pop = d.precipitation_probability_max[idx];
-    cells.push(`<div class="fc${today ? ' today' : ''}">
-      <div class="fc-day">${today ? 'Today' : fDay(d.time[idx])}</div>
-      <span class="fc-ico">${weatherIcon(d.weather_code[idx], 28)}</span>
-      <div class="fc-hi">${fT(d.temperature_2m_max[idx])}</div>
-      <div class="fc-lo">${fT(d.temperature_2m_min[idx])}</div>
-      ${pop != null ? `<div class="fc-pop">${pop}%</div>` : ''}
-    </div>`);
-  }
-  return `<div class="fcast-grid fu">${cells.join('')}</div>`;
-}
-
 function toggleTheme() {
   const cur = document.documentElement.dataset.theme || 'auto';
   const next = cur === 'dark' ? 'light' : cur === 'light' ? 'auto' : 'dark';
@@ -310,62 +292,45 @@ function renderContent(){
     </div>
   </section>
 
-  ${forecastGridHtml(d,t0)}
+  <div class="chart-card fu">
+    ${secHdr('48-Hour Temperature', subHourly)}
+    ${makeHourlyTempChart()}
+  </div>
 
-  <nav class="sec-nav fu" aria-label="Chart sections">
-    <a href="#charts-temp">Temperature</a>
-    <a href="#charts-rain">Rainfall</a>
-    <a href="#charts-humid">Humidity</a>
-    <a href="#charts-climate">Climate</a>
-  </nav>
+  <div class="chart-card fu">
+    ${secHdr('14-Day Temperature', subDaily)}
+    ${makeTempChart()}
+  </div>
 
-  <section id="charts-temp" class="chart-group">
-    <h2 class="group-ttl">Temperature</h2>
-    <div class="chart-card fu">
-      ${secHdr('48-Hour Temperature', subHourly)}
-      ${makeHourlyTempChart()}
-    </div>
-    <div class="chart-card fu">
-      ${secHdr('14-Day Temperature', subDaily)}
-      ${makeTempChart()}
-    </div>
-  </section>
+  <div class="chart-card fu">
+    ${secHdr('48-Hour Rainfall', subHourlyRain)}
+    ${makeHourlyRainChart()}
+  </div>
 
-  <section id="charts-rain" class="chart-group">
-    <h2 class="group-ttl">Rainfall</h2>
-    <div class="chart-card fu">
-      ${secHdr('48-Hour Rainfall', subHourlyRain)}
-      ${makeHourlyRainChart()}
-    </div>
-    <div class="chart-card fu">
-      ${secHdr('14-Day Rainfall', subDailyRain)}
-      ${makeDailyRainChart()}
-    </div>
-    <div class="chart-card fu">
-      ${secHdr('Year-to-Date Rainfall', subRain)}
-      ${makeRainYTDChart()}
-    </div>
-  </section>
+  <div class="chart-card fu">
+    ${secHdr('14-Day Rainfall', subDailyRain)}
+    ${makeDailyRainChart()}
+  </div>
 
-  <section id="charts-humid" class="chart-group">
-    <h2 class="group-ttl">Humidity</h2>
-    <div class="chart-card fu">
-      ${secHdr('48-Hour Humidity', subHourlyHumid)}
-      ${makeHourlyHumidChart()}
-    </div>
-    <div class="chart-card fu">
-      ${secHdr('Daily Humidity', subDailyHumid)}
-      ${makeDailyHumidChart()}
-    </div>
-  </section>
+  <div class="chart-card fu">
+    ${secHdr('48-Hour Humidity', subHourlyHumid)}
+    ${makeHourlyHumidChart()}
+  </div>
 
-  <section id="charts-climate" class="chart-group">
-    <h2 class="group-ttl">Climate</h2>
-    <div class="chart-card fu">
-      ${secHdr('Climate Overview', climatologyData?`Avg monthly high/low °${uT().slice(1)} (lines) & total rainfall (bars)${_locFor} · ${climatologyData.yearStart}–${climatologyData.yearEnd}`:`Climate normals${_locFor}`)}
-      ${makeClimateChart()}
-    </div>
-  </section>
+  <div class="chart-card fu">
+    ${secHdr('Daily Humidity', subDailyHumid)}
+    ${makeDailyHumidChart()}
+  </div>
+
+  <div class="chart-card fu">
+    ${secHdr('Year-to-Date Rainfall', subRain)}
+    ${makeRainYTDChart()}
+  </div>
+
+  <div class="chart-card fu">
+    ${secHdr('Climate Overview', climatologyData?`Avg monthly high/low °${uT().slice(1)} (lines) & total rainfall (bars)${_locFor} · ${climatologyData.yearStart}–${climatologyData.yearEnd}`:`Climate normals${_locFor}`)}
+    ${makeClimateChart()}
+  </div>
 
   <footer class="footer fu">
     <p>Forecast & historical data from <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> · Geocoding by <a href="https://nominatim.openstreetmap.org" target="_blank" rel="noopener">Nominatim / OSM</a></p>
