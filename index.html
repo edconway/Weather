@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Weather</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -14,7 +17,7 @@
     <p id="load-msg">Getting your location…</p>
   </div>
   <div id="error" class="error hidden">
-    <div class="error-icon">⚠️</div>
+    <div class="error-icon" aria-hidden="true"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 4.2 1.8 18.1A2 2 0 0 0 3.5 21h17a2 2 0 0 0 1.7-2.9L13.7 4.2a2 2 0 0 0-3.4 0z"/></svg></div>
     <h2>Couldn't load weather</h2>
     <p id="err-msg">Something went wrong.</p>
     <button class="btn" onclick="init()">Try Again</button>
@@ -28,6 +31,7 @@
   </div>
 </div>
 
+<script src="icons.js"></script>
 <script src="app.js"></script>
 <script src="charts.js"></script>
 <script src="search.js"></script>

@@ -58,7 +58,7 @@ function renderDrop(){
     const detail=[r.admin1,r.country_code].filter(Boolean).join(', ');
     const focused=i===searchFocusIdx?'focused':'';
     return`<div class="search-result ${focused}" data-idx="${i}">
-      <div class="sr-left"><span class="sr-pin">📍</span><span class="sr-name">${escapeHtml(r.name)}</span></div>
+      <div class="sr-left"><span class="sr-pin">${ICON.pin}</span><span class="sr-name">${escapeHtml(r.name)}</span></div>
       <span class="sr-detail">${escapeHtml(detail)}</span>
     </div>`;
   }).join('');

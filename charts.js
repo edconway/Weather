@@ -6,9 +6,21 @@ function _hourStep(){ return _narrow()?12:6; }
 function _hourLbl(hr){
   return hr===0?'Midnight':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
 }
+function _cc(){
+  const s=getComputedStyle(document.documentElement);
+  const g=v=>s.getPropertyValue(v).trim();
+  return{
+    hot:g('--chart-hot'),hotPast:g('--chart-hot-past'),
+    cold:g('--chart-cold'),coldPast:g('--chart-cold-past'),
+    rain:g('--chart-rain'),rainPast:g('--chart-rain-past'),rainSolid:g('--chart-rain-solid'),
+    humid:g('--chart-humid'),humidPast:g('--chart-humid-past'),
+    muted:g('--subtle'),dot:'rgba(15,23,42,.85)',
+  };
+}
 
 function makeTempChart(){
   if(!fcData||!histData) return '';
+  const c=_cc();
   const d=fcData.daily;
   // Find today's index in the 14-day array (past_days:7 + forecast_days:7)
   const todayStr=localDateStr();
@@ -48,13 +60,13 @@ function makeTempChart(){
     // Label near left edge, vertically centred on the band at the first data point
     const f=dailyAvg[0];
     const lblY=f.tMax!=null&&f.tMin!=null?((yf(nT(f.tMax))+yf(nT(f.tMin)))/2).toFixed(1):null;
-    const lbl=lblY?`<text x="${pL+4}" y="${(+lblY+4).toFixed(1)}" font-size="8.5" fill="#9ba3ae" opacity="0.8">Hist. avg</text>`:'';
+    const lbl=lblY?`<text x="${pL+4}" y="${(+lblY+4).toFixed(1)}" font-size="8.5" fill="${c.muted}" opacity="0.8">Hist. avg</text>`:'';
     return `<polygon points="${poly}" class="ch-band"/>${lbl}`;
   })();
   // Vertical "Today" divider
   const todayX=xf(todayIdx).toFixed(1);
-  const todayMark=`<line x1="${todayX}" y1="${pT}" x2="${todayX}" y2="${(pT+cH).toFixed(1)}" stroke="#9ba3ae" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
-    `<text x="${todayX}" y="${pT-4}" font-size="8" font-weight="700" fill="#9ba3ae" text-anchor="middle">Today</text>`;
+  const todayMark=`<line x1="${todayX}" y1="${pT}" x2="${todayX}" y2="${(pT+cH).toFixed(1)}" stroke="${c.muted}" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
+    `<text x="${todayX}" y="${pT-4}" font-size="8" font-weight="700" fill="${c.muted}" text-anchor="middle">Today</text>`;
   // Lines: past segment (dashed, index 0..todayIdx inclusive for continuity) and forecast segment (solid)
   const pastMxPts=maxV.slice(0,todayIdx+1).map((v,i)=>`${xf(i).toFixed(1)},${yf(v??lo).toFixed(1)}`).join(' ');
   const pastMnPts=minV.slice(0,todayIdx+1).map((v,i)=>`${xf(i).toFixed(1)},${yf(v??lo).toFixed(1)}`).join(' ');
@@ -65,17 +77,17 @@ function makeTempChart(){
     if(v==null) return '';
     const cx=xf(i).toFixed(1),cy=yf(v).toFixed(1);
     const isPast=i<todayIdx;
-    const fill=isPast?'rgba(255,123,123,0.45)':'#ff7b7b';
+    const fill=isPast?c.hotPast:c.hot;
     const lbl=!isPast?`<text x="${cx}" y="${(yf(v)-9).toFixed(1)}" class="cv cv-hot" text-anchor="middle">${Math.round(v)}°</text>`:'';
-    return `<circle cx="${cx}" cy="${cy}" r="${isPast?2.8:3.5}" fill="${fill}" stroke="rgba(15,12,41,.9)" stroke-width="1.5"/>${lbl}`;
+    return `<circle cx="${cx}" cy="${cy}" r="${isPast?2.8:3.5}" fill="${fill}" stroke="${c.dot}" stroke-width="1.5"/>${lbl}`;
   }).join('');
   const mnDots=minV.map((v,i)=>{
     if(v==null) return '';
     const cx=xf(i).toFixed(1),cy=yf(v).toFixed(1);
     const isPast=i<todayIdx;
-    const fill=isPast?'rgba(116,192,252,0.45)':'#74c0fc';
+    const fill=isPast?c.coldPast:c.cold;
     const lbl=!isPast?`<text x="${cx}" y="${(yf(v)+15).toFixed(1)}" class="cv cv-cold" text-anchor="middle">${Math.round(v)}°</text>`:'';
-    return `<circle cx="${cx}" cy="${cy}" r="${isPast?2.8:3.5}" fill="${fill}" stroke="rgba(15,12,41,.9)" stroke-width="1.5"/>${lbl}`;
+    return `<circle cx="${cx}" cy="${cy}" r="${isPast?2.8:3.5}" fill="${fill}" stroke="${c.dot}" stroke-width="1.5"/>${lbl}`;
   }).join('');
   const xLbls=labels.map((l,i)=>{
     if(_narrow()&&i%2!==0&&i!==todayIdx) return '';
@@ -96,15 +108,16 @@ function makeTempChart(){
       const hv=maxV[n-1],lv=minV[n-1];
       if(hv==null||lv==null) return '';
       const lx=(xf(n-1)+5).toFixed(1);
-      return `<text x="${lx}" y="${(yf(hv)+4).toFixed(1)}" font-size="9" font-weight="700" fill="#c0392b">High</text>` +
-             `<text x="${lx}" y="${(yf(lv)+4).toFixed(1)}" font-size="9" font-weight="700" fill="#2980b9">Low</text>`;
+      return `<text x="${lx}" y="${(yf(hv)+4).toFixed(1)}" font-size="9" font-weight="700" fill="${c.hot}">High</text>` +
+             `<text x="${lx}" y="${(yf(lv)+4).toFixed(1)}" font-size="9" font-weight="700" fill="${c.cold}">Low</text>`;
     })()}
     ${xLbls}
   </svg>`;
 }
 
 function makeRainYTDChart(){
-  if(!ytdData) return '<p class="search-msg" style="padding:24px 0">⏳ Loading year-to-date rainfall…</p>';
+  if(!ytdData) return '<p class="search-msg" style="padding:24px 0">Loading year-to-date rainfall…</p>';
+  const c=_cc();
   const{labels,cumCurrentYear,cumHistAvg,thisYear}=ytdData;
   const n=labels.length;
   if(!n) return '';
@@ -161,8 +174,8 @@ function makeRainYTDChart(){
   const avgPts=avgV.map((v,i)=>`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
   // "Today" divider at the point where actual data ends and forecast begins
   const rainTodayX=xf(n-1).toFixed(1);
-  const rainTodayMark=numFc>0?`<line x1="${rainTodayX}" y1="${pT}" x2="${rainTodayX}" y2="${(pT+cH).toFixed(1)}" stroke="#9ba3ae" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
-    `<text x="${rainTodayX}" y="${pT-4}" font-size="8" font-weight="700" fill="#9ba3ae" text-anchor="middle">Today</text>`:''  ;
+  const rainTodayMark=numFc>0?`<line x1="${rainTodayX}" y1="${pT}" x2="${rainTodayX}" y2="${(pT+cH).toFixed(1)}" stroke="${c.muted}" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
+    `<text x="${rainTodayX}" y="${pT-4}" font-size="8" font-weight="700" fill="${c.muted}" text-anchor="middle">Today</text>`:''  ;
   // Historical avg extension — connects from last avg point into forecast window
   const avgExtPts=avgExtV.length?[
     `${xf(n-1).toFixed(1)},${yf(avgV[n-1]).toFixed(1)}`,
@@ -182,8 +195,8 @@ function makeRainYTDChart(){
   const _rSep=endCurY-endAvgY;
   let _ryCur=endCurY, _ryAvg=endAvgY;
   if(Math.abs(_rSep)<13){const bump=(13-Math.abs(_rSep))/2+1;_ryCur+=_rSep>=0?bump:-bump;_ryAvg+=_rSep>=0?-bump:bump;}
-  const endLabels=`<text x="${+lx+5}" y="${(_ryCur+4).toFixed(1)}" font-size="8.5" font-weight="700" fill="rgba(102,126,234,1)" text-anchor="start">${thisYear}</text>` +
-    `<text x="${+lx+5}" y="${(_ryAvg+4).toFixed(1)}" font-size="8.5" fill="#9ba3ae" text-anchor="start">Hist. avg</text>`;
+  const endLabels=`<text x="${+lx+5}" y="${(_ryCur+4).toFixed(1)}" font-size="8.5" font-weight="700" fill="${c.rain}" text-anchor="start">${thisYear}</text>` +
+    `<text x="${+lx+5}" y="${(_ryAvg+4).toFixed(1)}" font-size="8.5" fill="${c.muted}" text-anchor="start">Hist. avg</text>`;
   _rainData={labels,curV,avgV,thisYear,pL,cW,n,fcV,numFc,totalN,fcstDates};
   return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="rain" tabindex="0" role="img">
     ${ticks.join('')}
@@ -193,8 +206,8 @@ function makeRainYTDChart(){
     <polyline points="${avgPts}" class="cl-ytd-hist"/>
     ${avgExtPts?`<polyline points="${avgExtPts}" class="cl-ytd-hist"/>`:''}
     <polyline points="${curPts}" class="cl-ytd-cur"/>
-    ${fcstPts?`<polyline points="${fcstPts}" stroke="rgba(102,126,234,.9)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5,4"/>`:''}
-    <circle cx="${lx}" cy="${ly}" r="4" fill="rgba(102,126,234,.9)" stroke="rgba(15,12,41,.9)" stroke-width="1.5"/>
+    ${fcstPts?`<polyline points="${fcstPts}" stroke="${c.rainSolid}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5,4"/>`:''}
+    <circle cx="${lx}" cy="${ly}" r="4" fill="${c.rainSolid}" stroke="${c.dot}" stroke-width="1.5"/>
     ${endLabels}
     ${xLabels}
   </svg>`;
@@ -202,7 +215,8 @@ function makeRainYTDChart(){
 
 function makeHourlyTempChart(){
   if(!fcData?.hourly?.time) return '';
-  if(!hourlyHistData) return '<p class="search-msg" style="padding:20px 0">⏳ Loading hourly history…</p>';
+  const c=_cc();
+  if(!hourlyHistData) return '<p class="search-msg" style="padding:20px 0">Loading hourly history…</p>';
   const hh=fcData.hourly;
   const now=new Date();
   const pad=n=>String(n).padStart(2,'0');
@@ -243,8 +257,8 @@ function makeHourlyTempChart(){
   }
   // Now marker
   const nowX=xf(relNow).toFixed(1);
-  const nowMark=`<line x1="${nowX}" y1="${pT}" x2="${nowX}" y2="${(pT+cH).toFixed(1)}" stroke="#9ba3ae" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
-    `<text x="${nowX}" y="${pT-4}" font-size="8" font-weight="700" fill="#9ba3ae" text-anchor="middle">Now</text>`;
+  const nowMark=`<line x1="${nowX}" y1="${pT}" x2="${nowX}" y2="${(pT+cH).toFixed(1)}" stroke="${c.muted}" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
+    `<text x="${nowX}" y="${pT-4}" font-size="8" font-weight="700" fill="${c.muted}" text-anchor="middle">Now</text>`;
   // Polylines
   const histPts=histLine.map((v,i)=>`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
   const pastPts=temps.slice(0,relNow+1).map((v,i)=>`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
@@ -257,10 +271,10 @@ function makeHourlyTempChart(){
     if(!is6h) return '';
     const isPast=i<relNow;
     const cx=xf(i).toFixed(1),cy=yf(v).toFixed(1);
-    const fill=isPast?'rgba(255,100,100,0.45)':'#ff7b7b';
+    const fill=isPast?'${c.hotPast}':'${c.hot}';
     const r=isPast?2.5:3;
     const lbl=!isPast&&is6h?`<text x="${cx}" y="${(yf(v)-8).toFixed(1)}" class="cv cv-hot" text-anchor="middle">${Math.round(v)}°</text>`:'';
-    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="rgba(15,12,41,.9)" stroke-width="1.5"/>${lbl}`;
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="${c.dot}" stroke-width="1.5"/>${lbl}`;
   }).join('');
   // X-axis labels every 6h
   const usedX=new Set();
@@ -282,8 +296,8 @@ function makeHourlyTempChart(){
     if(Math.abs(_heSep)<13){const bump=(13-Math.abs(_heSep))/2+1;_heTmp+=_heSep>=0?bump:-bump;_heAvg+=_heSep>=0?-bump:bump;}
   }
   const endLbls=[
-    _heTmp!=null?`<text x="${endX}" y="${(_heTmp+4).toFixed(1)}" font-size="8.5" font-weight="700" fill="#c0392b">Forecast</text>`:'',
-    _heAvg!=null?`<text x="${endX}" y="${(_heAvg+4).toFixed(1)}" font-size="8.5" fill="#9ba3ae">5-yr avg</text>`:''
+    _heTmp!=null?`<text x="${endX}" y="${(_heTmp+4).toFixed(1)}" font-size="8.5" font-weight="700" fill="${c.hot}">Forecast</text>`:'',
+    _heAvg!=null?`<text x="${endX}" y="${(_heAvg+4).toFixed(1)}" font-size="8.5" fill="${c.muted}">5-yr avg</text>`:''
   ].join('');
   _hourlyData={temps,histLine,pL,cW,n,nowIdx:relNow,times:slicedTime};
   return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="hourly" tabindex="0" role="img">
@@ -301,6 +315,7 @@ function makeHourlyTempChart(){
 
 function makeHourlyRainChart(){
   if(!fcData?.hourly?.time) return '';
+  const c=_cc();
   const hh=fcData.hourly;
   const now=new Date();
   const pad=n=>String(n).padStart(2,'0');
@@ -337,21 +352,21 @@ function makeHourlyRainChart(){
   }
   // "Now" divider in the middle, same as temp chart
   const nowX=xCx(relNow).toFixed(1);
-  const nowMark=`<line x1="${nowX}" y1="${pT}" x2="${nowX}" y2="${(pT+cH).toFixed(1)}" stroke="#9ba3ae" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
-    `<text x="${nowX}" y="${pT-4}" font-size="8" font-weight="700" fill="#9ba3ae" text-anchor="middle">Now</text>`;
+  const nowMark=`<line x1="${nowX}" y1="${pT}" x2="${nowX}" y2="${(pT+cH).toFixed(1)}" stroke="${c.muted}" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
+    `<text x="${nowX}" y="${pT-4}" font-size="8" font-weight="700" fill="${c.muted}" text-anchor="middle">Now</text>`;
   // Bars — past faded, forecast solid
   const bars=precip.map((v,i)=>{
     const bx=xBL(i).toFixed(1);
     const bH=Math.max(0,yf(0)-yf(v));
     if(bH<0.5) return '';
-    const fill=i<relNow?'rgba(102,126,234,0.3)':'rgba(102,126,234,0.8)';
+    const fill=i<relNow?'${c.rainPast}':'${c.rainSolid}';
     return `<rect x="${bx}" y="${yf(v).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${fill}" rx="1"/>`;
   }).join('');
   // Probability text above forecast bars only (>=20%)
   const probLbls=prob.map((p,i)=>{
     if(i<relNow||p==null||p<20) return '';
     const ty=(yf(precip[i]??0)-4).toFixed(1);
-    return `<text x="${xCx(i).toFixed(1)}" y="${ty}" font-size="7" fill="rgba(41,128,185,0.85)" text-anchor="middle">${p}%</text>`;
+    return `<text x="${xCx(i).toFixed(1)}" y="${ty}" font-size="7" fill="${c.cold}" text-anchor="middle">${p}%</text>`;
   }).join('');
   // X labels every 6h
   const usedX=new Set();
@@ -374,6 +389,7 @@ function makeHourlyRainChart(){
 
 function makeDailyRainChart(){
   if(!fcData?.daily?.time) return '';
+  const c=_cc();
   const daily=fcData.daily;
   // With past_days:7, index 7 is today — all 14 days are already in fcData
   const todayIdx=Math.min(7,daily.time.length-1);
@@ -402,21 +418,21 @@ function makeDailyRainChart(){
   }
   // Today divider
   const todayX=xCx(todayIdx).toFixed(1);
-  const todayMark=`<line x1="${todayX}" y1="${pT}" x2="${todayX}" y2="${(pT+cH).toFixed(1)}" stroke="#9ba3ae" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
-    `<text x="${todayX}" y="${pT-4}" font-size="8" font-weight="700" fill="#9ba3ae" text-anchor="middle">Today</text>`;
+  const todayMark=`<line x1="${todayX}" y1="${pT}" x2="${todayX}" y2="${(pT+cH).toFixed(1)}" stroke="${c.muted}" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
+    `<text x="${todayX}" y="${pT-4}" font-size="8" font-weight="700" fill="${c.muted}" text-anchor="middle">Today</text>`;
   // Bars and labels
   const els=daily.time.map((dateStr,i)=>{
     const mm=precip[i], cx=xCx(i).toFixed(1), bx=xBL(i).toFixed(1);
     const bH=Math.max(0,yf(0)-yf(mm));
     const isPast=i<todayIdx;
-    const fill=isPast?'rgba(102,126,234,0.3)':'rgba(102,126,234,0.8)';
+    const fill=isPast?'${c.rainPast}':'${c.rainSolid}';
     const bar=bH>0.5?`<rect x="${bx}" y="${yf(mm).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${fill}" rx="2"/>`:''
-    const valLbl=mm>=0.1?`<text x="${cx}" y="${(yf(mm)-5).toFixed(1)}" font-size="8" fill="rgba(102,126,234,0.9)" text-anchor="middle">${fmtMm(mm)}</text>`:''
+    const valLbl=mm>=0.1?`<text x="${cx}" y="${(yf(mm)-5).toFixed(1)}" font-size="8" fill="${c.rainSolid}" text-anchor="middle">${fmtMm(mm)}</text>`:''
     const isToday=i===todayIdx;
     const showDayLbl=isToday||!_narrow()||i%2===0;
     const dayLbl=showDayLbl?(isToday?'Today':fDay(dateStr)):'';
     const prob=probs[i];
-    const probLbl=!isPast&&prob!=null?`<text x="${cx}" y="${H-8}" font-size="7.5" fill="rgba(41,128,185,0.8)" text-anchor="middle">${prob}%</text>`:'';
+    const probLbl=!isPast&&prob!=null?`<text x="${cx}" y="${H-8}" font-size="7.5" fill="${c.cold}" text-anchor="middle">${prob}%</text>`:'';
     return bar+valLbl+
       (dayLbl?`<text x="${cx}" y="${H-22}" class="ca" font-weight="${isToday?700:400}" text-anchor="middle">${dayLbl}</text>`:'')+
       probLbl;
@@ -432,7 +448,8 @@ function makeDailyRainChart(){
 
 function makeHourlyHumidChart(){
   if(!fcData?.hourly?.time) return '';
-  if(!hourlyHumidData) return '<p class="search-msg" style="padding:20px 0">⏳ Loading humidity history…</p>';
+  const c=_cc();
+  if(!hourlyHumidData) return '<p class="search-msg" style="padding:20px 0">Loading humidity history…</p>';
   const hh=fcData.hourly;
   const now=new Date();
   const pad=n=>String(n).padStart(2,'0');
@@ -466,8 +483,8 @@ function makeHourlyHumidChart(){
   }
   // Now divider
   const nowX=xf(relNow).toFixed(1);
-  const nowMark=`<line x1="${nowX}" y1="${pT}" x2="${nowX}" y2="${(pT+cH).toFixed(1)}" stroke="#9ba3ae" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
-    `<text x="${nowX}" y="${pT-4}" font-size="8" font-weight="700" fill="#9ba3ae" text-anchor="middle">Now</text>`;
+  const nowMark=`<line x1="${nowX}" y1="${pT}" x2="${nowX}" y2="${(pT+cH).toFixed(1)}" stroke="${c.muted}" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
+    `<text x="${nowX}" y="${pT-4}" font-size="8" font-weight="700" fill="${c.muted}" text-anchor="middle">Now</text>`;
   // Polylines
   const histPts=aVals.map((v,i)=>v!=null?`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`:null).filter(Boolean).join(' ');
   const pastPts=hVals.slice(0,relNow+1).map((v,i)=>v!=null?`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`:null).filter(Boolean).join(' ');
@@ -477,8 +494,8 @@ function makeHourlyHumidChart(){
   const eFC=hVals[n-1], eHI=aVals[n-1];
   let yFC=eFC!=null?yf(eFC):null, yHI=eHI!=null?yf(eHI):null;
   if(yFC!=null&&yHI!=null&&Math.abs(yFC-yHI)<12){const b=(12-Math.abs(yFC-yHI))/2+1;yFC+=(yFC>=yHI?b:-b);yHI+=(yHI>yFC?b:-b);}
-  const endLbls=(yFC!=null?`<text x="${endX}" y="${(yFC+4).toFixed(1)}" font-size="8.5" font-weight="700" fill="#4bc6b9">Forecast</text>`:'')+
-    (yHI!=null?`<text x="${endX}" y="${(yHI+4).toFixed(1)}" font-size="8.5" fill="#9ba3ae">5-yr avg</text>`:'');
+  const endLbls=(yFC!=null?`<text x="${endX}" y="${(yFC+4).toFixed(1)}" font-size="8.5" font-weight="700" fill="${c.humid}">Forecast</text>`:'')+
+    (yHI!=null?`<text x="${endX}" y="${(yHI+4).toFixed(1)}" font-size="8.5" fill="${c.muted}">5-yr avg</text>`:'');
   // X labels every 6h
   const usedX=new Set();
   const xLbls=times.map((t,i)=>{
@@ -494,8 +511,8 @@ function makeHourlyHumidChart(){
     ${nowMark}
     <line id="ttg-hourly-humid" x1="${pL}" y1="${pT}" x2="${pL}" y2="${(pT+cH).toFixed(1)}" stroke="rgba(255,255,255,.18)" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>
     <polyline points="${histPts}" class="cl-ytd-hist"/>
-    <polyline points="${pastPts}" fill="none" stroke="rgba(75,198,185,0.5)" stroke-width="2" stroke-dasharray="5,4" stroke-linejoin="round" stroke-linecap="round"/>
-    <polyline points="${fcstPts}" fill="none" stroke="#4bc6b9" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <polyline points="${pastPts}" fill="none" stroke="${c.humidPast}" stroke-width="2" stroke-dasharray="5,4" stroke-linejoin="round" stroke-linecap="round"/>
+    <polyline points="${fcstPts}" fill="none" stroke="${c.humid}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
     ${endLbls}
     ${xLbls}
   </svg>`;
@@ -503,7 +520,8 @@ function makeHourlyHumidChart(){
 
 function makeDailyHumidChart(){
   if(!fcData?.hourly?.time) return '';
-  if(!hourlyHumidData) return '<p class="search-msg" style="padding:20px 0">⏳ Loading humidity history…</p>';
+  const c=_cc();
+  if(!hourlyHumidData) return '<p class="search-msg" style="padding:20px 0">Loading humidity history…</p>';
   const hh=fcData.hourly;
   // Build day→hourly values map from the full hourly array
   const dayMap={};
@@ -547,11 +565,11 @@ function makeDailyHumidChart(){
   // Seasonal avg reference line
   const histY=histMean!=null?yf(histMean).toFixed(1):null;
   const histLine=histY?`<line x1="${pL}" y1="${histY}" x2="${W-pR}" y2="${histY}" class="cl-ytd-hist"/>` +
-    `<text x="${(W-pR+5).toFixed(1)}" y="${(+histY+4).toFixed(1)}" font-size="8.5" fill="#9ba3ae">Avg</text>`:'';
+    `<text x="${(W-pR+5).toFixed(1)}" y="${(+histY+4).toFixed(1)}" font-size="8.5" fill="${c.muted}">Avg</text>`:'';
   // Today divider
   const todayX=xCx(relToday).toFixed(1);
-  const todayMark=`<line x1="${todayX}" y1="${pT}" x2="${todayX}" y2="${(pT+cH).toFixed(1)}" stroke="#9ba3ae" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
-    `<text x="${todayX}" y="${pT-4}" font-size="8" font-weight="700" fill="#9ba3ae" text-anchor="middle">Today</text>`;
+  const todayMark=`<line x1="${todayX}" y1="${pT}" x2="${todayX}" y2="${(pT+cH).toFixed(1)}" stroke="${c.muted}" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
+    `<text x="${todayX}" y="${pT-4}" font-size="8" font-weight="700" fill="${c.muted}" text-anchor="middle">Today</text>`;
   const els=dates.map((dateStr,i)=>{
     const mm=dailyMean[i];
     const isPast=i<relToday, isToday=i===relToday;
@@ -559,7 +577,7 @@ function makeDailyHumidChart(){
     const dayLabel=(!isToday&&_narrow()&&i%2!==0)?'':`<text x="${cx}" y="${H-22}" class="ca" font-weight="${isToday?700:400}" text-anchor="middle">${isToday?'Today':fDay(dateStr)}</text>`;
     if(mm==null) return ''; // skip days with insufficient data
     const bH=Math.max(0,yf(lo)-yf(mm));
-    const fill=isPast?'rgba(75,198,185,0.3)':'rgba(75,198,185,0.8)';
+    const fill=isPast?'${c.humidPast}':'${c.humid}';
     const bar=bH>0.5?`<rect x="${bx}" y="${yf(mm).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${fill}" rx="2"/>`:''
     return bar+dayLabel;
   }).join('');
@@ -574,7 +592,8 @@ function makeDailyHumidChart(){
 }
 
 function makeClimateChart(){
-  if(!climatologyData) return '<p class="search-msg" style="padding:20px 0">⏳ Loading climate data…</p>';
+  if(!climatologyData) return '<p class="search-msg" style="padding:20px 0">Loading climate data…</p>';
+  const c=_cc();
   const{months:data,yearStart,yearEnd}=climatologyData;
   const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const curMo=new Date().getMonth();
@@ -621,7 +640,7 @@ function makeClimateChart(){
     if(d.rain==null) return '';
     const bH=Math.max(0,yfR(0)-yfR(d.rain));
     if(bH<0.5) return '';
-    return `<rect x="${xBL(i).toFixed(1)}" y="${yfR(d.rain).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="rgba(102,126,234,0.45)" rx="2"/>`;
+    return `<rect x="${xBL(i).toFixed(1)}" y="${yfR(d.rain).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${c.rainPast}" rx="2"/>`;
   }).join('');
   // Temperature polylines
   const hotPts=data.map((d,i)=>d.tMax!=null?`${xCx(i).toFixed(1)},${yfT(d.tMax).toFixed(1)}`:null).filter(Boolean).join(' ');
@@ -629,14 +648,14 @@ function makeClimateChart(){
   // Dots at each month
   const dots=data.map((d,i)=>{
     const cx=xCx(i).toFixed(1), r=i===curMo?4:3;
-    return (d.tMax!=null?`<circle cx="${cx}" cy="${yfT(d.tMax).toFixed(1)}" r="${r}" fill="#ff7b7b" stroke="rgba(15,12,41,.9)" stroke-width="1.5"/>`:'') +
-           (d.tMin!=null?`<circle cx="${cx}" cy="${yfT(d.tMin).toFixed(1)}" r="${r}" fill="#74c0fc" stroke="rgba(15,12,41,.9)" stroke-width="1.5"/>`:'');
+    return (d.tMax!=null?`<circle cx="${cx}" cy="${yfT(d.tMax).toFixed(1)}" r="${r}" fill="${c.hot}" stroke="${c.dot}" stroke-width="1.5"/>`:'') +
+           (d.tMin!=null?`<circle cx="${cx}" cy="${yfT(d.tMin).toFixed(1)}" r="${r}" fill="${c.cold}" stroke="${c.dot}" stroke-width="1.5"/>`:'');
   }).join('');
   // End-of-line labels
   const endX=(xCx(11)+5).toFixed(1);
   const lastHot=data[11]?.tMax, lastCold=data[11]?.tMin;
-  const endLbls=(lastHot!=null?`<text x="${endX}" y="${(yfT(lastHot)+4).toFixed(1)}" font-size="8.5" font-weight="600" fill="#c0392b">High</text>`:'')+
-    (lastCold!=null?`<text x="${endX}" y="${(yfT(lastCold)+4).toFixed(1)}" font-size="8.5" font-weight="600" fill="#4a9eda">Low</text>`:'');
+  const endLbls=(lastHot!=null?`<text x="${endX}" y="${(yfT(lastHot)+4).toFixed(1)}" font-size="8.5" font-weight="600" fill="${c.hot}">High</text>`:'')+
+    (lastCold!=null?`<text x="${endX}" y="${(yfT(lastCold)+4).toFixed(1)}" font-size="8.5" font-weight="600" fill="${c.cold}">Low</text>`:'');
   // X axis
   const xLbls=MON.map((m,i)=>
     `<text x="${xCx(i).toFixed(1)}" y="${H-6}" class="ca" text-anchor="middle" font-weight="${i===curMo?700:400}">${m}</text>`
@@ -647,8 +666,8 @@ function makeClimateChart(){
     ${rTicks.join('')}
     ${curHL}
     ${bars}
-    <polyline points="${hotPts}" fill="none" stroke="#ff7b7b" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-    <polyline points="${coldPts}" fill="none" stroke="#74c0fc" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <polyline points="${hotPts}" fill="none" stroke="${c.hot}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <polyline points="${coldPts}" fill="none" stroke="${c.cold}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
     ${dots}
     ${endLbls}
     ${xLbls}
