@@ -943,12 +943,16 @@ function setLoad(msg){
   content.addEventListener('mouseleave',hideTT);
 
   let _compact=window.innerWidth<=480;
+  let _mobile=window.innerWidth<=640;
   let _resizeTimer;
   window.addEventListener('resize',()=>{
     clearTimeout(_resizeTimer);
     _resizeTimer=setTimeout(()=>{
       const c=window.innerWidth<=480;
-      if(c!==_compact&&fcData){ _compact=c; renderContent(); }
+      const m=window.innerWidth<=640;
+      if((c!==_compact||m!==_mobile)&&fcData){
+        _compact=c; _mobile=m; renderContent();
+      }
     }, 200);
   });
 })();
