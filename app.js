@@ -898,11 +898,16 @@ function setLoad(msg){
         <div class="tt-row"><span class="tt-lbl">Avg rainfall</span><span class="tt-muted">${fmtR(d.rain)}</span></div>`;
     } else return;
     tt.innerHTML=html;
-    const tW=170,mg=14;
+    const mg=14;
     let tx=cx+mg, ty=cy-100;
-    if(tx+tW>window.innerWidth) tx=cx-tW-mg;
-    if(ty<8) ty=cy+mg;
+    const tW=Math.min(170, tt.offsetWidth||170, window.innerWidth-mg*2);
+    if(tx+tW>window.innerWidth-mg) tx=Math.max(mg, cx-tW-mg);
+    if(tx<mg) tx=mg;
+    if(ty<mg) ty=cy+mg;
     tt.style.left=tx+'px'; tt.style.top=ty+'px';
+    const tH=tt.offsetHeight;
+    if(ty+tH>window.innerHeight-mg) ty=Math.max(mg, window.innerHeight-tH-mg);
+    tt.style.top=ty+'px';
     tt.classList.remove('hidden');
   }
   function hideTT(){
@@ -925,6 +930,16 @@ function setLoad(msg){
     showTT(svgX,svg.dataset.chart,e.clientX,e.clientY);
   });
   content.addEventListener('mouseleave',hideTT);
+
+  let _compact=window.innerWidth<=480;
+  let _resizeTimer;
+  window.addEventListener('resize',()=>{
+    clearTimeout(_resizeTimer);
+    _resizeTimer=setTimeout(()=>{
+      const c=window.innerWidth<=480;
+      if(c!==_compact&&fcData){ _compact=c; renderContent(); }
+    }, 200);
+  });
 })();
 
 // ── Boot ───────────────────────────────────────────────
