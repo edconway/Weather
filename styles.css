@@ -236,58 +236,6 @@ body{
 .sec-details[open] summary{color:var(--muted)}
 .sec-sub{font-size:.76rem;color:var(--subtle);margin-top:6px;line-height:1.45;word-break:break-word}
 
-/* ─── Section nav ─── */
-.sec-nav{
-  display:flex;gap:8px;overflow-x:auto;
-  margin-bottom:20px;padding:2px 0 6px;
-  scrollbar-width:none;
-  position:sticky;top:0;z-index:50;
-  background:linear-gradient(var(--bg) 70%,transparent);
-  padding-top:4px;
-}
-.sec-nav::-webkit-scrollbar{display:none}
-.sec-nav a{
-  flex-shrink:0;padding:7px 15px;border-radius:999px;
-  font-size:.78rem;font-weight:600;color:var(--muted);
-  background:var(--card);text-decoration:none;
-  box-shadow:var(--shadow-sm);
-  transition:color .15s,background .15s;
-}
-.sec-nav a:hover{color:var(--accent);background:var(--accent-soft)}
-
-/* ─── Chart groups ─── */
-.chart-group{margin-bottom:8px}
-.group-ttl{
-  font-size:.92rem;font-weight:600;color:var(--text);
-  margin:0 0 12px;letter-spacing:-.02em;
-}
-
-/* ─── Forecast grid ─── */
-.fcast-grid{
-  display:grid;grid-template-columns:repeat(7,1fr);
-  gap:6px;margin-bottom:20px;
-}
-@media(max-width:580px){
-  .fcast-grid{display:flex;overflow-x:auto;padding-bottom:8px;scrollbar-width:none}
-  .fcast-grid::-webkit-scrollbar{display:none}
-  .fc{min-width:76px}
-}
-.fc{
-  background:var(--card);
-  border:none;border-radius:var(--rs);
-  padding:12px 6px;text-align:center;
-  transition:background .15s,box-shadow .15s;cursor:default;
-  box-shadow:var(--shadow-sm);
-}
-.fc:hover{background:var(--card-hover);box-shadow:var(--shadow-md)}
-.fc.today{background:var(--accent-soft);box-shadow:var(--shadow-sm),0 0 0 1.5px var(--accent)}
-.fc-day{font-size:.7rem;font-weight:600;color:var(--muted);margin-bottom:7px}
-.fc.today .fc-day{color:var(--accent)}
-.fc-ico{color:var(--accent);display:flex;justify-content:center;margin:2px 0}
-.fc-hi{font-size:.85rem;font-weight:700;color:var(--hot);margin-top:6px}
-.fc-lo{font-size:.76rem;color:var(--cold);margin-top:2px}
-.fc-pop{font-size:.65rem;color:var(--subtle);margin-top:4px}
-
 /* ─── Historical comparison ─── */
 .hist{
   background:#f7f8f9;
@@ -522,11 +470,8 @@ body{
   :root:not([data-theme="light"]) .search-result:hover,
   :root:not([data-theme="light"]) .search-result.focused{background:#1f242c}
   :root:not([data-theme="light"]) .hero{background:var(--card)}
-  :root:not([data-theme="light"]) .fc,
   :root:not([data-theme="light"]) .hist,
   :root:not([data-theme="light"]) .chart-card{background:var(--card)}
-  :root:not([data-theme="light"]) .fc:hover{background:var(--card-hover)}
-  :root:not([data-theme="light"]) .fc.today{background:var(--accent-soft);box-shadow:var(--shadow-sm),0 0 0 1.5px var(--accent)}
   :root:not([data-theme="light"]) .stat-tile{background:var(--card-hover)}
   :root:not([data-theme="light"]) .tt{background:var(--card);box-shadow:var(--shadow-md)}
   :root:not([data-theme="light"]) .ch-band{fill:var(--chart-band)}
@@ -545,11 +490,8 @@ body{
 :root[data-theme="dark"] .search-result:hover,
 :root[data-theme="dark"] .search-result.focused{background:var(--card-hover)}
 :root[data-theme="dark"] .hero{background:var(--card)}
-:root[data-theme="dark"] .fc,
 :root[data-theme="dark"] .hist,
 :root[data-theme="dark"] .chart-card{background:var(--card)}
-:root[data-theme="dark"] .fc:hover{background:var(--card-hover)}
-:root[data-theme="dark"] .fc.today{background:var(--accent-soft);box-shadow:var(--shadow-sm),0 0 0 1.5px var(--accent)}
 :root[data-theme="dark"] .stat-tile{background:var(--card-hover)}
 :root[data-theme="dark"] .tt{background:var(--card);box-shadow:var(--shadow-md)}
 :root[data-theme="dark"] .ch-band{fill:var(--chart-band)}
