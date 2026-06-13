@@ -1,8 +1,23 @@
 // ── Chart renderers ────────────────────────────────────
 
 function _narrow(){ return typeof window!=='undefined'&&window.innerWidth<=480; }
+function _mobileChart(){ return typeof window!=='undefined'&&window.innerWidth<=640; }
 function _chartPR(){ return _narrow()?42:14; }
 function _hourStep(){ return _narrow()?12:6; }
+function _chartH(baseH){
+  if(!_mobileChart()) return baseH;
+  return Math.round(580*0.75); // 4:3 aspect on mobile
+}
+function _chartPad(pT,pB,baseH){
+  const H=_chartH(baseH);
+  if(H<=baseH) return {pT,pB};
+  const s=H/baseH;
+  return {pT:Math.round(pT*s),pB:Math.round(pB*s)};
+}
+function _dims(baseH,pL,pR,pT,pB){
+  const H=_chartH(baseH),pad=_chartPad(pT,pB,baseH);
+  return {W:580,H,pL,pR,pT:pad.pT,pB:pad.pB};
+}
 function _hourLbl(hr){
   return hr===0?'Midnight':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
 }
@@ -35,7 +50,7 @@ function makeTempChart(){
   if(!allV.length) return '';
   const lo=Math.floor(Math.min(...allV))-2;
   const hi=Math.ceil(Math.max(...allV))+2;
-  const W=580,H=210,pL=46,pR=_chartPR(),pT=24,pB=38;
+  const{W,H,pL,pR,pT,pB}=_dims(210,46,_chartPR(),24,38);
   const cW=W-pL-pR,cH=H-pT-pB;
   const n=labels.length;
   const xf=i=>pL+i/(n-1)*cW;
@@ -141,7 +156,7 @@ function makeRainYTDChart(){
   const avgV=cumHistAvg.map(nP);
   const fcV=fcstExtCum.map(nP);
   const avgExtV=(ytdData.cumHistAvgExt||[]).slice(0,numFc).map(nP);
-  const W=580,H=222,pL=52,pR=_chartPR(),pT=20,pB=36;
+  const{W,H,pL,pR,pT,pB}=_dims(222,52,_chartPR(),20,36);
   const cW=W-pL-pR,cH=H-pT-pB;
   const yMax=Math.max(...curV,...avgV,...(fcV.length?fcV:[0]),...(avgExtV.length?avgExtV:[0]),.01)*1.1;
   // x maps over the full totalN range so forecast extends naturally to the right
@@ -240,7 +255,7 @@ function makeHourlyTempChart(){
   const allV=[...temps,...histLine].filter(v=>v!=null&&!isNaN(v));
   if(!allV.length) return '';
   const lo=Math.floor(Math.min(...allV))-1, hi=Math.ceil(Math.max(...allV))+1;
-  const W=580,H=198,pL=46,pR=_chartPR(),pT=20,pB=32;
+  const{W,H,pL,pR,pT,pB}=_dims(198,46,_chartPR(),20,32);
   const cW=W-pL-pR,cH=H-pT-pB;
   const n=temps.length;
   const xf=i=>pL+i/(n-1)*cW;
@@ -332,7 +347,7 @@ function makeHourlyRainChart(){
   if(!n) return '';
   const relNow=nowIdx-startIdx;
   const yMax=Math.max(...precip,0.5)*1.25;
-  const W=580,H=185,pL=46,pR=_chartPR(),pT=20,pB=36;
+  const{W,H,pL,pR,pT,pB}=_dims(185,46,_chartPR(),20,36);
   const cW=W-pL-pR,cH=H-pT-pB;
   const slotW=cW/n;
   const barW=Math.max(2,slotW*0.72);
@@ -396,7 +411,7 @@ function makeDailyRainChart(){
   const n=daily.time.length; // 14
   const precip=(daily.precipitation_sum||[]).map(v=>v??0);
   const probs=daily.precipitation_probability_max||[];
-  const W=580,H=185,pL=46,pR=_chartPR(),pT=20,pB=38;
+  const{W,H,pL,pR,pT,pB}=_dims(185,46,_chartPR(),20,38);
   const cW=W-pL-pR,cH=H-pT-pB;
   const yMax=Math.max(...precip,1)*1.2;
   const slotW=cW/n;
@@ -470,7 +485,7 @@ function makeHourlyHumidChart(){
   if(!allV.length) return '';
   const lo=Math.max(0,Math.floor(Math.min(...allV)/10)*10-10);
   const hi=Math.min(100,Math.ceil(Math.max(...allV)/10)*10+5);
-  const W=580,H=185,pL=46,pR=_chartPR(),pT=20,pB=32;
+  const{W,H,pL,pR,pT,pB}=_dims(185,46,_chartPR(),20,32);
   const cW=W-pL-pR,cH=H-pT-pB;
   const xf=i=>pL+i/(n-1)*cW;
   const yf=v=>pT+(1-(v-lo)/(hi-lo))*cH;
@@ -549,7 +564,7 @@ function makeDailyHumidChart(){
   if(!allV.length) return '';
   const lo=Math.max(0,Math.floor(Math.min(...allV,(histMean??100))/10)*10-10);
   const hi=Math.min(100,Math.ceil(Math.max(...allV,(histMean??0))/10)*10+5);
-  const W=580,H=185,pL=46,pR=_chartPR(),pT=20,pB=38;
+  const{W,H,pL,pR,pT,pB}=_dims(185,46,_chartPR(),20,38);
   const cW=W-pL-pR,cH=H-pT-pB;
   const slotW=cW/n;
   const barW=slotW*0.6;
@@ -598,7 +613,7 @@ function makeClimateChart(){
   const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const curMo=new Date().getMonth();
   const n=12;
-  const W=580,H=200,pL=46,pR=_narrow()?58:54,pT=24,pB=28;
+  const{W,H,pL,pR,pT,pB}=_dims(200,46,_narrow()?58:54,24,28);
   const cW=W-pL-pR,cH=H-pT-pB;
   // Temperature axis (left) — store in °C, display in user units
   const tMaxes=data.map(d=>d.tMax).filter(v=>v!=null);

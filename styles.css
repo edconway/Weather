@@ -367,6 +367,20 @@ body{
   box-shadow:var(--shadow-sm);
 }
 .chart-card .wc-svg{min-width:min(100%,300px)}
+
+@media(max-width:640px){
+  .chart-card{
+    overflow-x:auto;
+    overflow-y:visible;
+    -webkit-overflow-scrolling:touch;
+  }
+  .chart-card .wc-svg{
+    width:100%;
+    min-width:100%;
+    min-height:clamp(260px,88vw,420px);
+    height:auto;
+  }
+}
 .chart-leg{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px}
 .cli{display:flex;align-items:center;gap:6px;font-size:.7rem;color:var(--muted)}
 
