@@ -44,7 +44,59 @@ function applyTheme(theme) {
 
 function themeBtnLabel() {
   const t = document.documentElement.dataset.theme || 'auto';
-  return t === 'dark' ? '☀️ Light' : t === 'light' ? '🌓 Auto' : '🌙 Dark';
+  if (t === 'dark') return 'Light';
+  if (t === 'light') return 'Auto';
+  return 'Dark';
+}
+
+function applyTimeAmbience() {
+  const h = new Date().getHours();
+  const period = h >= 5 && h < 12 ? 'morning' : h >= 12 && h < 17 ? 'afternoon' : h >= 17 && h < 21 ? 'evening' : 'night';
+  document.documentElement.dataset.time = period;
+}
+
+function heroTint(code) {
+  if (code === 0 || code === 1) return 'rgba(255,210,80,.08)';
+  if (code === 2 || code === 3) return 'rgba(140,170,220,.07)';
+  if (code >= 95) return 'rgba(120,80,255,.06)';
+  if (code >= 71) return 'rgba(190,225,255,.06)';
+  if (code >= 51) return 'rgba(60,140,255,.06)';
+  return 'rgba(74,95,127,.04)';
+}
+
+function anomalyBadge(text, kind) {
+  return `<span class="badge badge-${kind}">${escapeHtml(text)}</span>`;
+}
+
+function rainAnomalyKind(text) {
+  if (text.includes('wet') || text.includes('Wet')) return 'wet';
+  if (text.includes('Dry') || text.includes('Drier')) return 'dry';
+  return 'neutral';
+}
+
+function secHdr(title, details) {
+  return `<div class="sec-hdr" style="margin-bottom:6px">
+    <span class="sec-ttl">${escapeHtml(title)}</span>
+    ${details ? `<details class="sec-details"><summary>Chart details</summary><p class="sec-sub">${escapeHtml(details)}</p></details>` : ''}
+  </div>`;
+}
+
+function forecastGridHtml(d, t0) {
+  const cells = [];
+  for (let i = 0; i < 7; i++) {
+    const idx = t0 + i;
+    if (idx >= d.time.length) break;
+    const today = i === 0;
+    const pop = d.precipitation_probability_max[idx];
+    cells.push(`<div class="fc${today ? ' today' : ''}">
+      <div class="fc-day">${today ? 'Today' : fDay(d.time[idx])}</div>
+      <span class="fc-ico">${weatherIcon(d.weather_code[idx], 28)}</span>
+      <div class="fc-hi">${fT(d.temperature_2m_max[idx])}</div>
+      <div class="fc-lo">${fT(d.temperature_2m_min[idx])}</div>
+      ${pop != null ? `<div class="fc-pop">${pop}%</div>` : ''}
+    </div>`);
+  }
+  return `<div class="fcast-grid fu">${cells.join('')}</div>`;
 }
 
 function toggleTheme() {
@@ -112,7 +164,7 @@ function renderHeader(){
     const shortCustom=customName?customName.split(',')[0].trim():'Custom';
     el.innerHTML=`<div class="hdr">
       <div id="btn-loc" class="loc" role="button" tabindex="0" title="Search for a location">
-        <span class="loc-icon">📍</span>
+        <span class="loc-icon">${ICON.pin}</span>
         <div class="loc-text">
           <h1 class="loc-name">${escapeHtml(geoName)||'—'}</h1>
           <p class="loc-date">${fDate(new Date())}</p>
@@ -215,25 +267,25 @@ function renderContent(){
   // ── Hero anomaly context ──────────────────────────────
   const _histEntry=histData?.dailyAvg?.[7];
   const _tempAnomaly=(()=>{
-    if(!_histEntry?.tMax||!_histEntry?.tMin) return '';
+    if(!_histEntry?.tMax||!_histEntry?.tMin) return null;
     const fMean=(tMax0+tMin0)/2, hMean=(_histEntry.tMax+_histEntry.tMin)/2;
     const delta=fMean-hMean, abs=Math.abs(delta);
-    if(abs<1) return 'Near normal';
+    if(abs<1) return {text:'Near normal',kind:'neutral'};
     const disp=imp?Math.round(abs*9/5):Math.round(abs);
-    return `${disp}${uT()} ${delta>0?'warmer':'colder'} than normal`;
+    return {text:`${disp}${uT()} ${delta>0?'warmer':'colder'} than normal`,kind:delta>0?'warm':'cold'};
   })();
   const _rainAnomaly=(()=>{
-    if(!dailyRainHistData?.[0]) return '';
+    if(!dailyRainHistData?.[0]) return null;
     const dr=dailyRainHistData[0];
-    if(dr.forecastMm<0.1) return dr.histMeanMm>=1?'Drier than normal':'Dry day expected';
-    if(dr.p90Mm>0&&dr.forecastMm>=dr.p90Mm) return 'Unusually wet';
-    if(dr.forecastMm>dr.histMeanMm*1.5&&dr.forecastMm-dr.histMeanMm>=1) return 'Wetter than normal';
-    if(dr.histMeanMm>0.5&&dr.forecastMm<dr.histMeanMm*0.5) return 'Drier than normal';
-    return 'Near normal rainfall';
+    if(dr.forecastMm<0.1) return {text:dr.histMeanMm>=1?'Drier than normal':'Dry day expected',kind:'dry'};
+    if(dr.p90Mm>0&&dr.forecastMm>=dr.p90Mm) return {text:'Unusually wet',kind:'wet'};
+    if(dr.forecastMm>dr.histMeanMm*1.5&&dr.forecastMm-dr.histMeanMm>=1) return {text:'Wetter than normal',kind:'wet'};
+    if(dr.histMeanMm>0.5&&dr.forecastMm<dr.histMeanMm*0.5) return {text:'Drier than normal',kind:'dry'};
+    return {text:'Near normal rainfall',kind:'neutral'};
   })();
 
   document.getElementById('content').innerHTML=`
-  <section class="hero fu" style="--glow:${glowColor(d.weather_code[t0])}">
+  <section class="hero fu" style="--glow:${glowColor(d.weather_code[t0])};--hero-tint:${heroTint(d.weather_code[t0])}">
     <div class="hero-top">
       <div class="hero-left">
         <div class="hero-temp">${fTn(tNow)}<sup>${uT()}</sup></div>
@@ -244,83 +296,76 @@ function renderContent(){
           <span style="color:var(--subtle)"> / </span>
           <span class="lo">↓${fT(tMin0)}</span>
         </div>
+        ${(_tempAnomaly||_rainAnomaly)?`<div class="hero-badges">
+          ${_tempAnomaly?anomalyBadge(_tempAnomaly.text,_tempAnomaly.kind):''}
+          ${_rainAnomaly?anomalyBadge(_rainAnomaly.text,rainAnomalyKind(_rainAnomaly.text)):''}
+        </div>`:''}
       </div>
-      ${(_tempAnomaly||_rainAnomaly)?`<div class="hero-anomaly-col">
-        ${_tempAnomaly?`<p class="hero-anomaly">${_tempAnomaly}</p>`:''}
-        ${_rainAnomaly?`<p class="hero-anomaly">${_rainAnomaly}</p>`:''}
-      </div>`:''}
-      <div class="hero-icon">${w0.i}</div>
+      <div class="hero-icon">${weatherIcon(d.weather_code[t0],56)}</div>
     </div>
     <div class="hero-stats">
-      <div class="stat"><span class="stat-ico">🌧️</span><span class="stat-lbl">Rain chance</span><span class="stat-val">${pop0!=null?pop0+'%':'—'}</span></div>
-      <div class="stat"><span class="stat-ico">💨</span><span class="stat-lbl">Wind</span><span class="stat-val">${fW(wind0)}</span></div>
-      <div class="stat"><span class="stat-ico">🌞</span><span class="stat-lbl">UV Index</span><span class="stat-val">${uvLabel(uv0)}</span></div>
+      <div class="stat-tile"><span class="stat-ico stat-ico-rain">${ICON.rain}</span><span class="stat-lbl">Rain chance</span><span class="stat-val">${pop0!=null?pop0+'%':'—'}</span></div>
+      <div class="stat-tile"><span class="stat-ico stat-ico-wind">${ICON.wind}</span><span class="stat-lbl">Wind</span><span class="stat-val">${fW(wind0)}</span></div>
+      <div class="stat-tile"><span class="stat-ico stat-ico-sun">${ICON.sun}</span><span class="stat-lbl">UV index</span><span class="stat-val">${uvLabel(uv0)}</span></div>
     </div>
   </section>
 
-  <div class="chart-card fu">
-    <div class="sec-hdr" style="margin-bottom:6px">
-      <span class="sec-ttl">48-Hour Temperature</span>
-      <p class="sec-sub">${subHourly}</p>
-    </div>
-    ${makeHourlyTempChart()}
-  </div>
+  ${forecastGridHtml(d,t0)}
 
-  <div class="chart-card fu">
-    <div class="sec-hdr" style="margin-bottom:6px">
-      <span class="sec-ttl">14-Day Temperature</span>
-      <p class="sec-sub">${subDaily}</p>
-    </div>
-    ${makeTempChart()}
-  </div>
+  <nav class="sec-nav fu" aria-label="Chart sections">
+    <a href="#charts-temp">Temperature</a>
+    <a href="#charts-rain">Rainfall</a>
+    <a href="#charts-humid">Humidity</a>
+    <a href="#charts-climate">Climate</a>
+  </nav>
 
-  <div class="chart-card fu">
-    <div class="sec-hdr" style="margin-bottom:6px">
-      <span class="sec-ttl">48-Hour Rainfall</span>
-      <p class="sec-sub">${subHourlyRain}</p>
+  <section id="charts-temp" class="chart-group">
+    <h2 class="group-ttl">Temperature</h2>
+    <div class="chart-card fu">
+      ${secHdr('48-Hour Temperature', subHourly)}
+      ${makeHourlyTempChart()}
     </div>
-    ${makeHourlyRainChart()}
-  </div>
+    <div class="chart-card fu">
+      ${secHdr('14-Day Temperature', subDaily)}
+      ${makeTempChart()}
+    </div>
+  </section>
 
-  <div class="chart-card fu">
-    <div class="sec-hdr" style="margin-bottom:6px">
-      <span class="sec-ttl">14-Day Rainfall</span>
-      <p class="sec-sub">${subDailyRain}</p>
+  <section id="charts-rain" class="chart-group">
+    <h2 class="group-ttl">Rainfall</h2>
+    <div class="chart-card fu">
+      ${secHdr('48-Hour Rainfall', subHourlyRain)}
+      ${makeHourlyRainChart()}
     </div>
-    ${makeDailyRainChart()}
-  </div>
+    <div class="chart-card fu">
+      ${secHdr('14-Day Rainfall', subDailyRain)}
+      ${makeDailyRainChart()}
+    </div>
+    <div class="chart-card fu">
+      ${secHdr('Year-to-Date Rainfall', subRain)}
+      ${makeRainYTDChart()}
+    </div>
+  </section>
 
-  <div class="chart-card fu">
-    <div class="sec-hdr" style="margin-bottom:6px">
-      <span class="sec-ttl">48-Hour Humidity</span>
-      <p class="sec-sub">${subHourlyHumid}</p>
+  <section id="charts-humid" class="chart-group">
+    <h2 class="group-ttl">Humidity</h2>
+    <div class="chart-card fu">
+      ${secHdr('48-Hour Humidity', subHourlyHumid)}
+      ${makeHourlyHumidChart()}
     </div>
-    ${makeHourlyHumidChart()}
-  </div>
+    <div class="chart-card fu">
+      ${secHdr('Daily Humidity', subDailyHumid)}
+      ${makeDailyHumidChart()}
+    </div>
+  </section>
 
-  <div class="chart-card fu">
-    <div class="sec-hdr" style="margin-bottom:6px">
-      <span class="sec-ttl">Daily Humidity</span>
-      <p class="sec-sub">${subDailyHumid}</p>
+  <section id="charts-climate" class="chart-group">
+    <h2 class="group-ttl">Climate</h2>
+    <div class="chart-card fu">
+      ${secHdr('Climate Overview', climatologyData?`Avg monthly high/low °${uT().slice(1)} (lines) & total rainfall (bars)${_locFor} · ${climatologyData.yearStart}–${climatologyData.yearEnd}`:`Climate normals${_locFor}`)}
+      ${makeClimateChart()}
     </div>
-    ${makeDailyHumidChart()}
-  </div>
-
-  <div class="chart-card fu">
-    <div class="sec-hdr" style="margin-bottom:6px">
-      <span class="sec-ttl">Year-to-Date Rainfall</span>
-      <p class="sec-sub">${subRain}</p>
-    </div>
-    ${makeRainYTDChart()}
-  </div>
-
-  <div class="chart-card fu">
-    <div class="sec-hdr" style="margin-bottom:6px">
-      <span class="sec-ttl">Climate Overview</span>
-      <p class="sec-sub">${climatologyData?`Avg monthly high/low °${uT().slice(1)} (lines) & total rainfall (bars)${_locFor} · ${climatologyData.yearStart}–${climatologyData.yearEnd}`:`Climate normals${_locFor}`}</p>
-    </div>
-    ${makeClimateChart()}
-  </div>
+  </section>
 
   <footer class="footer fu">
     <p>Forecast & historical data from <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> · Geocoding by <a href="https://nominatim.openstreetmap.org" target="_blank" rel="noopener">Nominatim / OSM</a></p>
@@ -328,6 +373,7 @@ function renderContent(){
 }
 
 function render(){
+  applyTimeAmbience();
   renderHeader();
   renderContent();
   document.getElementById('main').classList.remove('hidden');
@@ -952,7 +998,7 @@ function showSearchFirst(hint){
   renderHeader();
   document.getElementById('content').innerHTML=`
     <div class="empty-state">
-      <div class="empty-ico">🌍</div>
+      <div class="empty-ico">${ICON.globe}</div>
       <p class="empty-title">Search for a city to get started</p>
       <p class="empty-sub">${hint||'Type any city name in the search bar above'}</p>
     </div>`;
@@ -975,6 +1021,7 @@ async function loadWeather(lat, lon, name, source) {
 }
 
 async function init(){
+  applyTimeAmbience();
   const prefs = loadPrefs();
   if (prefs.theme && prefs.theme !== 'auto') applyTheme(prefs.theme);
 
