@@ -7,7 +7,75 @@ function nuggtApiBase() {
 }
 
 function nuggtPublishKey() {
-  return window.NUGGT_PUBLISH_KEY || localStorage.getItem('nuggt-publish-key') || '';
+  const meta = document.querySelector('meta[name="nuggt-publish-key"]');
+  return window.NUGGT_PUBLISH_KEY
+    || (meta?.content?.trim())
+    || localStorage.getItem('nuggt-publish-key')
+    || '';
+}
+
+function nuggtErrorMessage(err, status, key) {
+  if (status === 401) {
+    return 'Nuggt rejected the request (401). Set a valid publish key in nuggt-config.js — see nuggt-config.example.js.';
+  }
+  if (status === 403) {
+    return 'Nuggt rejected the request (403). Check that this site\'s origin is listed in MANIFEST_PUBLISH_ORIGINS on the Nuggt server.';
+  }
+  if (status === 422) {
+    return `Nuggt could not validate this chart (${err?.message || '422'}). Check the browser console for details.`;
+  }
+  if (err?.name === 'TypeError' && /fetch|network/i.test(String(err.message))) {
+    return key
+      ? 'Network or CORS error contacting Nuggt. Ensure MANIFEST_PUBLISH_ORIGINS includes this site (e.g. https://edconway.github.io).'
+      : 'Network or CORS error contacting Nuggt. You likely need a publish key in nuggt-config.js and your origin allowed on the Nuggt server.';
+  }
+  if (!key) {
+    return 'Could not send to Nuggt. Set NUGGT_PUBLISH_KEY in nuggt-config.js (production requires a publish key).';
+  }
+  return `Could not send to Nuggt. ${err?.message || 'Please try again.'}`;
+}
+
+async function nuggtPublish(manifest, key) {
+  const base = nuggtApiBase();
+  const headers = { 'Content-Type': 'application/json' };
+  if (key) headers.Authorization = `Bearer ${key}`;
+
+  const endpoints = ['/api/weather-manifest', '/api/manifests'];
+  let lastErr = null;
+  let lastStatus = 0;
+
+  for (const path of endpoints) {
+    try {
+      const res = await fetch(`${base}${path}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(manifest),
+      });
+      lastStatus = res.status;
+      if (!res.ok) {
+        const detail = await res.text().catch(() => '');
+        let msg = detail;
+        try {
+          const j = JSON.parse(detail);
+          msg = j.detail || j.message || detail;
+        } catch {}
+        const err = new Error(msg || `Request failed (${res.status})`);
+        err.status = res.status;
+        lastErr = err;
+        if (res.status >= 500) continue;
+        throw err;
+      }
+      const data = await res.json();
+      const importUrl = data.import_url || data.importUrl;
+      if (!importUrl) throw new Error('No import URL returned');
+      return importUrl;
+    } catch (err) {
+      lastErr = err;
+      if (lastStatus >= 500) continue;
+      throw err;
+    }
+  }
+  throw lastErr || new Error('Request failed');
 }
 
 function nuggtNum(v) {
@@ -46,10 +114,11 @@ function nuggtManifest(chartMeta, dataExtra) {
 }
 
 function fmtHourLabel(iso) {
-  const hr = +iso.slice(11, 13);
-  if (hr === 0) return 'Midnight';
-  if (hr === 12) return 'Noon';
-  return hr < 12 ? `${hr}am` : `${hr - 12}pm`;
+  const d = new Date(iso.includes('T') ? iso : iso + 'T12:00:00');
+  const hr = d.getHours();
+  const day = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const time = hr === 0 ? 'Midnight' : hr === 12 ? 'Noon' : hr < 12 ? `${hr}am` : `${hr - 12}pm`;
+  return `${day} ${time}`;
 }
 
 function fmtDayLabel(dateStr) {
@@ -243,9 +312,7 @@ async function sendToNuggt(chartId, btn) {
     return;
   }
 
-  const headers = { 'Content-Type': 'application/json' };
   const key = nuggtPublishKey();
-  if (key) headers.Authorization = `Bearer ${key}`;
 
   const label = btn?.textContent || 'Send to Nuggt';
   if (btn) {
@@ -254,25 +321,11 @@ async function sendToNuggt(chartId, btn) {
   }
 
   try {
-    const res = await fetch(`${nuggtApiBase()}/api/weather-manifest`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(manifest),
-    });
-    if (!res.ok) {
-      const detail = await res.text().catch(() => '');
-      throw new Error(detail || `Request failed (${res.status})`);
-    }
-    const { import_url: importUrl } = await res.json();
-    if (!importUrl) throw new Error('No import URL returned');
+    const importUrl = await nuggtPublish(manifest, key);
     window.open(importUrl, '_blank', 'noopener,noreferrer');
   } catch (err) {
     console.error('Send to Nuggt failed:', err);
-    alert(
-      key
-        ? 'Could not send this chart to Nuggt. Please try again.'
-        : 'Could not send to Nuggt. A publish key may be required — see nuggt-config.example.js.'
-    );
+    alert(nuggtErrorMessage(err, err.status || 0, key));
   } finally {
     if (btn) {
       btn.disabled = false;
