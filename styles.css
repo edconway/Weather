@@ -222,8 +222,17 @@ body{
 .stat-val{font-size:.95rem;font-weight:600;color:var(--text)}
 
 /* ─── Section header ─── */
-.sec-hdr{margin-bottom:10px}
-.sec-ttl{font-size:.82rem;font-weight:600;color:var(--text);letter-spacing:-.01em}
+.sec-hdr-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.send-to-nuggt{
+  background:var(--card);border:none;border-radius:999px;
+  color:var(--accent);cursor:pointer;
+  font-size:.72rem;font-weight:600;padding:6px 12px;
+  box-shadow:var(--shadow-sm);
+  transition:background .15s,color .15s,opacity .15s;
+  white-space:nowrap;flex-shrink:0;
+}
+.send-to-nuggt:hover{background:var(--accent-soft)}
+.send-to-nuggt:disabled{opacity:.55;cursor:wait}
 .sec-details{margin-top:4px}
 .sec-details summary{
   font-size:.74rem;color:var(--subtle);cursor:pointer;
