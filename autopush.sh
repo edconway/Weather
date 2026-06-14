@@ -17,7 +17,7 @@ git pull --rebase --quiet origin main >> "$LOG" 2>&1
   sleep 2  # brief debounce — wait for rapid saves to settle
 
   if [ -n "$(git status --porcelain)" ]; then
-    git add index.html styles.css app.js charts.js search.js
+    git add index.html styles.css app.js charts.js search.js icons.js nuggt-export.js nuggt-config.js nuggt-config.example.js
     MSG="Auto-update: $(date '+%Y-%m-%d %H:%M:%S')"
     git commit -m "$MSG" >> "$LOG" 2>&1 && \
       git push origin main >> "$LOG" 2>&1 && \

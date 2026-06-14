@@ -74,9 +74,13 @@ function rainAnomalyKind(text) {
   return 'neutral';
 }
 
-function secHdr(title, details) {
+function secHdr(title, details, nuggtId) {
+  const btn = nuggtId ? nuggtBtn(nuggtId) : '';
   return `<div class="sec-hdr" style="margin-bottom:6px">
-    <span class="sec-ttl">${escapeHtml(title)}</span>
+    <div class="sec-hdr-row">
+      <span class="sec-ttl">${escapeHtml(title)}</span>
+      ${btn}
+    </div>
     ${details ? `<details class="sec-details"><summary>Chart details</summary><p class="sec-sub">${escapeHtml(details)}</p></details>` : ''}
   </div>`;
 }
@@ -293,42 +297,42 @@ function renderContent(){
   </section>
 
   <div class="chart-card fu">
-    ${secHdr('48-Hour Temperature', subHourly)}
+    ${secHdr('48-Hour Temperature', subHourly, 'hourly')}
     ${makeHourlyTempChart()}
   </div>
 
   <div class="chart-card fu">
-    ${secHdr('14-Day Temperature', subDaily)}
+    ${secHdr('14-Day Temperature', subDaily, 'temp')}
     ${makeTempChart()}
   </div>
 
   <div class="chart-card fu">
-    ${secHdr('48-Hour Rainfall', subHourlyRain)}
+    ${secHdr('48-Hour Rainfall', subHourlyRain, 'hourly-rain')}
     ${makeHourlyRainChart()}
   </div>
 
   <div class="chart-card fu">
-    ${secHdr('14-Day Rainfall', subDailyRain)}
+    ${secHdr('14-Day Rainfall', subDailyRain, 'daily-rain')}
     ${makeDailyRainChart()}
   </div>
 
   <div class="chart-card fu">
-    ${secHdr('48-Hour Humidity', subHourlyHumid)}
+    ${secHdr('48-Hour Humidity', subHourlyHumid, 'hourly-humid')}
     ${makeHourlyHumidChart()}
   </div>
 
   <div class="chart-card fu">
-    ${secHdr('Daily Humidity', subDailyHumid)}
+    ${secHdr('Daily Humidity', subDailyHumid, 'daily-humid')}
     ${makeDailyHumidChart()}
   </div>
 
   <div class="chart-card fu">
-    ${secHdr('Year-to-Date Rainfall', subRain)}
+    ${secHdr('Year-to-Date Rainfall', subRain, 'rain')}
     ${makeRainYTDChart()}
   </div>
 
   <div class="chart-card fu">
-    ${secHdr('Climate Overview', climatologyData?`Avg monthly high/low °${uT().slice(1)} (lines) & total rainfall (bars)${_locFor} · ${climatologyData.yearStart}–${climatologyData.yearEnd}`:`Climate normals${_locFor}`)}
+    ${secHdr('Climate Overview', climatologyData?`Avg monthly high/low °${uT().slice(1)} (lines) & total rainfall (bars)${_locFor} · ${climatologyData.yearStart}–${climatologyData.yearEnd}`:`Climate normals${_locFor}`, 'climate')}
     ${makeClimateChart()}
   </div>
 
@@ -701,6 +705,13 @@ function setLoad(msg){
     if(!document.contains(e.target)) return;
     const wrap=document.querySelector('.hdr-wrap');
     if(wrap&&!wrap.contains(e.target)) closeSearch();
+  });
+
+  document.getElementById('content').addEventListener('click',e=>{
+    const btn=e.target.closest('.send-to-nuggt');
+    if(!btn) return;
+    const chartId=btn.dataset.nuggtChart;
+    if(chartId) sendToNuggt(chartId, btn);
   });
 
 
