@@ -943,14 +943,17 @@ function setLoad(msg){
 
   let _compact=window.innerWidth<=480;
   let _mobile=window.innerWidth<=640;
+  let _vpW=window.innerWidth;
   let _resizeTimer;
   window.addEventListener('resize',()=>{
     clearTimeout(_resizeTimer);
     _resizeTimer=setTimeout(()=>{
       const c=window.innerWidth<=480;
       const m=window.innerWidth<=640;
-      if((c!==_compact||m!==_mobile)&&fcData){
-        _compact=c; _mobile=m; renderContent();
+      const w=window.innerWidth;
+      const widthChanged=m&&Math.abs(w-_vpW)>=24;
+      if((c!==_compact||m!==_mobile||widthChanged)&&fcData){
+        _compact=c; _mobile=m; _vpW=w; renderContent();
       }
     }, 200);
   });

@@ -315,7 +315,7 @@ body{
   .hero-anomaly-col,.hero-badges{grid-column:1/-1}
   .hero-badges{margin-top:4px}
   .hero-cond{font-size:.95rem}
-  .chart-card{padding:16px 14px 6px}
+  .chart-card{padding:14px 12px 6px}
   .hist{padding:16px}
 }
 
@@ -360,25 +360,10 @@ body{
   background:var(--card);
   border:none;border-radius:var(--r);
   padding:20px 20px 8px;margin-bottom:12px;
-  overflow-x:auto;
-  -webkit-overflow-scrolling:touch;
+  overflow:visible;
   box-shadow:var(--shadow-sm);
 }
-.chart-card .wc-svg{min-width:min(100%,300px)}
-
-@media(max-width:640px){
-  .chart-card{
-    overflow-x:auto;
-    overflow-y:visible;
-    -webkit-overflow-scrolling:touch;
-  }
-  .chart-card .wc-svg{
-    width:100%;
-    min-width:100%;
-    min-height:clamp(260px,88vw,420px);
-    height:auto;
-  }
-}
+.chart-card .wc-svg{width:100%;height:auto;display:block}
 .chart-leg{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px}
 .cli{display:flex;align-items:center;gap:6px;font-size:.7rem;color:var(--muted)}
 

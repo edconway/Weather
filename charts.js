@@ -2,21 +2,24 @@
 
 function _narrow(){ return typeof window!=='undefined'&&window.innerWidth<=480; }
 function _mobileChart(){ return typeof window!=='undefined'&&window.innerWidth<=640; }
-function _chartPR(){ return _narrow()?42:14; }
+function _chartPR(){ return 14; }
 function _hourStep(){ return _narrow()?12:6; }
-function _chartH(baseH){
-  if(!_mobileChart()) return baseH;
-  return Math.round(580*0.75); // 4:3 aspect on mobile
-}
-function _chartPad(pT,pB,baseH){
-  const H=_chartH(baseH);
-  if(H<=baseH) return {pT,pB};
-  const s=H/baseH;
-  return {pT:Math.round(pT*s),pB:Math.round(pB*s)};
+function _chartW(){
+  if(typeof window==='undefined'||!_mobileChart()) return 580;
+  const appPad=Math.min(Math.max(window.innerWidth*0.03,12),16)*2;
+  const cardPad=window.innerWidth<=480?24:28;
+  return Math.max(280,Math.round(window.innerWidth-appPad-cardPad));
 }
 function _dims(baseH,pL,pR,pT,pB){
-  const H=_chartH(baseH),pad=_chartPad(pT,pB,baseH);
-  return {W:580,H,pL,pR,pT:pad.pT,pB:pad.pB};
+  const W=_chartW(),scale=W/580;
+  return{
+    W,
+    H:Math.round(baseH*scale),
+    pL:Math.round(pL*scale),
+    pR:Math.round(pR*scale),
+    pT:Math.round(pT*scale),
+    pB:Math.round(pB*scale),
+  };
 }
 function _hourLbl(hr){
   return hr===0?'Midnight':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
@@ -613,7 +616,7 @@ function makeClimateChart(){
   const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const curMo=new Date().getMonth();
   const n=12;
-  const{W,H,pL,pR,pT,pB}=_dims(200,46,_narrow()?58:54,24,28);
+  const{W,H,pL,pR,pT,pB}=_dims(200,46,_narrow()?50:46,24,28);
   const cW=W-pL-pR,cH=H-pT-pB;
   // Temperature axis (left) — store in °C, display in user units
   const tMaxes=data.map(d=>d.tMax).filter(v=>v!=null);
