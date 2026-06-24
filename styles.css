@@ -222,17 +222,7 @@ body{
 .stat-val{font-size:.95rem;font-weight:600;color:var(--text)}
 
 /* ─── Section header ─── */
-.sec-details{margin-top:4px}
-.sec-details summary{
-  font-size:.74rem;color:var(--subtle);cursor:pointer;
-  list-style:none;display:inline-flex;align-items:center;gap:4px;
-  user-select:none;
-}
-.sec-details summary::-webkit-details-marker{display:none}
-.sec-details summary::after{content:'›';display:inline-block;transition:transform .15s;font-size:.9em}
-.sec-details[open] summary::after{transform:rotate(90deg)}
-.sec-details[open] summary{color:var(--muted)}
-.sec-sub{font-size:.76rem;color:var(--subtle);margin-top:6px;line-height:1.45;word-break:break-word}
+.sec-sub{font-size:.76rem;color:var(--subtle);margin-top:4px;line-height:1.45;word-break:break-word}
 
 /* ─── Historical comparison ─── */
 .hist{
@@ -315,7 +305,7 @@ body{
   .hero-anomaly-col,.hero-badges{grid-column:1/-1}
   .hero-badges{margin-top:4px}
   .hero-cond{font-size:.95rem}
-  .chart-card{padding:14px 12px 6px}
+  .chart-card{padding:12px 12px 2px}
   .hist{padding:16px}
 }
 
@@ -324,7 +314,7 @@ body{
   .hero-stats{gap:8px;margin-top:16px;padding-top:14px}
   .stat-val{font-size:.88rem}
   .sec-hdr{margin-bottom:8px}
-  .chart-card{padding:14px 12px 4px}
+  .chart-card{padding:12px 10px 2px}
   .chart-leg{gap:10px}
   .empty-state{padding:60px 16px 32px}
 }
@@ -359,7 +349,7 @@ body{
 .chart-card{
   background:var(--card);
   border:none;border-radius:var(--r);
-  padding:20px 20px 8px;margin-bottom:12px;
+  padding:14px 14px 2px;margin-bottom:12px;
   overflow:visible;
   box-shadow:var(--shadow-sm);
 }

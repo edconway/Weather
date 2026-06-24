@@ -77,7 +77,7 @@ function rainAnomalyKind(text) {
 function secHdr(title, details) {
   return `<div class="sec-hdr" style="margin-bottom:6px">
     <span class="sec-ttl">${escapeHtml(title)}</span>
-    ${details ? `<details class="sec-details"><summary>Chart details</summary><p class="sec-sub">${escapeHtml(details)}</p></details>` : ''}
+    ${details ? `<p class="sec-sub">${escapeHtml(details)}</p>` : ''}
   </div>`;
 }
 
@@ -942,18 +942,13 @@ function setLoad(msg){
   content.addEventListener('mouseleave',hideTT);
 
   let _compact=window.innerWidth<=480;
-  let _mobile=window.innerWidth<=640;
-  let _vpW=window.innerWidth;
   let _resizeTimer;
   window.addEventListener('resize',()=>{
     clearTimeout(_resizeTimer);
     _resizeTimer=setTimeout(()=>{
       const c=window.innerWidth<=480;
-      const m=window.innerWidth<=640;
-      const w=window.innerWidth;
-      const widthChanged=m&&Math.abs(w-_vpW)>=24;
-      if((c!==_compact||m!==_mobile||widthChanged)&&fcData){
-        _compact=c; _mobile=m; _vpW=w; renderContent();
+      if(c!==_compact&&fcData){
+        _compact=c; renderContent();
       }
     }, 200);
   });

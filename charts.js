@@ -1,25 +1,17 @@
 // ── Chart renderers ────────────────────────────────────
 
 function _narrow(){ return typeof window!=='undefined'&&window.innerWidth<=480; }
-function _mobileChart(){ return typeof window!=='undefined'&&window.innerWidth<=640; }
 function _chartPR(){ return 14; }
 function _hourStep(){ return _narrow()?12:6; }
-function _chartW(){
-  if(typeof window==='undefined'||!_mobileChart()) return 580;
-  const appPad=Math.min(Math.max(window.innerWidth*0.03,12),16)*2;
-  const cardPad=window.innerWidth<=480?24:28;
-  return Math.max(280,Math.round(window.innerWidth-appPad-cardPad));
+function _prForEnd(...labels){
+  const base=_chartPR();
+  const texts=labels.filter(Boolean).map(String);
+  if(!texts.length) return base;
+  const est=Math.max(...texts.map(t=>t.length))*5.5+12;
+  return Math.max(base,Math.round(est));
 }
 function _dims(baseH,pL,pR,pT,pB){
-  const W=_chartW(),scale=W/580;
-  return{
-    W,
-    H:Math.round(baseH*scale),
-    pL:Math.round(pL*scale),
-    pR:Math.round(pR*scale),
-    pT:Math.round(pT*scale),
-    pB:Math.round(pB*scale),
-  };
+  return{W:580,H:baseH,pL,pR,pT,pB};
 }
 function _hourLbl(hr){
   return hr===0?'Midnight':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
@@ -53,7 +45,7 @@ function makeTempChart(){
   if(!allV.length) return '';
   const lo=Math.floor(Math.min(...allV))-2;
   const hi=Math.ceil(Math.max(...allV))+2;
-  const{W,H,pL,pR,pT,pB}=_dims(210,46,_chartPR(),24,38);
+  const{W,H,pL,pR,pT,pB}=_dims(210,46,_prForEnd('High','Low'),24,38);
   const cW=W-pL-pR,cH=H-pT-pB;
   const n=labels.length;
   const xf=i=>pL+i/(n-1)*cW;
@@ -159,7 +151,7 @@ function makeRainYTDChart(){
   const avgV=cumHistAvg.map(nP);
   const fcV=fcstExtCum.map(nP);
   const avgExtV=(ytdData.cumHistAvgExt||[]).slice(0,numFc).map(nP);
-  const{W,H,pL,pR,pT,pB}=_dims(222,52,_chartPR(),20,36);
+  const{W,H,pL,pR,pT,pB}=_dims(222,52,_prForEnd(String(thisYear),'Hist. avg'),20,36);
   const cW=W-pL-pR,cH=H-pT-pB;
   const yMax=Math.max(...curV,...avgV,...(fcV.length?fcV:[0]),...(avgExtV.length?avgExtV:[0]),.01)*1.1;
   // x maps over the full totalN range so forecast extends naturally to the right
@@ -258,7 +250,7 @@ function makeHourlyTempChart(){
   const allV=[...temps,...histLine].filter(v=>v!=null&&!isNaN(v));
   if(!allV.length) return '';
   const lo=Math.floor(Math.min(...allV))-1, hi=Math.ceil(Math.max(...allV))+1;
-  const{W,H,pL,pR,pT,pB}=_dims(198,46,_chartPR(),20,32);
+  const{W,H,pL,pR,pT,pB}=_dims(198,46,_prForEnd('Forecast','5-yr avg'),20,32);
   const cW=W-pL-pR,cH=H-pT-pB;
   const n=temps.length;
   const xf=i=>pL+i/(n-1)*cW;
@@ -488,7 +480,7 @@ function makeHourlyHumidChart(){
   if(!allV.length) return '';
   const lo=Math.max(0,Math.floor(Math.min(...allV)/10)*10-10);
   const hi=Math.min(100,Math.ceil(Math.max(...allV)/10)*10+5);
-  const{W,H,pL,pR,pT,pB}=_dims(185,46,_chartPR(),20,32);
+  const{W,H,pL,pR,pT,pB}=_dims(185,46,_prForEnd('Forecast','5-yr avg'),20,32);
   const cW=W-pL-pR,cH=H-pT-pB;
   const xf=i=>pL+i/(n-1)*cW;
   const yf=v=>pT+(1-(v-lo)/(hi-lo))*cH;
@@ -616,7 +608,7 @@ function makeClimateChart(){
   const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const curMo=new Date().getMonth();
   const n=12;
-  const{W,H,pL,pR,pT,pB}=_dims(200,46,_narrow()?50:46,24,28);
+  const{W,H,pL,pR,pT,pB}=_dims(200,46,Math.max(_prForEnd('High','Low'),50),24,28);
   const cW=W-pL-pR,cH=H-pT-pB;
   // Temperature axis (left) — store in °C, display in user units
   const tMaxes=data.map(d=>d.tMax).filter(v=>v!=null);
