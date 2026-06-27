@@ -202,6 +202,9 @@ body{
 .badge-neutral{background:var(--accent-soft);color:var(--accent)}
 .badge-muggy{background:rgba(74,175,163,.16);color:#3a8f85}
 .badge-muggy-low{background:rgba(91,143,201,.12);color:var(--cold)}
+.badge-jump{cursor:pointer;transition:opacity .15s,transform .15s}
+.badge-jump:hover{opacity:.88;transform:translateY(-1px)}
+.badge-jump:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .hero-icon{color:var(--accent);line-height:1;flex-shrink:0;display:flex;align-items:flex-start;justify-content:flex-end;opacity:.92}
 .w-icon{display:block}
 
@@ -374,6 +377,17 @@ body{
 .panel-cap-hint{font-size:.7rem;opacity:.65;white-space:nowrap;flex-shrink:0}
 .panel-chart{padding:14px 14px 2px}
 .panel-chart+.panel-chart{border-top:1px solid var(--card-border)}
+.panel-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  margin-bottom:12px;
+}
+.panel-row .weather-panel{margin-bottom:0;scroll-margin-top:12px}
+.weather-panel{scroll-margin-top:12px}
+@media(max-width:720px){
+  .panel-row{grid-template-columns:1fr}
+}
 .chart-card .wc-svg{width:100%;height:auto;display:block}
 .panel-chart .wc-svg{width:100%;height:auto;display:block}
 .chart-leg{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px}

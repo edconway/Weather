@@ -64,9 +64,17 @@ function heroTint(code) {
   return 'rgba(74,95,127,.04)';
 }
 
-function anomalyBadge(text, kind, title) {
-  const t=title?` title="${escapeHtml(title)}"`:'';
-  return `<span class="badge badge-${kind}"${t}>${escapeHtml(text)}</span>`;
+function anomalyBadge(text, kind, opts) {
+  opts=opts||{};
+  const t=opts.title?` title="${escapeHtml(opts.title)}"`:'';
+  const jump=opts.panel?` data-panel-jump="${opts.panel}" role="link" tabindex="0"`:'';
+  return `<span class="badge badge-${kind} badge-jump"${t}${jump}>${escapeHtml(text)}</span>`;
+}
+
+function scrollToPanel(id){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 function rainAnomalyKind(text) {
@@ -296,9 +304,9 @@ function renderContent(){
           <span class="lo">↓${fT(tMin0)}</span>
         </div>
         ${(_tempAnomaly||_rainAnomaly||_wbAnomaly)?`<div class="hero-badges">
-          ${_tempAnomaly?anomalyBadge(_tempAnomaly.text,_tempAnomaly.kind):''}
-          ${_rainAnomaly?anomalyBadge(_rainAnomaly.text,rainAnomalyKind(_rainAnomaly.text)):''}
-          ${_wbAnomaly?anomalyBadge(_wbAnomaly.text,_wbAnomaly.kind,_wbAnomaly.title):''}
+          ${_wbAnomaly?anomalyBadge(_wbAnomaly.text,_wbAnomaly.kind,{title:_wbAnomaly.title,panel:'panel-wet-bulb'}):''}
+          ${_tempAnomaly?anomalyBadge(_tempAnomaly.text,_tempAnomaly.kind,{panel:'panel-temperature'}):''}
+          ${_rainAnomaly?anomalyBadge(_rainAnomaly.text,rainAnomalyKind(_rainAnomaly.text),{panel:'panel-rain'}):''}
         </div>`:''}
       </div>
       <div class="hero-icon">${weatherIcon(d.weather_code[t0],56)}</div>
@@ -310,23 +318,8 @@ function renderContent(){
     </div>
   </section>
 
-  <div class="weather-panel fu">
-    <div class="panel-cap" style="background:rgba(212,101,90,.08);border-bottom:1px solid rgba(212,101,90,.1);">
-      <span class="panel-cap-icon" style="color:#c45c52"><svg width="13" height="15" viewBox="0 0 24 28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 16.76V5a2 2 0 0 0-4 0v11.76a4 4 0 1 0 4 0z"/></svg></span>
-      <span class="panel-cap-title" style="color:#c45c52">Temperature</span>
-      <span class="panel-cap-hint" style="color:#c45c52">Actual air temp, high &amp; low</span>
-    </div>
-    <div class="panel-chart">
-      ${secHdr('48-Hour Temperature', subHourly)}
-      ${makeHourlyTempChart()}
-    </div>
-    <div class="panel-chart">
-      ${secHdr('14-Day Temperature', subDaily)}
-      ${makeTempChart()}
-    </div>
-  </div>
-
-  <div class="weather-panel fu">
+  <div class="panel-row">
+  <div class="weather-panel fu" id="panel-wet-bulb">
     <div class="panel-cap" style="background:rgba(74,175,163,.08);border-bottom:1px solid rgba(74,175,163,.12);">
       <span class="panel-cap-icon" style="color:#3a9f95"><svg width="13" height="15" viewBox="0 0 24 28" fill="currentColor"><path d="M12 2C6 9 3 14.5 3 17.5a9 9 0 0 0 18 0C21 14.5 18 9 12 2z"/></svg></span>
       <span class="panel-cap-title" style="color:#3a9f95">Wet Bulb · Feels-Like Heat</span>
@@ -342,7 +335,24 @@ function renderContent(){
     </div>
   </div>
 
-  <div class="weather-panel fu">
+  <div class="weather-panel fu" id="panel-temperature">
+    <div class="panel-cap" style="background:rgba(212,101,90,.08);border-bottom:1px solid rgba(212,101,90,.1);">
+      <span class="panel-cap-icon" style="color:#c45c52"><svg width="13" height="15" viewBox="0 0 24 28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 16.76V5a2 2 0 0 0-4 0v11.76a4 4 0 1 0 4 0z"/></svg></span>
+      <span class="panel-cap-title" style="color:#c45c52">Temperature</span>
+      <span class="panel-cap-hint" style="color:#c45c52">Actual air temp, high &amp; low</span>
+    </div>
+    <div class="panel-chart">
+      ${secHdr('48-Hour Temperature', subHourly)}
+      ${makeHourlyTempChart()}
+    </div>
+    <div class="panel-chart">
+      ${secHdr('14-Day Temperature', subDaily)}
+      ${makeTempChart()}
+    </div>
+  </div>
+  </div>
+
+  <div class="weather-panel fu" id="panel-rain">
     <div class="panel-cap" style="background:rgba(107,127,215,.08);border-bottom:1px solid rgba(107,127,215,.1);">
       <span class="panel-cap-icon" style="color:#5568b8"><svg width="15" height="13" viewBox="0 0 24 20" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 14A4 4 0 0 0 16 7h-1.5A6.5 6.5 0 1 0 3 12.5"/><line x1="8" y1="16" x2="8" y2="18"/><line x1="12" y1="16" x2="12" y2="18"/><line x1="16" y1="16" x2="16" y2="18"/></svg></span>
       <span class="panel-cap-title" style="color:#5568b8">Rain &amp; Humidity</span>
@@ -1035,6 +1045,18 @@ function setLoad(msg){
     document.getElementById('ttg-daily-humid')?.setAttribute('visibility','hidden');
   }
   const content=document.getElementById('content');
+  content.addEventListener('click',e=>{
+    const badge=e.target.closest('[data-panel-jump]');
+    if(!badge) return;
+    e.preventDefault();
+    scrollToPanel(badge.dataset.panelJump);
+  });
+  content.addEventListener('keydown',e=>{
+    const badge=e.target.closest('[data-panel-jump]');
+    if(!badge||!(e.key==='Enter'||e.key===' ')) return;
+    e.preventDefault();
+    scrollToPanel(badge.dataset.panelJump);
+  });
   content.addEventListener('mousemove',e=>{
     const svg=e.target.closest('svg[data-chart]');
     if(!svg){hideTT();return;}
