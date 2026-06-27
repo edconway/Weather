@@ -125,6 +125,99 @@ function makeTempChart(){
   </svg>`;
 }
 
+function makeWetBulbChart(){
+  if(!fcData||!histData) return '';
+  const c=_cc();
+  const d=fcData.daily;
+  const wbMax=d.wet_bulb_temperature_2m_max, wbMin=d.wet_bulb_temperature_2m_min;
+  if(!wbMax?.length||!wbMin?.length) return '';
+  const todayStr=localDateStr();
+  const todayIdx=Math.max(0,d.time.findIndex(t=>t===todayStr));
+  const labels=d.time.map((t,i)=>i===todayIdx?'Today':fDay(t));
+  const maxV=wbMax.map(v=>v!=null?nT(v):null);
+  const minV=wbMin.map(v=>v!=null?nT(v):null);
+  const dailyAvg=histData.dailyAvg||[];
+  const bandMaxes=dailyAvg.map(a=>a.wbMax!=null?nT(a.wbMax):null).filter(v=>v!=null);
+  const bandMins=dailyAvg.map(a=>a.wbMin!=null?nT(a.wbMin):null).filter(v=>v!=null);
+  const allV=[...maxV,...minV,...bandMaxes,...bandMins].filter(v=>v!=null&&!isNaN(v));
+  if(!allV.length) return '';
+  const lo=Math.floor(Math.min(...allV))-2;
+  const hi=Math.ceil(Math.max(...allV))+2;
+  const{W,H,pL,pR,pT,pB}=_dims(210,46,_prForEnd('High','Low'),24,38);
+  const cW=W-pL-pR,cH=H-pT-pB;
+  const n=labels.length;
+  const xf=i=>pL+i/(n-1)*cW;
+  const yf=v=>pT+(1-(v-lo)/(hi-lo))*cH;
+  const rng=hi-lo;
+  const rawStep=rng/4;
+  const mag=Math.pow(10,Math.floor(Math.log10(rawStep||1)));
+  const tickStep=[1,2,5,10].map(s=>s*mag).find(s=>rng/s<=6)||Math.ceil(rawStep);
+  const ticks=[];
+  for(let v=Math.ceil(lo/tickStep)*tickStep;v<=hi;v+=tickStep){
+    const y=yf(v).toFixed(1);
+    ticks.push(`<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" class="cg"/>` +
+      `<text x="${pL-5}" y="${+y+4}" class="ca" text-anchor="end">${v}°</text>`);
+  }
+  const band=(()=>{
+    if(!dailyAvg.length) return '';
+    const topPts=dailyAvg.map((a,i)=>a.wbMax!=null?`${xf(i).toFixed(1)},${yf(nT(a.wbMax)).toFixed(1)}`:null).filter(Boolean);
+    const botPts=dailyAvg.map((a,i)=>a.wbMin!=null?`${xf(i).toFixed(1)},${yf(nT(a.wbMin)).toFixed(1)}`:null).filter(Boolean);
+    if(!topPts.length||!botPts.length) return '';
+    const poly=[...topPts,...[...botPts].reverse()].join(' ');
+    const f=dailyAvg[0];
+    const lblY=f.wbMax!=null&&f.wbMin!=null?((yf(nT(f.wbMax))+yf(nT(f.wbMin)))/2).toFixed(1):null;
+    const lbl=lblY?`<text x="${pL+4}" y="${(+lblY+4).toFixed(1)}" font-size="8.5" fill="${c.muted}" opacity="0.8">Hist. avg</text>`:'';
+    return `<polygon points="${poly}" class="ch-band"/>${lbl}`;
+  })();
+  const todayX=xf(todayIdx).toFixed(1);
+  const todayMark=`<line x1="${todayX}" y1="${pT}" x2="${todayX}" y2="${(pT+cH).toFixed(1)}" stroke="${c.muted}" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
+    `<text x="${todayX}" y="${pT-4}" font-size="8" font-weight="700" fill="${c.muted}" text-anchor="middle">Today</text>`;
+  const pastMxPts=maxV.slice(0,todayIdx+1).map((v,i)=>`${xf(i).toFixed(1)},${yf(v??lo).toFixed(1)}`).join(' ');
+  const pastMnPts=minV.slice(0,todayIdx+1).map((v,i)=>`${xf(i).toFixed(1)},${yf(v??lo).toFixed(1)}`).join(' ');
+  const fcstMxPts=maxV.slice(todayIdx).map((v,i)=>`${xf(todayIdx+i).toFixed(1)},${yf(v??lo).toFixed(1)}`).join(' ');
+  const fcstMnPts=minV.slice(todayIdx).map((v,i)=>`${xf(todayIdx+i).toFixed(1)},${yf(v??lo).toFixed(1)}`).join(' ');
+  const mxDots=maxV.map((v,i)=>{
+    if(v==null) return '';
+    const cx=xf(i).toFixed(1),cy=yf(v).toFixed(1);
+    const isPast=i<todayIdx;
+    const fill=isPast?c.humidPast:c.humid;
+    const lbl=!isPast?`<text x="${cx}" y="${(yf(v)-9).toFixed(1)}" class="cv" fill="${c.humid}" text-anchor="middle">${Math.round(v)}°</text>`:'';
+    return `<circle cx="${cx}" cy="${cy}" r="${isPast?2.8:3.5}" fill="${fill}" stroke="${c.dot}" stroke-width="1.5"/>${lbl}`;
+  }).join('');
+  const mnDots=minV.map((v,i)=>{
+    if(v==null) return '';
+    const cx=xf(i).toFixed(1),cy=yf(v).toFixed(1);
+    const isPast=i<todayIdx;
+    const fill=isPast?'rgba(74,175,163,.22)':'rgba(74,175,163,.55)';
+    const lbl=!isPast?`<text x="${cx}" y="${(yf(v)+15).toFixed(1)}" class="cv" fill="${c.humid}" text-anchor="middle">${Math.round(v)}°</text>`:'';
+    return `<circle cx="${cx}" cy="${cy}" r="${isPast?2.8:3.5}" fill="${fill}" stroke="${c.dot}" stroke-width="1.5"/>${lbl}`;
+  }).join('');
+  const xLbls=labels.map((l,i)=>{
+    if(_narrow()&&i%2!==0&&i!==todayIdx) return '';
+    return `<text x="${xf(i).toFixed(1)}" y="${H-6}" class="ca" text-anchor="middle">${l}</text>`;
+  }).join('');
+  _wetBulbData={labels,maxV,minV,dailyAvg,pL,cW,n,todayIdx};
+  return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="wet-bulb" tabindex="0" role="img">
+    ${ticks.join('')}
+    ${band}
+    ${todayMark}
+    <line id="ttg-wet-bulb" x1="${pL}" y1="${pT}" x2="${pL}" y2="${(pT+cH).toFixed(1)}" stroke="rgba(255,255,255,.18)" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>
+    <polyline points="${pastMxPts}" stroke="${c.humid}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5,4" opacity="0.55"/>
+    <polyline points="${pastMnPts}" stroke="${c.humid}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5,4" opacity="0.35"/>
+    <polyline points="${fcstMxPts}" stroke="${c.humid}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <polyline points="${fcstMnPts}" stroke="${c.humid}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/>
+    ${mxDots}${mnDots}
+    ${(()=>{
+      const hv=maxV[n-1],lv=minV[n-1];
+      if(hv==null||lv==null) return '';
+      const lx=(xf(n-1)+5).toFixed(1);
+      return `<text x="${lx}" y="${(yf(hv)+4).toFixed(1)}" font-size="9" font-weight="700" fill="${c.humid}">High</text>` +
+             `<text x="${lx}" y="${(yf(lv)+4).toFixed(1)}" font-size="9" font-weight="700" fill="${c.humid}" opacity="0.75">Low</text>`;
+    })()}
+    ${xLbls}
+  </svg>`;
+}
+
 function makeRainYTDChart(){
   if(!ytdData) return '<p class="search-msg" style="padding:24px 0">Loading year-to-date rainfall…</p>';
   const c=_cc();
@@ -317,6 +410,99 @@ function makeHourlyTempChart(){
     <polyline points="${histPts}" class="cl-ytd-hist"/>
     <polyline points="${pastPts}" class="cl cl-hot" stroke-dasharray="5,4" opacity="0.55"/>
     <polyline points="${fcstPts}" class="cl cl-hot"/>
+    ${dots}
+    ${endLbls}
+    ${xLbls}
+  </svg>`;
+}
+
+function makeHourlyWetBulbChart(){
+  if(!fcData?.hourly?.time) return '';
+  const c=_cc();
+  if(!hourlyWbHistData) return '<p class="search-msg" style="padding:20px 0">Loading wet bulb history…</p>';
+  const hh=fcData.hourly;
+  const wb=hh.wet_bulb_temperature_2m;
+  if(!wb?.length) return '';
+  const now=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  const nowStr=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:00`;
+  const rawNow=hh.time.findIndex(t=>t>=nowStr);
+  const nowIdx=rawNow<1?1:rawNow;
+  const startIdx=Math.max(0,nowIdx-24);
+  const endIdx=Math.min(hh.time.length,nowIdx+24);
+  const slicedTime=hh.time.slice(startIdx,endIdx);
+  const slicedWb=wb.slice(startIdx,endIdx);
+  const relNow=nowIdx-startIdx;
+  let lastV=null, lastA=null;
+  const vals=slicedWb.map(v=>{if(v!=null)lastV=nT(v);return lastV;});
+  const histLine=slicedTime.map(t=>{
+    const v=hourlyWbHistData.avgByHour[+t.slice(11,13)];
+    if(v!=null)lastA=nT(v); return lastA;
+  });
+  const allV=[...vals,...histLine].filter(v=>v!=null&&!isNaN(v));
+  if(!allV.length) return '';
+  const lo=Math.floor(Math.min(...allV))-1, hi=Math.ceil(Math.max(...allV))+1;
+  const{W,H,pL,pR,pT,pB}=_dims(198,46,_prForEnd('Forecast','5-yr avg'),20,32);
+  const cW=W-pL-pR,cH=H-pT-pB;
+  const n=vals.length;
+  const xf=i=>pL+i/(n-1)*cW;
+  const yf=v=>pT+(1-(v-lo)/(hi-lo))*cH;
+  const rng=hi-lo, rawStep=rng/3;
+  const mag=Math.pow(10,Math.floor(Math.log10(rawStep||1)));
+  const tickStep=[1,2,5,10].map(s=>s*mag).find(s=>rng/s<=5)||Math.ceil(rawStep);
+  const ticks=[];
+  for(let v=Math.ceil(lo/tickStep)*tickStep;v<=hi;v+=tickStep){
+    const y=yf(v).toFixed(1);
+    ticks.push(`<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" class="cg"/>` +
+      `<text x="${pL-5}" y="${+y+4}" class="ca" text-anchor="end">${v}°</text>`);
+  }
+  const nowX=xf(relNow).toFixed(1);
+  const nowMark=`<line x1="${nowX}" y1="${pT}" x2="${nowX}" y2="${(pT+cH).toFixed(1)}" stroke="${c.muted}" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` +
+    `<text x="${nowX}" y="${pT-4}" font-size="8" font-weight="700" fill="${c.muted}" text-anchor="middle">Now</text>`;
+  const histPts=histLine.map((v,i)=>`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
+  const pastPts=vals.slice(0,relNow+1).map((v,i)=>`${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
+  const fcstPts=vals.slice(relNow).map((v,i)=>`${xf(relNow+i).toFixed(1)},${yf(v).toFixed(1)}`).join(' ');
+  const dots=vals.map((v,i)=>{
+    if(v==null) return '';
+    const hr=+slicedTime[i].slice(11,13);
+    const is6h=hr%6===0;
+    if(!is6h) return '';
+    const isPast=i<relNow;
+    const cx=xf(i).toFixed(1),cy=yf(v).toFixed(1);
+    const fill=isPast?c.humidPast:c.humid;
+    const r=isPast?2.5:3;
+    const lbl=!isPast&&is6h?`<text x="${cx}" y="${(yf(v)-8).toFixed(1)}" class="cv" fill="${c.humid}" text-anchor="middle">${Math.round(v)}°</text>`:'';
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="${c.dot}" stroke-width="1.5"/>${lbl}`;
+  }).join('');
+  const usedX=new Set();
+  const xLbls=slicedTime.map((t,i)=>{
+    const hr=+t.slice(11,13);
+    const step=_hourStep();
+    if(hr%step!==0) return '';
+    const xKey=Math.round(xf(i));
+    if(usedX.has(xKey)) return ''; usedX.add(xKey);
+    return `<text x="${xf(i).toFixed(1)}" y="${H-4}" class="ca" text-anchor="middle">${_hourLbl(hr)}</text>`;
+  }).join('');
+  const endX=(xf(n-1)+5).toFixed(1);
+  const endValY=vals[n-1]!=null?yf(vals[n-1]):null;
+  const endAvgY=histLine[n-1]!=null?yf(histLine[n-1]):null;
+  let _heVal=endValY, _heAvg=endAvgY;
+  if(_heVal!=null&&_heAvg!=null){
+    const _heSep=_heVal-_heAvg;
+    if(Math.abs(_heSep)<13){const bump=(13-Math.abs(_heSep))/2+1;_heVal+=_heSep>=0?bump:-bump;_heAvg+=_heSep>=0?-bump:bump;}
+  }
+  const endLbls=[
+    _heVal!=null?`<text x="${endX}" y="${(_heVal+4).toFixed(1)}" font-size="8.5" font-weight="700" fill="${c.humid}">Forecast</text>`:'',
+    _heAvg!=null?`<text x="${endX}" y="${(_heAvg+4).toFixed(1)}" font-size="8.5" fill="${c.muted}">5-yr avg</text>`:''
+  ].join('');
+  _hourlyWbData={vals,histLine,pL,cW,n,nowIdx:relNow,times:slicedTime};
+  return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="hourly-wb" tabindex="0" role="img">
+    ${ticks.join('')}
+    ${nowMark}
+    <line id="ttg-hourly-wb" x1="${pL}" y1="${pT}" x2="${pL}" y2="${(pT+cH).toFixed(1)}" stroke="rgba(255,255,255,.18)" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>
+    <polyline points="${histPts}" class="cl-ytd-hist"/>
+    <polyline points="${pastPts}" stroke="${c.humid}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5,4" opacity="0.55"/>
+    <polyline points="${fcstPts}" stroke="${c.humid}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
     ${dots}
     ${endLbls}
     ${xLbls}

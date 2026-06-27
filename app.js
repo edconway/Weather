@@ -105,8 +105,8 @@ let searching=false, searchResults=[], searchFocusIdx=-1, searchTimer=null;
 let myLat=null, myLon=null, myName=null;       // GPS location
 let customLat=_prefs.customLat??null, customLon=_prefs.customLon??null, customName=_prefs.customName??null; // searched location
 let activeSource=_prefs.activeSource||'geo'; // 'geo' | 'custom'
-let ytdData=null, hourlyHistData=null, hourlyRainHistData=null, dailyRainHistData=null, climatologyData=null, hourlyHumidData=null;
-let _tempData=null,_rainData=null,_hourlyData=null,_hourlyRainData=null,_dailyRainData=null,_climateData=null,_hourlyHumidData=null,_dailyHumidData=null;
+let ytdData=null, hourlyHistData=null, hourlyWbHistData=null, hourlyRainHistData=null, dailyRainHistData=null, climatologyData=null, hourlyHumidData=null;
+let _tempData=null,_rainData=null,_hourlyData=null,_hourlyWbData=null,_wetBulbData=null,_hourlyRainData=null,_dailyRainData=null,_climateData=null,_hourlyHumidData=null,_dailyHumidData=null;
 
 // ── Unit helpers ───────────────────────────────────────
 const c2f=c=>c*9/5+32, k2m=k=>k*.621371, mm2in=m=>m*.0393701;
@@ -236,6 +236,8 @@ function renderContent(){
   // Chart subtitles
   const subHourly=`Hourly temperature${_locFor} · actual & forecast vs ${hourlyHistData?`${hourlyHistData.yearStart}–${hourlyHistData.yearEnd} avg`:'historical avg'}`;
   const subDaily=`14-day high/low${_locFor} · vs 7-day rolling avg ${h.histYearStart}–${h.histYearEnd}`;
+  const subHourlyWb=`Hourly wet bulb${_locFor} · actual & forecast vs ${hourlyWbHistData?`${hourlyWbHistData.yearStart}–${hourlyWbHistData.yearEnd} avg`:'historical avg'}`;
+  const subDailyWb=`14-day wet bulb high/low${_locFor} · vs 7-day rolling avg ${h.histYearStart}–${h.histYearEnd}`;
   const _thisYr=new Date().getFullYear();
   const subHourlyRain=`Hourly precipitation${_locFor}${hourlyRainHistData?` · vs ${hourlyRainHistData.yearStart}–${hourlyRainHistData.yearEnd} avg`:''}`;
   const subDailyRain=`14-day precipitation${_locFor} · past 7 days actual, next 7 days forecast`;
@@ -300,6 +302,16 @@ function renderContent(){
   <div class="chart-card fu">
     ${secHdr('14-Day Temperature', subDaily)}
     ${makeTempChart()}
+  </div>
+
+  <div class="chart-card fu">
+    ${secHdr('48-Hour Wet Bulb', subHourlyWb)}
+    ${makeHourlyWetBulbChart()}
+  </div>
+
+  <div class="chart-card fu">
+    ${secHdr('14-Day Wet Bulb', subDailyWb)}
+    ${makeWetBulbChart()}
   </div>
 
   <div class="chart-card fu">
@@ -404,9 +416,9 @@ async function geocode(lat,lon){
 async function getForecast(lat,lon){
   const p=new URLSearchParams({
     latitude:lat,longitude:lon,timezone:'auto',forecast_days:7,past_days:7,
-    daily:'weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max',
+    daily:'weather_code,temperature_2m_max,temperature_2m_min,wet_bulb_temperature_2m_max,wet_bulb_temperature_2m_min,apparent_temperature_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max',
     past_hours:24,forecast_hours:48,
-    hourly:'temperature_2m,apparent_temperature,precipitation,precipitation_probability,rain,showers,snowfall,weather_code,relative_humidity_2m'
+    hourly:'temperature_2m,wet_bulb_temperature_2m,apparent_temperature,precipitation,precipitation_probability,rain,showers,snowfall,weather_code,relative_humidity_2m'
   });
   const r=await fetch(`https://api.open-meteo.com/v1/forecast?${p}`);
   if(!r.ok) throw new Error('Forecast API error.');
@@ -489,7 +501,7 @@ async function getHourlyNormals(lat,lon){
       latitude:lat,longitude:lon,timezone:'auto',
       start_date:`${s.getFullYear()}-${pad(s.getMonth()+1)}-${pad(s.getDate())}`,
       end_date:`${e.getFullYear()}-${pad(e.getMonth()+1)}-${pad(e.getDate())}`,
-      hourly:'temperature_2m,precipitation,relative_humidity_2m'
+      hourly:'temperature_2m,wet_bulb_temperature_2m,precipitation,relative_humidity_2m'
     });
     fetches.push(archiveFetch(`https://archive-api.open-meteo.com/v1/archive?${p}`)
       .then(r=>r.ok?r.json():null).catch(()=>null));
@@ -502,12 +514,16 @@ async function getHourlyNormals(lat,lon){
   const rVals=Array.from({length:24},()=>[]);
   // Humidity accumulators
   const hSums=new Array(24).fill(0), hCounts=new Array(24).fill(0);
+  // Wet bulb accumulators
+  const wbSums=new Array(24).fill(0), wbCounts=new Array(24).fill(0);
   results.forEach(data=>{
     if(!data?.hourly?.time) return;
     data.hourly.time.forEach((t,i)=>{
       const hr=+t.slice(11,13);
       const tv=data.hourly.temperature_2m?.[i];
       if(tv!=null){tSums[hr]+=tv;tCounts[hr]++;}
+      const wv=data.hourly.wet_bulb_temperature_2m?.[i];
+      if(wv!=null){wbSums[hr]+=wv;wbCounts[hr]++;}
       const rv=data.hourly.precipitation?.[i];
       if(rv!=null){rSums[hr]+=rv;rCounts[hr]++;if(rv>=0.1)wetCounts[hr]++;rVals[hr].push(rv);}
       const hv=data.hourly.relative_humidity_2m?.[i];
@@ -515,6 +531,7 @@ async function getHourlyNormals(lat,lon){
     });
   });
   const temp={avgByHour:tSums.map((s,h)=>tCounts[h]?s/tCounts[h]:null),yearStart:thisYear-5,yearEnd:thisYear-1};
+  const wetBulb={avgByHour:wbSums.map((s,h)=>wbCounts[h]?s/wbCounts[h]:null),yearStart:thisYear-5,yearEnd:thisYear-1};
   const rain={
     avgByHour:rSums.map((s,h)=>rCounts[h]?s/rCounts[h]:0),
     wetHourProbabilityByHour:rCounts.map((c,h)=>c?wetCounts[h]/c:0),
@@ -522,7 +539,7 @@ async function getHourlyNormals(lat,lon){
     yearStart:thisYear-5,yearEnd:thisYear-1
   };
   const humidity={avgByHour:hSums.map((s,h)=>hCounts[h]?s/hCounts[h]:null),yearStart:thisYear-5,yearEnd:thisYear-1};
-  return{temp,rain,humidity};
+  return{temp,wetBulb,rain,humidity};
 }
 
 
@@ -555,7 +572,7 @@ async function getClimatology(lat,lon){
     latitude:lat,longitude:lon,timezone:'auto',
     start_date:`${startYear}-01-01`,
     end_date:`${thisYear-1}-12-31`,
-    daily:'temperature_2m_max,temperature_2m_min,precipitation_sum'
+    daily:'temperature_2m_max,temperature_2m_min,wet_bulb_temperature_2m_max,wet_bulb_temperature_2m_min,precipitation_sum'
   });
   const r=await archiveFetch(`https://archive-api.open-meteo.com/v1/archive?${p}`);
   if(!r.ok) throw new Error('Climate fetch failed');
@@ -565,19 +582,23 @@ async function getClimatology(lat,lon){
   // Monthly aggregation for the climate chart
   const byMonthYear={};
   // Per-calendar-day lookups (MM-DD) for deriving rolling temp & rain normals
-  const byMMDD={}; // {mmdd:{maxes:[],mins:[],rains:[]}}
+  const byMMDD={}; // {mmdd:{maxes:[],mins:[],wbMaxes:[],wbMins:[],rains:[]}}
   data.daily.time.forEach((t,i)=>{
     const mx=data.daily.temperature_2m_max[i];
     const mn=data.daily.temperature_2m_min[i];
+    const wmx=data.daily.wet_bulb_temperature_2m_max[i];
+    const wmn=data.daily.wet_bulb_temperature_2m_min[i];
     const rn=data.daily.precipitation_sum[i];
     const mKey=t.slice(0,7), mmdd=t.slice(5);
     if(!byMonthYear[mKey]) byMonthYear[mKey]={tMax:[],tMin:[],rain:0};
     if(mx!=null) byMonthYear[mKey].tMax.push(mx);
     if(mn!=null) byMonthYear[mKey].tMin.push(mn);
     if(rn!=null) byMonthYear[mKey].rain+=rn;
-    if(!byMMDD[mmdd]) byMMDD[mmdd]={maxes:[],mins:[],rains:[]};
+    if(!byMMDD[mmdd]) byMMDD[mmdd]={maxes:[],mins:[],wbMaxes:[],wbMins:[],rains:[]};
     if(mx!=null) byMMDD[mmdd].maxes.push(mx);
     if(mn!=null) byMMDD[mmdd].mins.push(mn);
+    if(wmx!=null) byMMDD[mmdd].wbMaxes.push(wmx);
+    if(wmn!=null) byMMDD[mmdd].wbMins.push(wmn);
     if(rn!=null) byMMDD[mmdd].rains.push(rn);
   });
   const byMonth=Array.from({length:12},()=>({tMax:[],tMin:[],rain:[]}));
@@ -615,11 +636,14 @@ function deriveTempBand(climate){
   for(let i=-7;i<=6;i++){
     const tmp=new Date(thisYear,mo,dy+i);
     const mmdd=`${pad(tmp.getMonth()+1)}-${pad(tmp.getDate())}`;
-    const maxes=[],mins=[];
+    const maxes=[],mins=[],wbMaxes=[],wbMins=[];
     entries.forEach(([am,v])=>{
-      if(_mmddDist(mmdd,am)<=3){maxes.push(...v.maxes);mins.push(...v.mins);}
+      if(_mmddDist(mmdd,am)<=3){
+        maxes.push(...v.maxes); mins.push(...v.mins);
+        wbMaxes.push(...(v.wbMaxes||[])); wbMins.push(...(v.wbMins||[]));
+      }
     });
-    dailyAvg.push({tMax:arrAvg(maxes),tMin:arrAvg(mins)});
+    dailyAvg.push({tMax:arrAvg(maxes),tMin:arrAvg(mins),wbMax:arrAvg(wbMaxes),wbMin:arrAvg(wbMins)});
   }
   return{
     dailyAvg,
@@ -705,7 +729,8 @@ function setLoad(msg){
 
   function chartStep(chartType, dir) {
     const dataMap = {
-      temp: _tempData, rain: _rainData, hourly: _hourlyData,
+      temp: _tempData, rain: _rainData, hourly: _hourlyData, 'hourly-wb': _hourlyWbData,
+      'wet-bulb': _wetBulbData,
       'hourly-rain': _hourlyRainData, 'daily-rain': _dailyRainData,
       'hourly-humid': _hourlyHumidData, 'daily-humid': _dailyHumidData,
       climate: _climateData
@@ -737,7 +762,9 @@ function setLoad(msg){
       svg.setAttribute('role', 'img');
       const labels = {
         temp: '14-day temperature chart', rain: 'Year-to-date rainfall chart',
-        hourly: '48-hour temperature chart', 'hourly-rain': '48-hour rainfall chart',
+        hourly: '48-hour temperature chart', 'hourly-wb': '48-hour wet bulb chart',
+        'wet-bulb': '14-day wet bulb chart',
+        'hourly-rain': '48-hour rainfall chart',
         'daily-rain': '14-day rainfall chart', 'hourly-humid': '48-hour humidity chart',
         'daily-humid': 'Daily humidity chart', climate: 'Climate overview chart'
       };
@@ -834,6 +861,43 @@ function setLoad(msg){
       html=`<div class="tt-title">${dateStr} ${lbl}${tag}</div>
         <div class="tt-row"><span class="tt-lbl">Temp</span><span class="tt-hot">${tv}${tv!=='—'?u:''}</span></div>
         <div class="tt-row"><span class="tt-lbl">5-yr avg</span><span class="tt-muted">${hv}${hv!=='—'?u:''}</span></div>`;
+    } else if(chartType==='hourly-wb'&&_hourlyWbData){
+      const{vals,histLine,pL,cW,n,nowIdx,times}=_hourlyWbData;
+      const i=Math.max(0,Math.min(n-1,Math.round((svgX-pL)/cW*(n-1))));
+      const t=times[i];
+      const hr=+t.slice(11,13);
+      const isPast=i<nowIdx;
+      const tag=isPast?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · actual</span>':'';
+      const lbl=hr===0?'Midnight':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
+      const dateStr=new Date(t.replace('T',' ')).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+      const u=uT();
+      const tv=vals[i]!=null?Math.round(vals[i]):'—';
+      const hv=histLine[i]!=null?Math.round(histLine[i]):'—';
+      const gx=(pL+i/(n-1)*cW).toFixed(1);
+      document.getElementById('ttg-hourly-wb')?.setAttribute('x1',gx);
+      document.getElementById('ttg-hourly-wb')?.setAttribute('x2',gx);
+      document.getElementById('ttg-hourly-wb')?.setAttribute('visibility','visible');
+      html=`<div class="tt-title">${dateStr} ${lbl}${tag}</div>
+        <div class="tt-row"><span class="tt-lbl">Wet bulb</span><span class="tt-hot">${tv}${tv!=='—'?u:''}</span></div>
+        <div class="tt-row"><span class="tt-lbl">5-yr avg</span><span class="tt-muted">${hv}${hv!=='—'?u:''}</span></div>`;
+    } else if(chartType==='wet-bulb'&&_wetBulbData){
+      const{labels,maxV,minV,dailyAvg,pL,cW,n,todayIdx}=_wetBulbData;
+      const i=Math.max(0,Math.min(n-1,Math.round((svgX-pL)/cW*(n-1))));
+      const u=uT();
+      const hi=maxV[i]!=null?Math.round(maxV[i]):'—';
+      const lo=minV[i]!=null?Math.round(minV[i]):'—';
+      const da=dailyAvg?.[i];
+      const hr=da?.wbMax!=null&&da?.wbMin!=null?`${Math.round(nT(da.wbMin))}–${Math.round(nT(da.wbMax))}°`:'—';
+      const isActual=todayIdx!=null&&i<todayIdx;
+      const tag=isActual?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · actual</span>':'';
+      const gx=(pL+i/(n-1)*cW).toFixed(1);
+      document.getElementById('ttg-wet-bulb')?.setAttribute('x1',gx);
+      document.getElementById('ttg-wet-bulb')?.setAttribute('x2',gx);
+      document.getElementById('ttg-wet-bulb')?.setAttribute('visibility','visible');
+      html=`<div class="tt-title">${labels[i]}${tag}</div>
+        <div class="tt-row"><span class="tt-lbl">High</span><span class="tt-hot">${hi}${hi!=='—'?u:''}</span></div>
+        <div class="tt-row"><span class="tt-lbl">Low</span><span class="tt-cold">${lo}${lo!=='—'?u:''}</span></div>
+        <div class="tt-row"><span class="tt-lbl">Hist. range</span><span class="tt-muted">${hr}</span></div>`;
     } else if(chartType==='hourly-rain'&&_hourlyRainData){
       const{precip,prob,pL,slotW,n,relNow,times}=_hourlyRainData;
       const i=Math.max(0,Math.min(n-1,Math.floor((svgX-pL)/slotW)));
@@ -925,6 +989,8 @@ function setLoad(msg){
     document.getElementById('ttg-temp')?.setAttribute('visibility','hidden');
     document.getElementById('ttg-rain')?.setAttribute('visibility','hidden');
     document.getElementById('ttg-hourly')?.setAttribute('visibility','hidden');
+    document.getElementById('ttg-hourly-wb')?.setAttribute('visibility','hidden');
+    document.getElementById('ttg-wet-bulb')?.setAttribute('visibility','hidden');
     document.getElementById('ttg-hourly-rain')?.setAttribute('visibility','hidden');
     document.getElementById('ttg-daily-rain')?.setAttribute('visibility','hidden');
     document.getElementById('ttg-hourly-humid')?.setAttribute('visibility','hidden');
@@ -977,7 +1043,7 @@ async function loadWeather(lat, lon, name, source) {
   if (source === 'geo') { myLat = lat; myLon = lon; myName = name; }
   savePrefs({ activeSource, customLat, customLon, customName, imp });
   setLoad('Loading weather data…');
-  ytdData = null; hourlyHistData = null; hourlyRainHistData = null;
+  ytdData = null; hourlyHistData = null; hourlyWbHistData = null; hourlyRainHistData = null;
   dailyRainHistData = null; climatologyData = null; hourlyHumidData = null;
   const [fc, climate] = await Promise.all([getForecast(lat, lon), getClimatology(lat, lon)]);
   fcData = fc; climatologyData = climate;
