@@ -377,17 +377,7 @@ body{
 .panel-cap-hint{font-size:.7rem;opacity:.65;white-space:nowrap;flex-shrink:0}
 .panel-chart{padding:14px 14px 2px}
 .panel-chart+.panel-chart{border-top:1px solid var(--card-border)}
-.panel-row{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:12px;
-  margin-bottom:12px;
-}
-.panel-row .weather-panel{margin-bottom:0;scroll-margin-top:12px}
 .weather-panel{scroll-margin-top:12px}
-@media(max-width:720px){
-  .panel-row{grid-template-columns:1fr}
-}
 .chart-card .wc-svg{width:100%;height:auto;display:block}
 .panel-chart .wc-svg{width:100%;height:auto;display:block}
 .chart-leg{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px}

@@ -318,23 +318,6 @@ function renderContent(){
     </div>
   </section>
 
-  <div class="panel-row">
-  <div class="weather-panel fu" id="panel-wet-bulb">
-    <div class="panel-cap" style="background:rgba(74,175,163,.08);border-bottom:1px solid rgba(74,175,163,.12);">
-      <span class="panel-cap-icon" style="color:#3a9f95"><svg width="13" height="15" viewBox="0 0 24 28" fill="currentColor"><path d="M12 2C6 9 3 14.5 3 17.5a9 9 0 0 0 18 0C21 14.5 18 9 12 2z"/></svg></span>
-      <span class="panel-cap-title" style="color:#3a9f95">Wet Bulb · Feels-Like Heat</span>
-      <span class="panel-cap-hint" style="color:#3a9f95">Heat stress</span>
-    </div>
-    <div class="panel-chart">
-      ${secHdr('48-Hour Wet Bulb', subHourlyWb)}
-      ${makeHourlyWetBulbChart()}
-    </div>
-    <div class="panel-chart">
-      ${secHdr('14-Day Wet Bulb', subDailyWb)}
-      ${makeWetBulbChart()}
-    </div>
-  </div>
-
   <div class="weather-panel fu" id="panel-temperature">
     <div class="panel-cap" style="background:rgba(212,101,90,.08);border-bottom:1px solid rgba(212,101,90,.1);">
       <span class="panel-cap-icon" style="color:#c45c52"><svg width="13" height="15" viewBox="0 0 24 28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 16.76V5a2 2 0 0 0-4 0v11.76a4 4 0 1 0 4 0z"/></svg></span>
@@ -350,6 +333,21 @@ function renderContent(){
       ${makeTempChart()}
     </div>
   </div>
+
+  <div class="weather-panel fu" id="panel-wet-bulb">
+    <div class="panel-cap" style="background:rgba(74,175,163,.08);border-bottom:1px solid rgba(74,175,163,.12);">
+      <span class="panel-cap-icon" style="color:#3a9f95"><svg width="13" height="15" viewBox="0 0 24 28" fill="currentColor"><path d="M12 2C6 9 3 14.5 3 17.5a9 9 0 0 0 18 0C21 14.5 18 9 12 2z"/></svg></span>
+      <span class="panel-cap-title" style="color:#3a9f95">Wet Bulb · Feels-Like Heat</span>
+      <span class="panel-cap-hint" style="color:#3a9f95">Heat stress</span>
+    </div>
+    <div class="panel-chart">
+      ${secHdr('48-Hour Wet Bulb', subHourlyWb)}
+      ${makeHourlyWetBulbChart()}
+    </div>
+    <div class="panel-chart">
+      ${secHdr('14-Day Wet Bulb', subDailyWb)}
+      ${makeWetBulbChart()}
+    </div>
   </div>
 
   <div class="weather-panel fu" id="panel-rain">
