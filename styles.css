@@ -200,6 +200,8 @@ body{
 .badge-wet{background:rgba(107,127,215,.14);color:#5568b8}
 .badge-dry{background:rgba(139,149,165,.14);color:var(--muted)}
 .badge-neutral{background:var(--accent-soft);color:var(--accent)}
+.badge-muggy{background:rgba(74,175,163,.16);color:#3a8f85}
+.badge-muggy-low{background:rgba(91,143,201,.12);color:var(--cold)}
 .hero-icon{color:var(--accent);line-height:1;flex-shrink:0;display:flex;align-items:flex-start;justify-content:flex-end;opacity:.92}
 .w-icon{display:block}
 

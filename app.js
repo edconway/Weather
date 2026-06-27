@@ -64,8 +64,9 @@ function heroTint(code) {
   return 'rgba(74,95,127,.04)';
 }
 
-function anomalyBadge(text, kind) {
-  return `<span class="badge badge-${kind}">${escapeHtml(text)}</span>`;
+function anomalyBadge(text, kind, title) {
+  const t=title?` title="${escapeHtml(title)}"`:'';
+  return `<span class="badge badge-${kind}"${t}>${escapeHtml(text)}</span>`;
 }
 
 function rainAnomalyKind(text) {
@@ -267,6 +268,20 @@ function renderContent(){
     if(dr.histMeanMm>0.5&&dr.forecastMm<dr.histMeanMm*0.5) return {text:'Drier than normal',kind:'dry'};
     return {text:'Near normal rainfall',kind:'neutral'};
   })();
+  const _wbAnomaly=(()=>{
+    const wbNow=fcData.hourly?.wet_bulb_temperature_2m?.[_nowHourIdx];
+    const hr=new Date().getHours();
+    let wbNorm=hourlyWbHistData?.avgByHour?.[hr];
+    if(wbNorm==null&&_histEntry?.wbMax!=null&&_histEntry?.wbMin!=null)
+      wbNorm=(_histEntry.wbMax+_histEntry.wbMin)/2;
+    if(wbNow==null||wbNorm==null||wbNorm<8) return null;
+    const pct=Math.round(((wbNow-wbNorm)/wbNorm)*100);
+    const tip='Based on wet bulb temperature vs the usual reading for this time of day';
+    if(Math.abs(pct)<5) return {text:'Near normal mugginess',kind:'neutral',title:tip};
+    const n=Math.abs(pct);
+    if(pct>0) return {text:`Feels ${n}% more muggy than usual`,kind:'muggy',title:tip};
+    return {text:`Feels ${n}% less muggy than usual`,kind:'muggy-low',title:tip};
+  })();
 
   document.getElementById('content').innerHTML=`
   <section class="hero fu" style="--glow:${glowColor(d.weather_code[t0])};--hero-tint:${heroTint(d.weather_code[t0])}">
@@ -280,9 +295,10 @@ function renderContent(){
           <span style="color:var(--subtle)"> / </span>
           <span class="lo">↓${fT(tMin0)}</span>
         </div>
-        ${(_tempAnomaly||_rainAnomaly)?`<div class="hero-badges">
+        ${(_tempAnomaly||_rainAnomaly||_wbAnomaly)?`<div class="hero-badges">
           ${_tempAnomaly?anomalyBadge(_tempAnomaly.text,_tempAnomaly.kind):''}
           ${_rainAnomaly?anomalyBadge(_rainAnomaly.text,rainAnomalyKind(_rainAnomaly.text)):''}
+          ${_wbAnomaly?anomalyBadge(_wbAnomaly.text,_wbAnomaly.kind,_wbAnomaly.title):''}
         </div>`:''}
       </div>
       <div class="hero-icon">${weatherIcon(d.weather_code[t0],56)}</div>
