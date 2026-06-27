@@ -308,6 +308,7 @@ body{
   .hero-badges{margin-top:4px}
   .hero-cond{font-size:.95rem}
   .chart-card{padding:12px 12px 2px}
+  .panel-chart{padding:12px 12px 2px}
   .hist{padding:16px}
 }
 
@@ -317,6 +318,7 @@ body{
   .stat-val{font-size:.88rem}
   .sec-hdr{margin-bottom:8px}
   .chart-card{padding:12px 10px 2px}
+  .panel-chart{padding:12px 10px 2px}
   .chart-leg{gap:10px}
   .empty-state{padding:60px 16px 32px}
 }
@@ -355,7 +357,25 @@ body{
   overflow:visible;
   box-shadow:var(--shadow-sm);
 }
+/* ─── Grouped weather panels ─── */
+.weather-panel{
+  background:var(--card);
+  border-radius:var(--r);
+  overflow:hidden;
+  box-shadow:var(--shadow-sm);
+  margin-bottom:12px;
+}
+.panel-cap{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 14px;
+}
+.panel-cap-icon{display:flex;align-items:center;flex-shrink:0}
+.panel-cap-title{font-size:.85rem;font-weight:700;flex:1;line-height:1.2}
+.panel-cap-hint{font-size:.7rem;opacity:.65;white-space:nowrap;flex-shrink:0}
+.panel-chart{padding:14px 14px 2px}
+.panel-chart+.panel-chart{border-top:1px solid var(--card-border)}
 .chart-card .wc-svg{width:100%;height:auto;display:block}
+.panel-chart .wc-svg{width:100%;height:auto;display:block}
 .chart-leg{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px}
 .cli{display:flex;align-items:center;gap:6px;font-size:.7rem;color:var(--muted)}
 
@@ -461,6 +481,7 @@ body{
   :root:not([data-theme="light"]) .hero{background:var(--card)}
   :root:not([data-theme="light"]) .hist,
   :root:not([data-theme="light"]) .chart-card{background:var(--card)}
+  :root:not([data-theme="light"]) .weather-panel{background:var(--card)}
   :root:not([data-theme="light"]) .stat-tile{background:var(--card-hover)}
   :root:not([data-theme="light"]) .tt{background:var(--card);box-shadow:var(--shadow-md)}
   :root:not([data-theme="light"]) .ch-band{fill:var(--chart-band)}
@@ -481,6 +502,7 @@ body{
 :root[data-theme="dark"] .hero{background:var(--card)}
 :root[data-theme="dark"] .hist,
 :root[data-theme="dark"] .chart-card{background:var(--card)}
+:root[data-theme="dark"] .weather-panel{background:var(--card)}
 :root[data-theme="dark"] .stat-tile{background:var(--card-hover)}
 :root[data-theme="dark"] .tt{background:var(--card);box-shadow:var(--shadow-md)}
 :root[data-theme="dark"] .ch-band{fill:var(--chart-band)}

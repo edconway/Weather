@@ -310,54 +310,76 @@ function renderContent(){
     </div>
   </section>
 
-  <div class="chart-card fu">
-    ${secHdr('48-Hour Temperature', subHourly)}
-    ${makeHourlyTempChart()}
+  <div class="weather-panel fu">
+    <div class="panel-cap" style="background:rgba(212,101,90,.08);border-bottom:1px solid rgba(212,101,90,.1);">
+      <span class="panel-cap-icon" style="color:#c45c52"><svg width="13" height="15" viewBox="0 0 24 28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 16.76V5a2 2 0 0 0-4 0v11.76a4 4 0 1 0 4 0z"/></svg></span>
+      <span class="panel-cap-title" style="color:#c45c52">Temperature</span>
+      <span class="panel-cap-hint" style="color:#c45c52">Actual air temp, high &amp; low</span>
+    </div>
+    <div class="panel-chart">
+      ${secHdr('48-Hour Temperature', subHourly)}
+      ${makeHourlyTempChart()}
+    </div>
+    <div class="panel-chart">
+      ${secHdr('14-Day Temperature', subDaily)}
+      ${makeTempChart()}
+    </div>
   </div>
 
-  <div class="chart-card fu">
-    ${secHdr('14-Day Temperature', subDaily)}
-    ${makeTempChart()}
+  <div class="weather-panel fu">
+    <div class="panel-cap" style="background:rgba(74,175,163,.08);border-bottom:1px solid rgba(74,175,163,.12);">
+      <span class="panel-cap-icon" style="color:#3a9f95"><svg width="13" height="15" viewBox="0 0 24 28" fill="currentColor"><path d="M12 2C6 9 3 14.5 3 17.5a9 9 0 0 0 18 0C21 14.5 18 9 12 2z"/></svg></span>
+      <span class="panel-cap-title" style="color:#3a9f95">Wet Bulb · Feels-Like Heat</span>
+      <span class="panel-cap-hint" style="color:#3a9f95">Heat stress</span>
+    </div>
+    <div class="panel-chart">
+      ${secHdr('48-Hour Wet Bulb', subHourlyWb)}
+      ${makeHourlyWetBulbChart()}
+    </div>
+    <div class="panel-chart">
+      ${secHdr('14-Day Wet Bulb', subDailyWb)}
+      ${makeWetBulbChart()}
+    </div>
   </div>
 
-  <div class="chart-card fu">
-    ${secHdr('48-Hour Wet Bulb', subHourlyWb)}
-    ${makeHourlyWetBulbChart()}
+  <div class="weather-panel fu">
+    <div class="panel-cap" style="background:rgba(107,127,215,.08);border-bottom:1px solid rgba(107,127,215,.1);">
+      <span class="panel-cap-icon" style="color:#5568b8"><svg width="15" height="13" viewBox="0 0 24 20" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 14A4 4 0 0 0 16 7h-1.5A6.5 6.5 0 1 0 3 12.5"/><line x1="8" y1="16" x2="8" y2="18"/><line x1="12" y1="16" x2="12" y2="18"/><line x1="16" y1="16" x2="16" y2="18"/></svg></span>
+      <span class="panel-cap-title" style="color:#5568b8">Rain &amp; Humidity</span>
+      <span class="panel-cap-hint" style="color:#5568b8">Precipitation &amp; moisture</span>
+    </div>
+    <div class="panel-chart">
+      ${secHdr('48-Hour Rainfall', subHourlyRain)}
+      ${makeHourlyRainChart()}
+    </div>
+    <div class="panel-chart">
+      ${secHdr('14-Day Rainfall', subDailyRain)}
+      ${makeDailyRainChart()}
+    </div>
+    <div class="panel-chart">
+      ${secHdr('48-Hour Humidity', subHourlyHumid)}
+      ${makeHourlyHumidChart()}
+    </div>
+    <div class="panel-chart">
+      ${secHdr('Daily Humidity', subDailyHumid)}
+      ${makeDailyHumidChart()}
+    </div>
+    <div class="panel-chart">
+      ${secHdr('Year-to-Date Rainfall', subRain)}
+      ${makeRainYTDChart()}
+    </div>
   </div>
 
-  <div class="chart-card fu">
-    ${secHdr('14-Day Wet Bulb', subDailyWb)}
-    ${makeWetBulbChart()}
-  </div>
-
-  <div class="chart-card fu">
-    ${secHdr('48-Hour Rainfall', subHourlyRain)}
-    ${makeHourlyRainChart()}
-  </div>
-
-  <div class="chart-card fu">
-    ${secHdr('14-Day Rainfall', subDailyRain)}
-    ${makeDailyRainChart()}
-  </div>
-
-  <div class="chart-card fu">
-    ${secHdr('48-Hour Humidity', subHourlyHumid)}
-    ${makeHourlyHumidChart()}
-  </div>
-
-  <div class="chart-card fu">
-    ${secHdr('Daily Humidity', subDailyHumid)}
-    ${makeDailyHumidChart()}
-  </div>
-
-  <div class="chart-card fu">
-    ${secHdr('Year-to-Date Rainfall', subRain)}
-    ${makeRainYTDChart()}
-  </div>
-
-  <div class="chart-card fu">
-    ${secHdr('Climate Overview', climatologyData?`Avg monthly high/low °${uT().slice(1)} (lines) & total rainfall (bars)${_locFor} · ${climatologyData.yearStart}–${climatologyData.yearEnd}`:`Climate normals${_locFor}`)}
-    ${makeClimateChart()}
+  <div class="weather-panel fu">
+    <div class="panel-cap" style="background:var(--accent-soft);border-bottom:1px solid var(--card-border);">
+      <span class="panel-cap-icon" style="color:var(--accent)"><svg width="14" height="11" viewBox="0 0 24 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 9h18M3 3h18M3 15h18"/></svg></span>
+      <span class="panel-cap-title" style="color:var(--accent)">Climate Overview</span>
+      <span class="panel-cap-hint" style="color:var(--accent)">Monthly normals</span>
+    </div>
+    <div class="panel-chart">
+      ${secHdr('Climate Overview', climatologyData?`Avg monthly high/low °${uT().slice(1)} (lines) & total rainfall (bars)${_locFor} · ${climatologyData.yearStart}–${climatologyData.yearEnd}`:`Climate normals${_locFor}`)}
+      ${makeClimateChart()}
+    </div>
   </div>
 
   <footer class="footer fu">
