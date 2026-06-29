@@ -1,6 +1,7 @@
 // ── Chart renderers ────────────────────────────────────
 
 function _narrow(){ return typeof window!=='undefined'&&window.innerWidth<=480; }
+function _mobileChart(){ return typeof window!=='undefined'&&window.innerWidth<=640; }
 function _chartPR(){ return 14; }
 function _hourStep(){ return _narrow()?12:6; }
 function _prForEnd(...labels){
@@ -11,7 +12,19 @@ function _prForEnd(...labels){
   return Math.max(base,Math.round(est));
 }
 function _dims(baseH,pL,pR,pT,pB){
-  return{W:580,H:baseH,pL,pR,pT,pB};
+  const W=580;
+  if(!_mobileChart()) return{W,H:baseH,pL,pR,pT,pB};
+  // Square viewBox on mobile so charts fill ~1:1 tiles (matches CSS aspect-ratio)
+  const H=W;
+  const s=H/baseH;
+  const padScale=Math.min(s,1.65);
+  return{
+    W,H,
+    pL:Math.round(pL*padScale),
+    pR:Math.round(pR*padScale),
+    pT:Math.round(pT*padScale),
+    pB:Math.round(pB*padScale),
+  };
 }
 function _hourLbl(hr){
   return hr===0?'Midnight':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;

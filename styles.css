@@ -311,7 +311,17 @@ body{
   .hero-badges{margin-top:4px}
   .hero-cond{font-size:.95rem}
   .chart-card{padding:12px 12px 2px}
-  .panel-chart{padding:12px 12px 2px}
+  .panel-chart{
+    aspect-ratio:1;
+    display:flex;
+    flex-direction:column;
+    padding:10px 10px 6px;
+  }
+  .panel-chart .sec-hdr{margin-bottom:4px!important;flex-shrink:0}
+  .panel-chart .sec-ttl{font-size:.9rem}
+  .panel-chart .sec-sub{font-size:.72rem;line-height:1.35;margin-top:2px}
+  .panel-chart .search-msg{flex:1;display:flex;align-items:center;justify-content:center;padding:12px 0}
+  .panel-chart .wc-svg{flex:1;width:100%;min-height:0;height:100%}
   .hist{padding:16px}
 }
 
@@ -321,7 +331,7 @@ body{
   .stat-val{font-size:.88rem}
   .sec-hdr{margin-bottom:8px}
   .chart-card{padding:12px 10px 2px}
-  .panel-chart{padding:12px 10px 2px}
+  .panel-chart{padding:10px 8px 4px}
   .chart-leg{gap:10px}
   .empty-state{padding:60px 16px 32px}
 }
