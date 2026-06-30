@@ -93,7 +93,7 @@ function onSearchKey(e){
 function loadBackground(lat,lon){
   getRainYTD(lat,lon).then(ytd=>{ytdData=ytd;if(fcData)renderContent();}).catch(()=>{});
   getHourlyNormals(lat,lon).then(d=>{
-    hourlyHistData=d.temp; hourlyWbHistData=d.wetBulb; hourlyRainHistData=d.rain; hourlyHumidData=d.humidity;
+    hourlyHistData=d.temp; hourlyWbHistData=d.wetBulb; hourlyRainHistData=d.rain;
     if(fcData)renderContent();
   }).catch(()=>{});
 }
@@ -104,7 +104,7 @@ async function pickResult(lat,lon,name){
   activeSource='custom'; geoName=name;
   savePrefs({ customLat: lat, customLon: lon, customName: name, activeSource: 'custom' });
   renderHeader(); setLoad('Loading weather…');
-  ytdData=null; hourlyHistData=null; hourlyWbHistData=null; hourlyRainHistData=null; dailyRainHistData=null; climatologyData=null; hourlyHumidData=null;
+  ytdData=null; hourlyHistData=null; hourlyWbHistData=null; hourlyRainHistData=null; dailyRainHistData=null; climatologyData=null;
   try{
     const[fc,climate]=await Promise.all([getForecast(lat,lon),getClimatology(lat,lon)]);
     fcData=fc; climatologyData=climate;
@@ -126,7 +126,7 @@ async function switchSource(src){
   savePrefs({ activeSource: src });
   renderHeader();
   setLoad('Loading weather…');
-  ytdData=null; hourlyHistData=null; hourlyWbHistData=null; hourlyRainHistData=null; dailyRainHistData=null; climatologyData=null; hourlyHumidData=null;
+  ytdData=null; hourlyHistData=null; hourlyWbHistData=null; hourlyRainHistData=null; dailyRainHistData=null; climatologyData=null;
   try{
     const[fc,climate]=await Promise.all([getForecast(lat,lon),getClimatology(lat,lon)]);
     fcData=fc; climatologyData=climate;
