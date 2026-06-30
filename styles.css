@@ -428,23 +428,23 @@ body{
     --card-border:rgba(255,255,255,.06);
     --card-hover:#1f242c;
     --text:#eef0f3;
-    --muted:#9aa3ae;
-    --subtle:#6c7580;
+    --muted:#a3acb8;
+    --subtle:#a3acb8;
     --accent:#8ba3c7;
     --accent-soft:#1f2838;
     --hot:#e57373;
     --cold:#64b5f6;
-    --chart-hot:#e07a6f;
-    --chart-hot-past:rgba(224,122,111,.4);
-    --chart-cold:#6ba3e0;
-    --chart-cold-past:rgba(107,163,224,.4);
-    --chart-rain:#8b9ae8;
-    --chart-rain-past:rgba(139,154,232,.3);
-    --chart-rain-solid:rgba(139,154,232,.85);
-    --chart-humid:#5ec4b8;
-    --chart-humid-past:rgba(94,196,184,.3);
-    --chart-grid:#2a2f38;
-    --chart-band:#222830;
+    --chart-hot:#eb877c;
+    --chart-hot-past:rgba(235,135,124,.52);
+    --chart-cold:#74adef;
+    --chart-cold-past:rgba(116,173,239,.52);
+    --chart-rain:#95a3eb;
+    --chart-rain-past:rgba(149,163,235,.5);
+    --chart-rain-solid:rgba(149,163,235,.92);
+    --chart-humid:#62c9bd;
+    --chart-humid-past:rgba(98,201,189,.4);
+    --chart-grid:#3a4352;
+    --chart-band:#28303c;
     --shadow-sm:0 1px 3px rgba(0,0,0,.25);
     --shadow-md:0 4px 20px rgba(0,0,0,.35);
   }
@@ -460,23 +460,23 @@ body{
   --card-border:rgba(255,255,255,.06);
   --card-hover:#1f242c;
   --text:#eef0f3;
-  --muted:#9aa3ae;
-  --subtle:#6c7580;
+  --muted:#a3acb8;
+  --subtle:#a3acb8;
   --accent:#8ba3c7;
   --accent-soft:#1f2838;
   --hot:#e57373;
   --cold:#64b5f6;
-  --chart-hot:#e07a6f;
-  --chart-hot-past:rgba(224,122,111,.4);
-  --chart-cold:#6ba3e0;
-  --chart-cold-past:rgba(107,163,224,.4);
-  --chart-rain:#8b9ae8;
-  --chart-rain-past:rgba(139,154,232,.3);
-  --chart-rain-solid:rgba(139,154,232,.85);
-  --chart-humid:#5ec4b8;
-  --chart-humid-past:rgba(94,196,184,.3);
-  --chart-grid:#2a2f38;
-  --chart-band:#222830;
+  --chart-hot:#eb877c;
+  --chart-hot-past:rgba(235,135,124,.52);
+  --chart-cold:#74adef;
+  --chart-cold-past:rgba(116,173,239,.52);
+  --chart-rain:#95a3eb;
+  --chart-rain-past:rgba(149,163,235,.5);
+  --chart-rain-solid:rgba(149,163,235,.92);
+  --chart-humid:#62c9bd;
+  --chart-humid-past:rgba(98,201,189,.4);
+  --chart-grid:#3a4352;
+  --chart-band:#28303c;
   --shadow-sm:0 1px 3px rgba(0,0,0,.25);
   --shadow-md:0 4px 20px rgba(0,0,0,.35);
 }
@@ -501,6 +501,7 @@ body{
   :root:not([data-theme="light"]) .tt{background:var(--card);box-shadow:var(--shadow-md)}
   :root:not([data-theme="light"]) .ch-band{fill:var(--chart-band)}
   :root:not([data-theme="light"]) .cg{stroke:var(--chart-grid)}
+  :root:not([data-theme="light"]) .ca{font-size:10.5px;font-weight:500}
 }
 
 :root[data-theme="dark"] .spinner{border-color:var(--card-border);border-top-color:var(--accent)}
@@ -522,3 +523,4 @@ body{
 :root[data-theme="dark"] .tt{background:var(--card);box-shadow:var(--shadow-md)}
 :root[data-theme="dark"] .ch-band{fill:var(--chart-band)}
 :root[data-theme="dark"] .cg{stroke:var(--chart-grid)}
+:root[data-theme="dark"] .ca{font-size:10.5px;font-weight:500}

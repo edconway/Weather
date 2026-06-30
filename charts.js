@@ -33,6 +33,13 @@ function _dims(baseH,pL,pR,pT,pB){
 function _hourLbl(hr){
   return hr===0?'Midnight':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
 }
+function _chartDark(){
+  if(typeof window==='undefined') return false;
+  const t=document.documentElement.dataset.theme;
+  if(t==='dark') return true;
+  if(t==='light') return false;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
 function _cc(){
   const s=getComputedStyle(document.documentElement);
   const g=v=>s.getPropertyValue(v).trim();
@@ -41,7 +48,7 @@ function _cc(){
     cold:g('--chart-cold'),coldPast:g('--chart-cold-past'),
     rain:g('--chart-rain'),rainPast:g('--chart-rain-past'),rainSolid:g('--chart-rain-solid'),
     humid:g('--chart-humid'),humidPast:g('--chart-humid-past'),
-    muted:g('--subtle'),dot:'rgba(15,23,42,.85)',
+    muted:g('--subtle'),dot:_chartDark()?'rgba(238,240,243,.85)':'rgba(15,23,42,.85)',
   };
 }
 
