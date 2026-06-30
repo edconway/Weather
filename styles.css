@@ -387,6 +387,7 @@ body{
 .panel-cap-hint{font-size:.7rem;opacity:.65;white-space:nowrap;flex-shrink:0}
 .panel-chart{padding:14px 14px 2px}
 .panel-chart+.panel-chart{border-top:1px solid var(--card-border)}
+.lazy-sentinel{height:1px;margin:0;pointer-events:none;visibility:hidden}
 .weather-panel{scroll-margin-top:12px}
 .chart-card .wc-svg{width:100%;height:auto;display:block}
 .panel-chart .wc-svg{width:100%;height:auto;display:block}
