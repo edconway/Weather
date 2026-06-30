@@ -46,7 +46,8 @@ function _cc(){
 }
 
 function makeTempChart(){
-  if(!fcData||!histData) return '';
+  if(!fcData) return '';
+  if(!histData) return '<p class="search-msg" style="padding:20px 0">Loading historical comparison…</p>';
   const c=_cc();
   const d=fcData.daily;
   // Find today's index in the 14-day array (past_days:7 + forecast_days:7)
@@ -143,7 +144,8 @@ function makeTempChart(){
 }
 
 function makeWetBulbChart(){
-  if(!fcData||!histData) return '';
+  if(!fcData) return '';
+  if(!histData) return '<p class="search-msg" style="padding:20px 0">Loading historical comparison…</p>';
   const c=_cc();
   const d=fcData.daily;
   const wbMax=d.wet_bulb_temperature_2m_max, wbMin=d.wet_bulb_temperature_2m_min;

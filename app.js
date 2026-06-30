@@ -220,8 +220,8 @@ function barHtml(histVal,fcstVal,fmtFn,numFn){
 }
 
 function renderContent(){
-  if(!fcData||!histData) return;
-  const d=fcData.daily, h=histData;
+  if(!fcData) return;
+  const d=fcData.daily, h=histData||{};
   // With past_days:7 the array starts 7 days ago — find today's index
   const _todayStr=localDateStr();
   const t0=Math.max(0,d.time.findIndex(t=>t===_todayStr));
@@ -244,9 +244,13 @@ function renderContent(){
   const _locFor=_loc?` for ${_loc}`:'';
   // Chart subtitles
   const subHourly=`Hourly temperature${_locFor} · actual & forecast vs ${hourlyHistData?`${hourlyHistData.yearStart}–${hourlyHistData.yearEnd} avg`:'historical avg'}`;
-  const subDaily=`14-day high/low${_locFor} · vs 7-day rolling avg ${h.histYearStart}–${h.histYearEnd}`;
+  const subDaily=histData
+    ?`14-day high/low${_locFor} · vs 7-day rolling avg ${h.histYearStart}–${h.histYearEnd}`
+    :`14-day high/low${_locFor}`;
   const subHourlyWb=`Hourly wet bulb${_locFor} · actual & forecast vs ${hourlyWbHistData?`${hourlyWbHistData.yearStart}–${hourlyWbHistData.yearEnd} avg`:'historical avg'}`;
-  const subDailyWb=`14-day wet bulb high/low${_locFor} · vs 7-day rolling avg ${h.histYearStart}–${h.histYearEnd}`;
+  const subDailyWb=histData
+    ?`14-day wet bulb high/low${_locFor} · vs 7-day rolling avg ${h.histYearStart}–${h.histYearEnd}`
+    :`14-day wet bulb high/low${_locFor}`;
   const _thisYr=new Date().getFullYear();
   const subHourlyRain=`Hourly precipitation${_locFor}${hourlyRainHistData?` · vs ${hourlyRainHistData.yearStart}–${hourlyRainHistData.yearEnd} avg`:''}`;
   const subDailyRain=`14-day precipitation${_locFor} · past 7 days actual, next 7 days forecast`;
@@ -326,6 +330,7 @@ function renderContent(){
       ${secHdr('48-Hour Temperature', subHourly)}
       ${makeHourlyTempChart()}
     </div>
+    <div class="lazy-sentinel" data-lazy="climatology" aria-hidden="true"></div>
     <div class="panel-chart">
       ${secHdr('14-Day Temperature', subDaily)}
       ${makeTempChart()}
@@ -362,7 +367,7 @@ function renderContent(){
       ${secHdr('14-Day Rainfall', subDailyRain)}
       ${makeDailyRainChart()}
     </div>
-    <div class="panel-chart">
+    <div class="panel-chart" data-lazy="ytd">
       ${secHdr('Year-to-Date Rainfall', subRain)}
       ${makeRainYTDChart()}
     </div>
@@ -383,6 +388,7 @@ function renderContent(){
   <footer class="footer fu">
     <p>Forecast & historical data from <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> · Geocoding by <a href="https://nominatim.openstreetmap.org" target="_blank" rel="noopener">Nominatim / OSM</a></p>
   </footer>`;
+  setupLazyLoad();
 }
 
 function render(){
@@ -1040,19 +1046,107 @@ function showSearchFirst(hint){
   requestAnimationFrame(()=>{const i=document.getElementById('srch');if(i)i.focus();});
 }
 
-async function loadWeather(lat, lon, name, source) {
-  activeSource = source;
-  geoName = name;
-  if (source === 'geo') { myLat = lat; myLon = lon; myName = name; }
-  savePrefs({ activeSource, customLat, customLon, customName, imp });
-  setLoad('Loading weather data…');
-  ytdData = null; hourlyHistData = null; hourlyWbHistData = null; hourlyRainHistData = null;
-  dailyRainHistData = null; climatologyData = null;
-  const [fc, climate] = await Promise.all([getForecast(lat, lon), getClimatology(lat, lon)]);
-  fcData = fc; climatologyData = climate;
-  histData = deriveTempBand(climate); dailyRainHistData = deriveDailyRain(climate);
+// ── Lazy-loaded archive data ───────────────────────────
+let _lazyLat=null, _lazyLon=null, _lazyObserver=null;
+const _lazyLoaded=new Set(), _lazyLoading=new Set();
+
+function resetLazyState(){
+  _lazyLoaded.clear();
+  _lazyLoading.clear();
+  _lazyLat=null;
+  _lazyLon=null;
+  _lazyObserver?.disconnect();
+  _lazyObserver=null;
+}
+
+function resetWeatherData(){
+  ytdData=null;
+  hourlyHistData=null;
+  hourlyWbHistData=null;
+  hourlyRainHistData=null;
+  dailyRainHistData=null;
+  climatologyData=null;
+  histData=null;
+}
+
+function loadHourlyNormalsBackground(lat,lon){
+  getHourlyNormals(lat,lon).then(d=>{
+    if(_lazyLat!==lat||_lazyLon!==lon) return;
+    hourlyHistData=d.temp;
+    hourlyWbHistData=d.wetBulb;
+    hourlyRainHistData=d.rain;
+    if(fcData) renderContent();
+  }).catch(()=>{});
+}
+
+async function ensureClimatology(lat,lon){
+  if(_lazyLoaded.has('climatology')||_lazyLoading.has('climatology')||lat==null) return;
+  _lazyLoading.add('climatology');
+  try{
+    const climate=await getClimatology(lat,lon);
+    if(_lazyLat!==lat||_lazyLon!==lon) return;
+    climatologyData=climate;
+    histData=deriveTempBand(climate);
+    dailyRainHistData=deriveDailyRain(climate);
+    _lazyLoaded.add('climatology');
+    if(fcData) renderContent();
+  }catch{}finally{
+    _lazyLoading.delete('climatology');
+  }
+}
+
+async function ensureYTD(lat,lon){
+  if(_lazyLoaded.has('ytd')||_lazyLoading.has('ytd')||lat==null) return;
+  _lazyLoading.add('ytd');
+  try{
+    const ytd=await getRainYTD(lat,lon);
+    if(_lazyLat!==lat||_lazyLon!==lon) return;
+    ytdData=ytd;
+    _lazyLoaded.add('ytd');
+    if(fcData) renderContent();
+  }catch{}finally{
+    _lazyLoading.delete('ytd');
+  }
+}
+
+function setupLazyLoad(){
+  _lazyObserver?.disconnect();
+  if(_lazyLat==null||_lazyLon==null) return;
+  const lat=_lazyLat, lon=_lazyLon;
+  if(!('IntersectionObserver' in window)){
+    ensureClimatology(lat,lon);
+    ensureYTD(lat,lon);
+    return;
+  }
+  _lazyObserver=new IntersectionObserver(entries=>{
+    for(const entry of entries){
+      if(!entry.isIntersecting) continue;
+      const kind=entry.target.dataset.lazy;
+      if(kind==='climatology') ensureClimatology(lat,lon);
+      if(kind==='ytd') ensureYTD(lat,lon);
+    }
+  },{rootMargin:'320px 0px',threshold:0});
+  document.querySelectorAll('[data-lazy]').forEach(el=>_lazyObserver.observe(el));
+}
+
+function beginLocationWeather(fc,lat,lon,name,source){
+  activeSource=source;
+  geoName=name;
+  if(source==='geo'){myLat=lat;myLon=lon;myName=name;}
+  savePrefs({activeSource,customLat,customLon,customName,imp});
+  resetLazyState();
+  resetWeatherData();
+  fcData=fc;
+  _lazyLat=lat;
+  _lazyLon=lon;
   render();
-  loadBackground(lat, lon);
+  loadHourlyNormalsBackground(lat,lon);
+}
+
+async function loadWeather(lat,lon,name,source){
+  setLoad('Loading weather…');
+  const fc=await getForecast(lat,lon);
+  beginLocationWeather(fc,lat,lon,name,source);
 }
 
 async function init(){

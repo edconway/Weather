@@ -88,32 +88,14 @@ function onSearchKey(e){
   }
 }
 
-// Fire the non-blocking secondary fetches: YTD rainfall (1 req) + merged hourly
-// normals (5 reqs). Kept small so we stay well under Open-Meteo's rate limit.
-function loadBackground(lat,lon){
-  getRainYTD(lat,lon).then(ytd=>{ytdData=ytd;if(fcData)renderContent();}).catch(()=>{});
-  getHourlyNormals(lat,lon).then(d=>{
-    hourlyHistData=d.temp; hourlyWbHistData=d.wetBulb; hourlyRainHistData=d.rain;
-    if(fcData)renderContent();
-  }).catch(()=>{});
-}
-
 async function pickResult(lat,lon,name){
   closeSearch();
   customLat=lat; customLon=lon; customName=name;
-  activeSource='custom'; geoName=name;
-  savePrefs({ customLat: lat, customLon: lon, customName: name, activeSource: 'custom' });
-  renderHeader(); setLoad('Loading weather…');
-  ytdData=null; hourlyHistData=null; hourlyWbHistData=null; hourlyRainHistData=null; dailyRainHistData=null; climatologyData=null;
+  setLoad('Loading weather…');
   try{
-    const[fc,climate]=await Promise.all([getForecast(lat,lon),getClimatology(lat,lon)]);
-    fcData=fc; climatologyData=climate;
-    histData=deriveTempBand(climate); dailyRainHistData=deriveDailyRain(climate);
-    renderContent();
-    document.getElementById('main').classList.remove('hidden');
-    document.getElementById('loading').classList.add('hidden');
-  }catch(e){showErr(e.message||'Failed to load weather.');return;}
-  loadBackground(lat,lon);
+    const fc=await getForecast(lat,lon);
+    beginLocationWeather(fc,lat,lon,name,'custom');
+  }catch(e){showErr(e.message||'Failed to load weather.');}
 }
 
 async function switchSource(src){
@@ -122,20 +104,11 @@ async function switchSource(src){
   const lon=src==='geo'?myLon:customLon;
   const name=src==='geo'?myName:customName;
   if(lat==null) return;
-  activeSource=src; geoName=name;
-  savePrefs({ activeSource: src });
-  renderHeader();
   setLoad('Loading weather…');
-  ytdData=null; hourlyHistData=null; hourlyWbHistData=null; hourlyRainHistData=null; dailyRainHistData=null; climatologyData=null;
   try{
-    const[fc,climate]=await Promise.all([getForecast(lat,lon),getClimatology(lat,lon)]);
-    fcData=fc; climatologyData=climate;
-    histData=deriveTempBand(climate); dailyRainHistData=deriveDailyRain(climate);
-    renderContent();
-    document.getElementById('main').classList.remove('hidden');
-    document.getElementById('loading').classList.add('hidden');
-  }catch(e){showErr(e.message||'Failed to load weather.');return;}
-  loadBackground(lat,lon);
+    const fc=await getForecast(lat,lon);
+    beginLocationWeather(fc,lat,lon,name,src);
+  }catch(e){showErr(e.message||'Failed to load weather.');}
 }
 
 init();
