@@ -16,8 +16,8 @@
   --chart-cold:#5b8fc9;
   --chart-cold-past:rgba(91,143,201,.42);
   --chart-rain:#6b7fd7;
-  --chart-rain-past:rgba(107,127,215,.32);
-  --chart-rain-solid:rgba(107,127,215,.82);
+  --chart-rain-past:rgba(107,127,215,.55);
+  --chart-rain-solid:rgba(107,127,215,.92);
   --chart-humid:#4aafa3;
   --chart-humid-past:rgba(74,175,163,.32);
   --chart-grid:#e8eaee;
@@ -439,8 +439,8 @@ body{
     --chart-cold:#74adef;
     --chart-cold-past:rgba(116,173,239,.52);
     --chart-rain:#95a3eb;
-    --chart-rain-past:rgba(149,163,235,.5);
-    --chart-rain-solid:rgba(149,163,235,.92);
+    --chart-rain-past:rgba(149,163,235,.78);
+    --chart-rain-solid:#a8b4f5;
     --chart-humid:#62c9bd;
     --chart-humid-past:rgba(98,201,189,.4);
     --chart-grid:#3a4352;
@@ -471,8 +471,8 @@ body{
   --chart-cold:#74adef;
   --chart-cold-past:rgba(116,173,239,.52);
   --chart-rain:#95a3eb;
-  --chart-rain-past:rgba(149,163,235,.5);
-  --chart-rain-solid:rgba(149,163,235,.92);
+  --chart-rain-past:rgba(149,163,235,.78);
+  --chart-rain-solid:#a8b4f5;
   --chart-humid:#62c9bd;
   --chart-humid-past:rgba(98,201,189,.4);
   --chart-grid:#3a4352;
