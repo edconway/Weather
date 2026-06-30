@@ -4,9 +4,14 @@ function _narrow(){ return typeof window!=='undefined'&&window.innerWidth<=480; 
 function _mobileChart(){ return typeof window!=='undefined'&&window.innerWidth<=640; }
 function _chartPR(){ return 14; }
 function _hourStep(){ return _narrow()?12:6; }
+function _endLbl(t){
+  if(!_mobileChart()) return t;
+  const m={'Forecast':'Fcst','5-yr avg':'Avg','Hist. avg':'Hist'};
+  return m[t]??t;
+}
 function _prForEnd(...labels){
   const base=_chartPR();
-  const texts=labels.filter(Boolean).map(String);
+  const texts=labels.filter(Boolean).map(String).map(_endLbl);
   if(!texts.length) return base;
   const est=Math.max(...texts.map(t=>t.length))*5.5+12;
   return Math.max(base,Math.round(est));
@@ -14,16 +19,15 @@ function _prForEnd(...labels){
 function _dims(baseH,pL,pR,pT,pB){
   const W=580;
   if(!_mobileChart()) return{W,H:baseH,pL,pR,pT,pB};
-  // Square viewBox on mobile so charts fill ~1:1 tiles (matches CSS aspect-ratio)
+  // Square viewBox on mobile; scale vertical padding only (keep desktop lateral gutters)
   const H=W;
   const s=H/baseH;
-  const padScale=Math.min(s,1.65);
+  const padScaleY=Math.min(s,1.65);
   return{
     W,H,
-    pL:Math.round(pL*padScale),
-    pR:Math.round(pR*padScale),
-    pT:Math.round(pT*padScale),
-    pB:Math.round(pB*padScale),
+    pL,pR,
+    pT:Math.round(pT*padScaleY),
+    pB:Math.round(pB*padScaleY),
   };
 }
 function _hourLbl(hr){
@@ -131,8 +135,8 @@ function makeTempChart(){
       const hv=maxV[n-1],lv=minV[n-1];
       if(hv==null||lv==null) return '';
       const lx=(xf(n-1)+5).toFixed(1);
-      return `<text x="${lx}" y="${(yf(hv)+4).toFixed(1)}" font-size="9" font-weight="700" fill="${c.hot}">High</text>` +
-             `<text x="${lx}" y="${(yf(lv)+4).toFixed(1)}" font-size="9" font-weight="700" fill="${c.cold}">Low</text>`;
+      return `<text x="${lx}" y="${(yf(hv)+4).toFixed(1)}" font-size="9" font-weight="700" fill="${c.hot}">${_endLbl('High')}</text>` +
+             `<text x="${lx}" y="${(yf(lv)+4).toFixed(1)}" font-size="9" font-weight="700" fill="${c.cold}">${_endLbl('Low')}</text>`;
     })()}
     ${xLbls}
   </svg>`;
@@ -224,8 +228,8 @@ function makeWetBulbChart(){
       const hv=maxV[n-1],lv=minV[n-1];
       if(hv==null||lv==null) return '';
       const lx=(xf(n-1)+5).toFixed(1);
-      return `<text x="${lx}" y="${(yf(hv)+4).toFixed(1)}" font-size="9" font-weight="700" fill="${c.humid}">High</text>` +
-             `<text x="${lx}" y="${(yf(lv)+4).toFixed(1)}" font-size="9" font-weight="700" fill="${c.humid}" opacity="0.75">Low</text>`;
+      return `<text x="${lx}" y="${(yf(hv)+4).toFixed(1)}" font-size="9" font-weight="700" fill="${c.humid}">${_endLbl('High')}</text>` +
+             `<text x="${lx}" y="${(yf(lv)+4).toFixed(1)}" font-size="9" font-weight="700" fill="${c.humid}" opacity="0.75">${_endLbl('Low')}</text>`;
     })()}
     ${xLbls}
   </svg>`;
@@ -312,7 +316,7 @@ function makeRainYTDChart(){
   let _ryCur=endCurY, _ryAvg=endAvgY;
   if(Math.abs(_rSep)<13){const bump=(13-Math.abs(_rSep))/2+1;_ryCur+=_rSep>=0?bump:-bump;_ryAvg+=_rSep>=0?-bump:bump;}
   const endLabels=`<text x="${+lx+5}" y="${(_ryCur+4).toFixed(1)}" font-size="8.5" font-weight="700" fill="${c.rain}" text-anchor="start">${thisYear}</text>` +
-    `<text x="${+lx+5}" y="${(_ryAvg+4).toFixed(1)}" font-size="8.5" fill="${c.muted}" text-anchor="start">Hist. avg</text>`;
+    `<text x="${+lx+5}" y="${(_ryAvg+4).toFixed(1)}" font-size="8.5" fill="${c.muted}" text-anchor="start">${_endLbl('Hist. avg')}</text>`;
   _rainData={labels,curV,avgV,thisYear,pL,cW,n,fcV,numFc,totalN,fcstDates};
   return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="rain" tabindex="0" role="img">
     ${ticks.join('')}
@@ -412,8 +416,8 @@ function makeHourlyTempChart(){
     if(Math.abs(_heSep)<13){const bump=(13-Math.abs(_heSep))/2+1;_heTmp+=_heSep>=0?bump:-bump;_heAvg+=_heSep>=0?-bump:bump;}
   }
   const endLbls=[
-    _heTmp!=null?`<text x="${endX}" y="${(_heTmp+4).toFixed(1)}" font-size="8.5" font-weight="700" fill="${c.hot}">Forecast</text>`:'',
-    _heAvg!=null?`<text x="${endX}" y="${(_heAvg+4).toFixed(1)}" font-size="8.5" fill="${c.muted}">5-yr avg</text>`:''
+    _heTmp!=null?`<text x="${endX}" y="${(_heTmp+4).toFixed(1)}" font-size="8.5" font-weight="700" fill="${c.hot}">${_endLbl('Forecast')}</text>`:'',
+    _heAvg!=null?`<text x="${endX}" y="${(_heAvg+4).toFixed(1)}" font-size="8.5" fill="${c.muted}">${_endLbl('5-yr avg')}</text>`:''
   ].join('');
   _hourlyData={temps,histLine,pL,cW,n,nowIdx:relNow,times:slicedTime};
   return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="hourly" tabindex="0" role="img">
@@ -505,8 +509,8 @@ function makeHourlyWetBulbChart(){
     if(Math.abs(_heSep)<13){const bump=(13-Math.abs(_heSep))/2+1;_heVal+=_heSep>=0?bump:-bump;_heAvg+=_heSep>=0?-bump:bump;}
   }
   const endLbls=[
-    _heVal!=null?`<text x="${endX}" y="${(_heVal+4).toFixed(1)}" font-size="8.5" font-weight="700" fill="${c.humid}">Forecast</text>`:'',
-    _heAvg!=null?`<text x="${endX}" y="${(_heAvg+4).toFixed(1)}" font-size="8.5" fill="${c.muted}">5-yr avg</text>`:''
+    _heVal!=null?`<text x="${endX}" y="${(_heVal+4).toFixed(1)}" font-size="8.5" font-weight="700" fill="${c.humid}">${_endLbl('Forecast')}</text>`:'',
+    _heAvg!=null?`<text x="${endX}" y="${(_heAvg+4).toFixed(1)}" font-size="8.5" fill="${c.muted}">${_endLbl('5-yr avg')}</text>`:''
   ].join('');
   _hourlyWbData={vals,histLine,pL,cW,n,nowIdx:relNow,times:slicedTime};
   return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="hourly-wb" tabindex="0" role="img">
@@ -703,8 +707,8 @@ function makeHourlyHumidChart(){
   const eFC=hVals[n-1], eHI=aVals[n-1];
   let yFC=eFC!=null?yf(eFC):null, yHI=eHI!=null?yf(eHI):null;
   if(yFC!=null&&yHI!=null&&Math.abs(yFC-yHI)<12){const b=(12-Math.abs(yFC-yHI))/2+1;yFC+=(yFC>=yHI?b:-b);yHI+=(yHI>yFC?b:-b);}
-  const endLbls=(yFC!=null?`<text x="${endX}" y="${(yFC+4).toFixed(1)}" font-size="8.5" font-weight="700" fill="${c.humid}">Forecast</text>`:'')+
-    (yHI!=null?`<text x="${endX}" y="${(yHI+4).toFixed(1)}" font-size="8.5" fill="${c.muted}">5-yr avg</text>`:'');
+  const endLbls=(yFC!=null?`<text x="${endX}" y="${(yFC+4).toFixed(1)}" font-size="8.5" font-weight="700" fill="${c.humid}">${_endLbl('Forecast')}</text>`:'')+
+    (yHI!=null?`<text x="${endX}" y="${(yHI+4).toFixed(1)}" font-size="8.5" fill="${c.muted}">${_endLbl('5-yr avg')}</text>`:'');
   // X labels every 6h
   const usedX=new Set();
   const xLbls=times.map((t,i)=>{
@@ -863,8 +867,8 @@ function makeClimateChart(){
   // End-of-line labels
   const endX=(xCx(11)+5).toFixed(1);
   const lastHot=data[11]?.tMax, lastCold=data[11]?.tMin;
-  const endLbls=(lastHot!=null?`<text x="${endX}" y="${(yfT(lastHot)+4).toFixed(1)}" font-size="8.5" font-weight="600" fill="${c.hot}">High</text>`:'')+
-    (lastCold!=null?`<text x="${endX}" y="${(yfT(lastCold)+4).toFixed(1)}" font-size="8.5" font-weight="600" fill="${c.cold}">Low</text>`:'');
+  const endLbls=(lastHot!=null?`<text x="${endX}" y="${(yfT(lastHot)+4).toFixed(1)}" font-size="8.5" font-weight="600" fill="${c.hot}">${_endLbl('High')}</text>`:'')+
+    (lastCold!=null?`<text x="${endX}" y="${(yfT(lastCold)+4).toFixed(1)}" font-size="8.5" font-weight="600" fill="${c.cold}">${_endLbl('Low')}</text>`:'');
   // X axis
   const xLbls=MON.map((m,i)=>
     `<text x="${xCx(i).toFixed(1)}" y="${H-6}" class="ca" text-anchor="middle" font-weight="${i===curMo?700:400}">${m}</text>`
