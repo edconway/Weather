@@ -568,6 +568,7 @@ async function getHourlyNormals(lat,lon){
     wetHourProbabilityByHour:rCounts.map((c,h)=>c?wetCounts[h]/c:0),
     p90ByHour:rVals.map(vals=>{if(!vals.length)return 0;const s=[...vals].sort((a,b)=>a-b);return s[Math.floor(s.length*0.9)]??0;}),
     yearStart:thisYear-5,yearEnd:thisYear-1
+  };
   return{temp,wetBulb,rain};
 }
 
