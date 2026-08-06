@@ -57,6 +57,7 @@ struct NowPage: View {
 
                     statGlyphs(conditions)
                     badgeOrFallback
+                    unitsToggle
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -100,6 +101,27 @@ struct NowPage: View {
                 .foregroundStyle(.secondary)
                 .padding(.top, 4)
         }
+    }
+
+    /// §9 asked for a local imperial/metric toggle alongside the phone-synced
+    /// default. `WatchStore.imperial` is `@Observable` and persists via its own
+    /// `didSet`, so this button only needs to flip it.
+    ///
+    /// Note: the next phone sync overwrites this choice
+    /// (`applySyncedPayload` sets `imperial = payload.imperial`), matching the
+    /// plan's "units synced from phone prefs, plus local toggle" — the local
+    /// toggle is an override until the next sync, not a permanent split.
+    private var unitsToggle: some View {
+        Button {
+            store.imperial.toggle()
+        } label: {
+            Text(store.imperial ? "Switch to °C" : "Switch to °F")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 6)
+        .accessibilityHint("Changes temperature and wind units")
     }
 
     private func badgeTint(_ kind: AnomalyKind) -> Color {
