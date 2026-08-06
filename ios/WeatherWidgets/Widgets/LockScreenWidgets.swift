@@ -42,7 +42,7 @@ struct LockScreenAnomalyWidget: Widget {
             kind: "WeatherWorldLockAnomaly", provider: WeatherTimelineProvider()
         ) { entry in
             LockScreenAnomalyView(entry: entry.snapshot)
-                .widgetURL(AppConfig.todayDeepLink)
+                .widgetURL(AppConfig.panelDeepLink(.temperature))
                 .containerBackground(for: .widget) { Color.clear }
         }
         .configurationDisplayName("vs Normal")
@@ -73,7 +73,7 @@ struct LockScreenRainWidget: Widget {
             kind: "WeatherWorldLockRain", provider: WeatherTimelineProvider()
         ) { entry in
             LockScreenRainView(entry: entry.snapshot)
-                .widgetURL(AppConfig.todayDeepLink)
+                .widgetURL(AppConfig.panelDeepLink(.rain))
                 .containerBackground(for: .widget) { Color.clear }
         }
         .configurationDisplayName("Rain Chance")

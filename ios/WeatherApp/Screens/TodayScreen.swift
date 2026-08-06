@@ -79,6 +79,11 @@ struct TodayScreen: View {
                 .padding(.bottom, 24)
             }
             .refreshable { await store.refresh() }
+            .onChange(of: store.pendingPanelJump) { _, panel in
+                guard let panel else { return }
+                withAnimation { proxy.scrollTo(panel, anchor: .top) }
+                store.pendingPanelJump = nil
+            }
         }
     }
 

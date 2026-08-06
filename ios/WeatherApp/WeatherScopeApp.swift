@@ -18,6 +18,9 @@ struct WeatherScopeApp: App {
             TodayScreen(store: store)
                 .preferredColorScheme(store.theme.colorScheme)
                 .task { startSync() }
+                .onOpenURL { url in
+                    store.pendingPanelJump = AppConfig.panel(from: url)
+                }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background {

@@ -37,6 +37,10 @@ final class WeatherStore {
     private(set) var ytdRain: YTDRain?
     private(set) var ytdProjection: [YTDRainBuilder.ProjectionPoint] = []
 
+    /// Set by a widget/complication deep link; `TodayScreen` observes this to
+    /// scroll to the matching panel, then clears it.
+    var pendingPanelJump: PanelID?
+
     /// Non-blocking message shown over existing data (stale cache, a failed
     /// background piece) — the web app's banner case.
     private(set) var banner: String?
