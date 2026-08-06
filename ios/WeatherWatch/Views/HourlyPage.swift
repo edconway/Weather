@@ -141,6 +141,21 @@ struct HourlyPage: View {
         .chartYScale(domain: temperatureDomain)
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
+        // `chartXSelection`'s built-in gesture did not respond to taps in the
+        // watchOS simulator; this explicit tap handler is a belt-and-braces
+        // fallback so scrubbing works regardless.
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                Rectangle().fill(.clear).contentShape(Rectangle())
+                    .onTapGesture { location in
+                        let origin = geo[proxy.plotFrame!].origin
+                        let x = location.x - origin.x
+                        if let date: Date = proxy.value(atX: x) {
+                            selectedDate = date
+                        }
+                    }
+            }
+        }
     }
 
     private func scrubCard(_ point: ChartSeries.HourlyPoint) -> some View {

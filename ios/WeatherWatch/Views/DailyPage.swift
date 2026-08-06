@@ -89,6 +89,21 @@ struct DailyPage: View {
             }
         }
         .chartYAxis(.hidden)
+        // See HourlyPage: `chartXSelection`'s gesture did not respond to taps
+        // in the watchOS simulator, so this is a belt-and-braces fallback.
+        // The x-axis is categorical here, so the proxy value type is String.
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                Rectangle().fill(.clear).contentShape(Rectangle())
+                    .onTapGesture { location in
+                        let origin = geo[proxy.plotFrame!].origin
+                        let x = location.x - origin.x
+                        if let day: String = proxy.value(atX: x) {
+                            selectedDate = day
+                        }
+                    }
+            }
+        }
     }
 
     /// Warm if the day's midpoint sits above the historical normal, cool if
