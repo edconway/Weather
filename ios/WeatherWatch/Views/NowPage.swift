@@ -1,0 +1,116 @@
+import SwiftUI
+import WeatherCore
+
+/// §9.1 — location, condition, big temperature, hi/lo, feels-like, a glyph row,
+/// and the single highest-priority anomaly badge.
+struct NowPage: View {
+    let store: WatchStore
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 6) {
+                if let name = store.location?.shortName, !name.isEmpty {
+                    Text(name)
+                        .id(name)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                if let conditions = store.conditions {
+                    HStack(alignment: .top, spacing: 6) {
+                        Text(store.formatter.temperatureNumber(conditions.temperature)
+                                .map(String.init) ?? "—")
+                            .font(.system(size: 42, weight: .semibold, design: .rounded))
+                        Text(store.formatter.temperatureUnit)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 6)
+                        Spacer(minLength: 0)
+                        Image(systemName: conditions.symbolName)
+                            .symbolRenderingMode(.multicolor)
+                            .font(.title3)
+                            .padding(.top, 4)
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(
+                        "\(store.formatter.temperature(conditions.temperature)), "
+                        + conditions.condition.label)
+
+                    Text(conditions.condition.label)
+                        .font(.caption)
+                        .lineLimit(1)
+
+                    HStack(spacing: 6) {
+                        Text("↑\(store.formatter.temperature(conditions.high))")
+                            .foregroundStyle(.orange)
+                        Text("↓\(store.formatter.temperature(conditions.low))")
+                            .foregroundStyle(.blue)
+                    }
+                    .font(.caption2)
+
+                    if conditions.feelsLike != nil {
+                        Text("Feels \(store.formatter.temperature(conditions.feelsLike))")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    statGlyphs(conditions)
+                    badgeOrFallback
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .containerBackground(.blue.gradient.opacity(0.25), for: .navigation)
+        .navigationTitle("Now")
+    }
+
+    private func statGlyphs(_ conditions: CurrentConditions) -> some View {
+        HStack(spacing: 8) {
+            Label(
+                store.formatter.rainChance(conditions.rainChance),
+                systemImage: "drop.fill")
+            Label(
+                store.formatter.wind(conditions.windSpeed),
+                systemImage: "wind")
+            Label(
+                store.formatter.uvIndexCompact(conditions.uvIndex),
+                systemImage: "sun.max.fill")
+        }
+        .font(.system(size: 11))
+        .foregroundStyle(.secondary)
+        .labelStyle(.titleAndIcon)
+        .padding(.top, 2)
+    }
+
+    @ViewBuilder
+    private var badgeOrFallback: some View {
+        if let badge = store.badge {
+            Text(badge.text)
+                .font(.system(size: 11, weight: .semibold))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(badgeTint(badge.kind).opacity(0.22), in: Capsule())
+                .foregroundStyle(badgeTint(badge.kind))
+                .padding(.top, 4)
+        } else if !store.hasContext {
+            // §9.2 — never fake context; say plainly that it hasn't arrived.
+            Text("Open the iPhone app for historical context")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .padding(.top, 4)
+        }
+    }
+
+    private func badgeTint(_ kind: AnomalyKind) -> Color {
+        switch kind {
+        case .warm: return .orange
+        case .cold: return .blue
+        case .wet: return .teal
+        case .dry: return .gray
+        case .muggy: return .purple
+        case .muggyLow: return .mint
+        case .neutral: return .secondary
+        }
+    }
+}
