@@ -79,8 +79,14 @@ public actor WeatherRepository {
     public func hourlyNormals(
         for location: WeatherLocation, now: Date, timeZone: TimeZone
     ) async throws -> HourlyNormals {
+        let thisYear = DateKit(timeZone: timeZone).year(now)
+        // A cache entry built last December is still within its 7-day TTL in
+        // early January, but its year window (thisYear-5...thisYear-1 at the
+        // time it was built) is now one year behind — honour it only when the
+        // window still ends last year.
         if let cached = await cache.readFresh(
-            HourlyNormals.self, kind: .hourlyNormals, location: location) {
+            HourlyNormals.self, kind: .hourlyNormals, location: location),
+           cached.temp.yearEnd == thisYear - 1 {
             return cached
         }
         let dateKit = DateKit(timeZone: timeZone)
@@ -91,7 +97,7 @@ public actor WeatherRepository {
             throw WeatherError.network("Historical hourly data is unavailable right now.")
         }
         let normals = HourlyNormalsBuilder.build(
-            windows: windows, thisYear: dateKit.year(now))
+            windows: windows, thisYear: thisYear)
         await cache.write(normals, kind: .hourlyNormals, location: location)
         return normals
     }
@@ -101,11 +107,15 @@ public actor WeatherRepository {
     public func climatology(
         for location: WeatherLocation, now: Date, timeZone: TimeZone
     ) async throws -> Climatology {
+        let thisYear = DateKit(timeZone: timeZone).year(now)
+        // Same year-boundary guard as hourlyNormals, at climatology's longer
+        // 30-day TTL: a blob cached in late December is still "fresh" through
+        // most of January while its 10-year window has gone one year stale.
         if let cached = await cache.readFresh(
-            Climatology.self, kind: .climatology, location: location) {
+            Climatology.self, kind: .climatology, location: location),
+           cached.yearEnd == thisYear - 1 {
             return cached
         }
-        let thisYear = DateKit(timeZone: timeZone).year(now)
         let response = try await archiveClient.climatology(
             latitude: location.latitude, longitude: location.longitude, thisYear: thisYear)
         guard let climatology = ClimatologyBuilder.build(
