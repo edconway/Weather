@@ -171,6 +171,17 @@ right panel both times.
 **Watch-local units toggle**: confirmed live — tapping the toggle on the Now
 page flips every number across all three pages and survives a relaunch.
 
+**Watch Daily/Hourly charts now match the iOS app's visual language**:
+`DailyPage` draws high/low `LineMark`s (with a historical-normal `AreaMark`
+band underneath, matching `DailyTempChart`) instead of range bars, and
+`HourlyPage` adds a dashed gray "5-yr avg" `LineMark` plus a scrub-card row,
+matching `HourlyTempChart`. Confirmed live: both charts render and scrub
+correctly. The historical band/dashed line themselves render conditionally on
+`point.normal`/`point.normalTemperature` being present — not populated in a
+simulator with no paired phone to sync normals over WatchConnectivity, so
+their *presence* is verified by code path and by the equivalent iOS charts,
+not by an on-screen band/dashed line in this session.
+
 Not verified interactively:
 
 - **Background-refresh launches.** The simulator has no `BGTaskScheduler`; use

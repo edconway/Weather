@@ -35,7 +35,10 @@ struct HourlyPage: View {
     }
 
     private var temperatureDomain: ClosedRange<Double> {
-        let values = points.compactMap { $0.temperature }.map(store.formatter.temperatureValue)
+        // Includes the 5-yr average so the dashed line never clips at the
+        // edge of the domain on days that run unusually hot or cold.
+        let values = points.flatMap { [$0.temperature, $0.normalTemperature] }
+            .compactMap { $0 }.map(store.formatter.temperatureValue)
         guard let lo = values.min(), let hi = values.max() else { return 0...1 }
         let lower = (lo - 2).rounded(.down)
         let upper = (hi + 2).rounded(.up)
@@ -122,6 +125,20 @@ struct HourlyPage: View {
                 }
             }
 
+            // Dashed 5-yr average, as per the iOS app's HourlyTempChart —
+            // drawn on top of the solid line so the comparison reads clearly.
+            ForEach(points) { point in
+                if let normal = point.normalTemperature {
+                    LineMark(
+                        x: .value("Time", point.date),
+                        y: .value("Normal", store.formatter.temperatureValue(normal)),
+                        series: .value("Series", "normal"))
+                    .foregroundStyle(WatchPalette.historical.opacity(0.6))
+                    .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                    .interpolationMethod(.catmullRom)
+                }
+            }
+
             if let selected, let value = selected.temperature {
                 RuleMark(x: .value("Selected", selected.date))
                     .foregroundStyle(.white.opacity(0.25))
@@ -162,6 +179,11 @@ struct HourlyPage: View {
         VStack(spacing: 0) {
             Text(hourLabel(point.hour))
                 .font(.system(size: 9, weight: .semibold))
+            if let normal = point.normalTemperature {
+                Text(store.formatter.temperatureShort(normal))
+                    .font(.system(size: 9))
+                    .foregroundStyle(WatchPalette.historical)
+            }
             if let probability = point.probability, probability > 0 {
                 Text("\(probability)%")
                     .font(.system(size: 9))

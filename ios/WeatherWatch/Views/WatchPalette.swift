@@ -7,7 +7,7 @@ enum WatchPalette {
     static let hot = Color(red: 0.85, green: 0.33, blue: 0.28)
     static let cold = Color(red: 0.27, green: 0.53, blue: 0.82)
     static let rain = Color(red: 0.29, green: 0.45, blue: 0.85)
-    static let warm = Color(red: 0.80, green: 0.36, blue: 0.20)
-    static let cool = Color(red: 0.20, green: 0.47, blue: 0.78)
-    static let neutral = Color.green
+    /// The dashed "5-yr average" line and the band it draws — mirrors the iOS
+    /// app's `Palette.historical`.
+    static let historical = Color.gray
 }
