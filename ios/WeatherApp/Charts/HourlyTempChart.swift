@@ -2,8 +2,8 @@ import Charts
 import SwiftUI
 import WeatherCore
 
-/// §8.4.1 / §8.4.3 — 72 hourly points of temperature (or wet bulb) against the
-/// 5-year average for that hour of day.
+/// §8.4.1 / §8.4.3 — up to 48 hourly points (±24 h around now) of temperature
+/// (or wet bulb) against the 5-year average for that hour of day.
 ///
 /// One view covers both series because the only differences are which value is
 /// plotted and the scrub label; the web has two near-identical functions.

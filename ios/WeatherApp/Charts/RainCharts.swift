@@ -2,8 +2,8 @@ import Charts
 import SwiftUI
 import WeatherCore
 
-/// §8.4.5 — 72 hourly precipitation bars. Probability lives in the scrub
-/// annotation only; Swift Charts has no second y-axis.
+/// §8.4.5 — up to 48 hourly precipitation bars (±24 h around now). Probability
+/// lives in the scrub annotation only; Swift Charts has no second y-axis.
 struct HourlyRainChart: View {
     let points: [ChartSeries.HourlyPoint]
     let formatter: UnitFormatter

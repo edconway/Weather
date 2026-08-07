@@ -32,12 +32,12 @@ public enum ChartSeries {
         public var symbolName: String { condition.symbol(isDay: isDay) }
     }
 
-    /// The full 72-hour window (24 past + 48 forecast).
-    ///
-    /// PLAN DEVIATION: the web app re-slices this to ±24 h because `past_days=7`
-    /// used to override `past_hours`. The API now honours `past_hours=24` /
-    /// `forecast_hours=48` and returns exactly 72 points, which is what §8.4.1
-    /// asks for, so the window is used as-is.
+    /// The ±24 h window around now (24 past + 24 forecast, 48 points), matching
+    /// `makeHourlyTempChart` in charts.js. The API is fetched with
+    /// `forecast_hours=48` so other derivations (widgets, complications) have
+    /// a wider lookahead available, but this chart-facing view clamps to the
+    /// same window the web app shows — it discards hours 25–48 of the raw
+    /// response rather than displaying them.
     public static func hourly(
         forecast: ForecastResponse,
         conditions: CurrentConditions,
@@ -45,8 +45,12 @@ public enum ChartSeries {
     ) -> [HourlyPoint] {
         let dateKit = DateKit(timeZone: forecast.locationTimeZone)
         let hourly = forecast.hourly
+        let startIndex = max(0, conditions.nowIndex - 24)
+        let endIndex = min(hourly.time.count, conditions.nowIndex + 24)
+        guard startIndex < endIndex else { return [] }
 
-        return hourly.time.enumerated().compactMap { index, timeString in
+        return hourly.time[startIndex..<endIndex].enumerated().compactMap { offset, timeString in
+            let index = offset + startIndex
             guard let date = dateKit.date(fromHourString: timeString),
                   timeString.count >= 13,
                   let hour = Int(timeString.dropFirst(11).prefix(2))

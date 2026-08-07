@@ -81,10 +81,16 @@ The plan's own §1.4 deviations are all implemented. Beyond those:
 2. **`UnitFormatter.fixed` replaces `String(format:)` for precip and UV.**
    `printf` rounds exact binary halves to even, `toFixed` rounds away from zero
    (1.25 → "1.2" vs "1.3"). Verified identical to `toFixed` across 12 cases.
-3. **Hourly charts use all 72 points.** The web app re-slices to ±24 h because
-   `past_days=7` used to override `past_hours`; the API now honours
-   `past_hours=24&forecast_hours=48` and returns exactly the 72 points §8.4.1
-   asks for.
+3. **Fixed: hourly charts were showing all 72 raw points instead of ±24 h.**
+   The plan's §8.4.1 called for "72 pts: 24 past + 48 forecast," but the web
+   app (`makeHourlyTempChart` in charts.js) actually clamps to `nowIdx-24 …
+   nowIdx+24` — 24 past + 24 forecast, 48 points — explicitly discarding the
+   rest of the 72-hour API response it fetches for other purposes. The port
+   originally followed the plan's wording rather than the web's real runtime
+   behavior; `ChartSeries.hourly` now applies the same ±24 h clamp so
+   `HourlyTempChart`/`HourlyRainChart` match the web app. The raw API request
+   still asks for `past_hours=24&forecast_hours=48` since widgets/complications
+   want the wider lookahead.
 4. **`DailyRainDeriver` takes the string-matched today index** rather than the
    web's hardcoded `min(7, len-1)`, per §14.1.
 5. **YTD `latestDate` is the last date that actually has data**, per §6.7 —
