@@ -39,6 +39,9 @@ public struct CurrentConditionsContent: View {
                 .font(.system(size: 17, weight: .medium, design: .rounded))
                 .minimumScaleFactor(0.6)
         }
+        // Lets a tinted/monochrome watch face or Lock Screen recolor the icon
+        // and temperature together, rather than leaving them their fixed color.
+        .widgetAccentable()
         .accessibilityLabel(
             "\(entry.formatter.temperature(entry.temperature)), \(entry.condition.label)")
     }
@@ -59,7 +62,8 @@ public struct CurrentConditionsContent: View {
             .font(.title2)
         #if os(watchOS)
         return temperature
-            .widgetLabel { cornerCurvedLabel }
+            .widgetAccentable()
+            .widgetLabel { cornerCurvedLabel.widgetAccentable() }
             .accessibilityLabel(cornerAccessibilityLabel)
         #else
         return temperature.accessibilityLabel(cornerAccessibilityLabel)
@@ -98,6 +102,7 @@ public struct CurrentConditionsContent: View {
         } icon: {
             Image(systemName: entry.symbolName)
         }
+        .widgetAccentable()
     }
 
     private var rectangular: some View {
@@ -115,6 +120,7 @@ public struct CurrentConditionsContent: View {
                     .font(.caption2)
                     .lineLimit(1)
             }
+            .widgetAccentable()
             Text(secondLine)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -175,6 +181,7 @@ public struct TempAnomalyContent: View {
             Text(entry.deltaText ?? "≈")
                 .font(.system(size: 18, weight: .semibold, design: .rounded))
                 .minimumScaleFactor(0.5)
+                .widgetAccentable()
             Text("vs norm")
                 .font(.system(size: 9))
                 .foregroundStyle(.secondary)
@@ -189,6 +196,7 @@ public struct TempAnomalyContent: View {
         } icon: {
             Image(systemName: "thermometer.medium")
         }
+        .widgetAccentable()
     }
 
     private var rectangular: some View {
@@ -198,6 +206,7 @@ public struct TempAnomalyContent: View {
                 Text(entry.formatter.temperatureShort(entry.temperature))
                     .font(.headline)
             }
+            .widgetAccentable()
             Text(entry.deltaSentence ?? "Near normal")
                 .font(.caption2)
                 .lineLimit(1)
@@ -245,6 +254,7 @@ public struct RainChanceContent: View {
             } icon: {
                 Image(systemName: "drop.fill")
             }
+            .widgetAccentable()
         }
     }
 
@@ -253,6 +263,7 @@ public struct RainChanceContent: View {
         let icon = Image(systemName: "drop.fill")
         #if os(watchOS)
         return icon
+            .widgetAccentable()
             .widgetLabel {
                 Gauge(value: fraction) {
                     Text("Rain")
