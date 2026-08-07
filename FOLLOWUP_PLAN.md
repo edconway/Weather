@@ -6,6 +6,13 @@ document specifies the remaining improvements. Work through tasks **in order**;
 each ends with explicit acceptance criteria. Do not invent behavior beyond what
 is written here.
 
+**Status as of 2026-08-07: Tasks A–I done** (C and G were completed
+interactively before this document's tasks were run; A, B, D, E, F, H, I were
+each done and verified per their own acceptance criteria, commit-by-commit —
+see `git log`). Only **J (localization) remains, deliberately deferred** per
+its own instructions until the user asks for it. This document is kept as the
+record of what was asked and how it was verified, not as an open TODO list.
+
 ---
 
 ## 0. Ground rules — read fully before Task A

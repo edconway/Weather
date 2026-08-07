@@ -107,6 +107,14 @@ The plan's own §1.4 deviations are all implemented. Beyond those:
     scheduler's `userInfo` is handed to the action.
 11. **`sunrise` and `sunset` are added to the forecast request.** The web app
     does not use them; the corner complication does (see below).
+12. **Complication content is `.widgetAccentable()`** on its primary
+    icon/temperature/delta element (not secondary text, not `Gauge`-based
+    layouts, which already tint via `.tint()`), so a tinted watch face or
+    monochrome Lock Screen recolors the number that matters.
+13. **Climatology and hourly-normals cache reads also check the cached year
+    window**, not just the TTL. A blob built in late December is still within
+    its 30-day TTL through most of January while describing the wrong decade
+    — see `WeatherRepository.climatology`/`.hourlyNormals`.
 
 ## The corner complication
 
@@ -148,10 +156,27 @@ complication renderer occasionally wedges (`chronod` logs
 `"Unknown extension process"` for *every* app's complications, Apple's
 included); a simulator reboot clears it.
 
+**Chart scrubbing on the watch pages**: `chartXSelection`'s built-in tap
+gesture did not respond to scripted taps in the watchOS simulator (on either
+the 42mm or 46mm device). Both `HourlyPage` and `DailyPage` now also carry an
+explicit `.chartOverlay` tap handler as a fallback — confirmed live: tapping
+the Hourly temperature chart and a Daily range bar both pin a scrub card that
+persists after finger-up.
+
+**Widget deep links**: confirmed live via `xcrun simctl openurl` with
+`weatherworld://panel/panel-temperature` and `.../panel-rain`, both against a
+cold-started and an already-frontmost app — the Today screen scrolls to the
+right panel both times.
+
+**Watch-local units toggle**: confirmed live — tapping the toggle on the Now
+page flips every number across all three pages and survives a relaunch.
+
 Not verified interactively:
 
 - **Background-refresh launches.** The simulator has no `BGTaskScheduler`; use
   the lldb trick in plan §7.4.
-- **Chart scrubbing on the watch pages** — the annotation card did not visibly
-  appear under scripted taps; unconfirmed whether that is a simulator
-  touch-precision artefact or a real defect.
+- **`.widgetAccentable()`'s actual tinted appearance.** The modifier is applied
+  per Apple's documented API and doesn't change untinted rendering (confirmed:
+  the corner complication still renders correctly after the change), but
+  putting a face into tinted/Always-On mode to see the recolor itself wasn't
+  achieved in the simulator.
