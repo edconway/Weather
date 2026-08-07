@@ -100,6 +100,14 @@ The plan's own §1.4 deviations are all implemented. Beyond those:
    and vanish; the web tooltip stays put while the pointer is over the chart.
    `StickyXSelection` also clears the selection when the underlying data changes,
    so switching location cannot leave a stale card relabelled with new numbers.
+   The Today screen stacks up to 8 charts in one scroll view, each with its own
+   sticky selection; `ActiveScrubCoordinator` (shared via `.environment(_:)` from
+   `TodayScreen`) broadcasts which chart is active so scrubbing a new chart
+   clears whichever other chart's card was still pinned, instead of leaving
+   several tooltips stuck on screen at once. `chartXSelection`'s built-in
+   gesture also didn't reliably respond to every tap in the simulator (same
+   issue as the watch charts); `chartTapFallback` in `ChartKit.swift` adds the
+   same explicit `.chartOverlay` tap handler as a fallback.
 7. **Daily charts use a categorical x-axis** on the date string: weekday names
    repeat across 14 days, and a `Date` axis bins bars to day boundaries, which
    pushed the "Today" rule half a slot off.
@@ -168,6 +176,14 @@ the 42mm or 46mm device). Both `HourlyPage` and `DailyPage` now also carry an
 explicit `.chartOverlay` tap handler as a fallback — confirmed live: tapping
 the Hourly temperature chart and a Daily range bar both pin a scrub card that
 persists after finger-up.
+
+**Chart scrubbing on the iOS Today screen**: the same `chartXSelection`
+scripted-tap unreliability showed up here too, so every chart got the same
+`.chartOverlay` fallback (`chartTapFallback` in `ChartKit.swift`). Confirmed
+live on iPhone 17: tapping the 48-Hour Temperature chart pins its scrub card;
+tapping the 14-Day Temperature chart below it then pins that chart's own card
+*and* clears the Hourly chart's card — `ActiveScrubCoordinator` correctly
+limits the screen to one pinned tooltip at a time.
 
 **Widget deep links**: confirmed live via `xcrun simctl openurl` with
 `weatherworld://panel/panel-temperature` and `.../panel-rain`, both against a

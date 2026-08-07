@@ -28,6 +28,7 @@ struct DailyTempChart: View {
 
     @State private var liveSelection: String?
     @State private var selectedDate: String?
+    @State private var scrubID = UUID()
 
     private func high(_ point: ChartSeries.DailyPoint) -> Double? {
         series == .temperature ? point.high : point.wetBulbHigh
@@ -119,8 +120,9 @@ struct DailyTempChart: View {
             }
         }
         .chartXSelection(value: $liveSelection)
+        .chartTapFallback($liveSelection)
         .stickyXSelection(
-            live: $liveSelection, sticky: $selectedDate,
+            id: scrubID, live: $liveSelection, sticky: $selectedDate,
             resetOn: points.first?.dateString ?? "")
         .chartXScale(domain: points.map(\.dateString))
         .chartYScale(domain: yDomain)

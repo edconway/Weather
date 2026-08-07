@@ -11,6 +11,9 @@ struct ClimateChart: View {
     let formatter: UnitFormatter
 
     @State private var selectedMonth: Int?
+    @State private var scrubID: AnyHashable = UUID()
+
+    @Environment(ActiveScrubCoordinator.self) private var coordinator
 
     private var selected: ChartSeries.ClimatePoint? {
         selectedMonth.flatMap { month in points.first { $0.id == month } }
@@ -29,6 +32,12 @@ struct ClimateChart: View {
         // Drop the selection when the location changes, so the summary row never
         // describes one city with another's numbers.
         .onChange(of: points.first?.high) { _, _ in selectedMonth = nil }
+        // See StickyXSelection: clears this chart's summary row when a
+        // different chart on the screen becomes active.
+        .onChange(of: coordinator.activeID) { _, activeID in
+            guard selectedMonth != nil, activeID != scrubID else { return }
+            selectedMonth = nil
+        }
     }
 
     private var temperatureChart: some View {
@@ -57,6 +66,7 @@ struct ClimateChart: View {
             }
         }
         .chartXSelection(value: monthSelection)
+        .chartTapFallback(monthSelection)
         // The month labels live under the rainfall chart only — the two charts
         // share one x-axis, so repeating them would just be noise.
         .chartXAxis {
@@ -90,6 +100,7 @@ struct ClimateChart: View {
             }
         }
         .chartXSelection(value: monthSelection)
+        .chartTapFallback(monthSelection)
         .chartYAxis {
             AxisMarks(values: .automatic(desiredCount: 3)) { value in
                 AxisGridLine()
@@ -114,6 +125,7 @@ struct ClimateChart: View {
             set: { name in
                 guard let name else { return }
                 selectedMonth = points.first { $0.shortMonthName == name }?.id
+                coordinator.activeID = scrubID
             })
     }
 

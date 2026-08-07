@@ -34,6 +34,7 @@ struct HourlyTempChart: View {
 
     @State private var liveSelection: Date?
     @State private var selectedDate: Date?
+    @State private var scrubID = UUID()
 
     private func value(_ point: ChartSeries.HourlyPoint) -> Double? {
         switch series {
@@ -136,8 +137,9 @@ struct HourlyTempChart: View {
             }
         }
         .chartXSelection(value: $liveSelection)
+        .chartTapFallback($liveSelection)
         .stickyXSelection(
-            live: $liveSelection, sticky: $selectedDate,
+            id: scrubID, live: $liveSelection, sticky: $selectedDate,
             resetOn: points.first?.timeString ?? "")
         .chartYScale(domain: yDomain)
         .chartYAxis {

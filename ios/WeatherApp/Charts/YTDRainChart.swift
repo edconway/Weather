@@ -16,6 +16,7 @@ struct YTDRainChart: View {
 
     @State private var liveSelection: Date?
     @State private var selectedDate: Date?
+    @State private var scrubID = UUID()
 
     private enum Kind: String {
         case actual, historical, projection, historicalExtension
@@ -101,8 +102,9 @@ struct YTDRainChart: View {
             }
         }
         .chartXSelection(value: $liveSelection)
+        .chartTapFallback($liveSelection)
         .stickyXSelection(
-            live: $liveSelection, sticky: $selectedDate,
+            id: scrubID, live: $liveSelection, sticky: $selectedDate,
             resetOn: series.latestDate + "-" + String(series.actual.count))
         .chartYAxis {
             AxisMarks(values: .automatic(desiredCount: 5)) { value in

@@ -11,6 +11,7 @@ struct HourlyRainChart: View {
 
     @State private var liveSelection: Date?
     @State private var selectedDate: Date?
+    @State private var scrubID = UUID()
 
     private var nowDate: Date? { points.first(where: { !$0.isPast })?.date }
 
@@ -57,8 +58,9 @@ struct HourlyRainChart: View {
             }
         }
         .chartXSelection(value: $liveSelection)
+        .chartTapFallback($liveSelection)
         .stickyXSelection(
-            live: $liveSelection, sticky: $selectedDate,
+            id: scrubID, live: $liveSelection, sticky: $selectedDate,
             resetOn: points.first?.timeString ?? "")
         .chartYScale(domain: yDomain)
         .chartYAxis {
@@ -120,6 +122,7 @@ struct DailyRainChart: View {
 
     @State private var liveSelection: String?
     @State private var selectedDate: String?
+    @State private var scrubID = UUID()
 
     private var todayDateString: String? { points.first(where: \.isToday)?.dateString }
 
@@ -161,8 +164,9 @@ struct DailyRainChart: View {
             }
         }
         .chartXSelection(value: $liveSelection)
+        .chartTapFallback($liveSelection)
         .stickyXSelection(
-            live: $liveSelection, sticky: $selectedDate,
+            id: scrubID, live: $liveSelection, sticky: $selectedDate,
             resetOn: points.first?.dateString ?? "")
         .chartXScale(domain: points.map(\.dateString))
         .chartYScale(domain: yDomain)

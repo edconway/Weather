@@ -98,3 +98,24 @@ extension Date {
         return formatted(copy)
     }
 }
+
+extension View {
+    /// `chartXSelection`'s built-in gesture doesn't reliably pick up every
+    /// tap (the same unreliability documented for the watchOS charts); this
+    /// explicit tap handler is a belt-and-braces fallback so scrubbing works
+    /// regardless of the underlying gesture recognizer.
+    func chartTapFallback<Value: Plottable>(_ selection: Binding<Value?>) -> some View {
+        chartOverlay { proxy in
+            GeometryReader { geo in
+                Rectangle().fill(.clear).contentShape(Rectangle())
+                    .onTapGesture { location in
+                        let origin = geo[proxy.plotFrame!].origin
+                        let x = location.x - origin.x
+                        if let value: Value = proxy.value(atX: x) {
+                            selection.wrappedValue = value
+                        }
+                    }
+            }
+        }
+    }
+}

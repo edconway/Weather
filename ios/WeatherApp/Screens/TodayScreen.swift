@@ -8,6 +8,9 @@ struct TodayScreen: View {
 
     @State private var showingSearch = false
     @State private var showingSettings = false
+    /// Shared across every chart on this screen so scrubbing one clears
+    /// whichever other chart's tooltip was pinned — see `StickyXSelection`.
+    @State private var scrubCoordinator = ActiveScrubCoordinator()
 
     var body: some View {
         NavigationStack {
@@ -15,6 +18,7 @@ struct TodayScreen: View {
                 .navigationTitle("")
                 .toolbar(.hidden, for: .navigationBar)
         }
+        .environment(scrubCoordinator)
         .sheet(isPresented: $showingSearch) {
             SearchSheet { result in
                 Task { await store.selectSearchResult(result) }
