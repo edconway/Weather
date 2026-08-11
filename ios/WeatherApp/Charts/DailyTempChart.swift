@@ -13,6 +13,13 @@ struct DailyTempChart: View {
         case temperature
         case wetBulb
 
+        var eyebrow: String {
+            switch self {
+            case .temperature: return "14-Day Temperature"
+            case .wetBulb: return "14-Day Wet Bulb"
+            }
+        }
+
         var accessibilityName: String {
             switch self {
             case .temperature: return "14-day temperature chart"
@@ -25,6 +32,9 @@ struct DailyTempChart: View {
     let series: Series
     let formatter: UnitFormatter
     let timeZone: TimeZone
+    var detailText: String? = nil
+    var onOpenDetail: (() -> Void)? = nil
+    var expanded: Bool = false
 
     @State private var liveSelection: String?
     @State private var selectedDate: String?
@@ -50,6 +60,10 @@ struct DailyTempChart: View {
         points.first(where: \.isToday)?.dateString
     }
 
+    private var todayPoint: ChartSeries.DailyPoint? {
+        points.first(where: \.isToday)
+    }
+
     private var selected: ChartSeries.DailyPoint? {
         points.first { $0.dateString == selectedDate }
     }
@@ -62,18 +76,72 @@ struct DailyTempChart: View {
             .map { $0.map(formatter.temperatureValue) })
     }
 
+    private var readout: ChartReadout {
+        let point = selected ?? todayPoint ?? points.first
+        guard let point else { return .placeholder }
+        let highText = formatter.temperatureShort(high(point))
+        let lowText = formatter.temperatureShort(low(point))
+        let when = selected == nil && point.isToday
+            ? "Today"
+            : point.label(timeZone: timeZone)
+        let tag = point.isPast ? " · actual" : ""
+
+        if let top = normalHigh(point), let bottom = normalLow(point),
+           let hi = high(point) {
+            let midNormal = (top + bottom) / 2
+            let delta = hi - midNormal
+            let absDelta = formatter.temperatureShort(abs(delta))
+            if abs(delta) <= 0.5 {
+                return ChartReadout(
+                    primary: "\(highText) / \(lowText)",
+                    context: "\(when)\(tag) · near normal")
+            }
+            let relation = delta > 0 ? "warmer" : "colder"
+            return ChartReadout(
+                primary: "\(highText) / \(lowText)",
+                context: "\(when)\(tag) · \(absDelta) \(relation) than normal")
+        }
+        return ChartReadout(
+            primary: "\(highText) / \(lowText)",
+            context: "\(when)\(tag)")
+    }
+
+    private var legend: [ChartLegendItem] {
+        [
+            ChartLegendItem("High", swatch: .solid(Palette.hot)),
+            ChartLegendItem("Low", swatch: .solid(Palette.cold)),
+            ChartLegendItem("Normal range", swatch: .band(Palette.historical.opacity(0.35))),
+        ]
+    }
+
     var body: some View {
+        ChartModule(
+            eyebrow: series.eyebrow,
+            readout: readout,
+            detailText: detailText,
+            legend: legend,
+            onOpenDetail: onOpenDetail
+        ) {
+            plot
+        }
+    }
+
+    private var plot: some View {
         Chart {
-            // The band goes first so the lines draw over it.
             ForEach(points) { point in
                 if let top = normalHigh(point), let bottom = normalLow(point) {
                     AreaMark(
                         x: .value("Day", point.dateString),
                         yStart: .value("Normal low", formatter.temperatureValue(bottom)),
                         yEnd: .value("Normal high", formatter.temperatureValue(top)))
-                    .foregroundStyle(Palette.historical.opacity(0.22))
+                    .foregroundStyle(Palette.historical.opacity(ChartKit.normalBandOpacity))
                     .interpolationMethod(.catmullRom)
                 }
+            }
+
+            if let todayDateString {
+                RectangleMark(x: .value("Today", todayDateString))
+                    .foregroundStyle(Color.secondary.opacity(0.08))
             }
 
             ForEach(points) { point in
@@ -84,12 +152,13 @@ struct DailyTempChart: View {
                         series: .value("Series", "high"))
                     .foregroundStyle(Palette.hot)
                     .interpolationMethod(.catmullRom)
-                    .opacity(point.isPast ? 0.55 : 1)
+                    .opacity(point.isPast ? ChartKit.pastSeriesOpacity : 1)
                     PointMark(
                         x: .value("Day", point.dateString),
                         y: .value("High", formatter.temperatureValue(value)))
                     .foregroundStyle(Palette.hot)
                     .symbolSize(point.isPast ? 16 : 30)
+                    .opacity(point.isPast ? ChartKit.pastSeriesOpacity : 1)
                 }
                 if let value = low(point) {
                     LineMark(
@@ -98,25 +167,34 @@ struct DailyTempChart: View {
                         series: .value("Series", "low"))
                     .foregroundStyle(Palette.cold)
                     .interpolationMethod(.catmullRom)
-                    .opacity(point.isPast ? 0.55 : 1)
+                    .opacity(point.isPast ? ChartKit.pastSeriesOpacity : 1)
                     PointMark(
                         x: .value("Day", point.dateString),
                         y: .value("Low", formatter.temperatureValue(value)))
                     .foregroundStyle(Palette.cold)
                     .symbolSize(point.isPast ? 16 : 30)
+                    .opacity(point.isPast ? ChartKit.pastSeriesOpacity : 1)
                 }
             }
 
             if let todayDateString {
                 RuleMark(x: .value("Today", todayDateString))
-                    .foregroundStyle(.secondary.opacity(0.5))
+                    .foregroundStyle(.secondary.opacity(0.4))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                    .annotation(position: .top, alignment: .center) {
+                        NowCapsule(label: "TODAY")
+                    }
             }
 
-            if let selected {
+            if let selected, let hi = high(selected) {
                 RuleMark(x: .value("Selected", selected.dateString))
-                    .foregroundStyle(.secondary.opacity(0.35))
-                    .scrubAnnotation { scrubCard(selected) }
+                    .foregroundStyle(Palette.hot.opacity(0.4))
+                    .lineStyle(StrokeStyle(lineWidth: 1))
+                PointMark(
+                    x: .value("Day", selected.dateString),
+                    y: .value("High", formatter.temperatureValue(hi)))
+                .foregroundStyle(Palette.hot)
+                .symbolSize(70)
             }
         }
         .chartXSelection(value: $liveSelection)
@@ -124,18 +202,10 @@ struct DailyTempChart: View {
         .stickyXSelection(
             id: scrubID, live: $liveSelection, sticky: $selectedDate,
             resetOn: points.first?.dateString ?? "")
+        .chartSelectionHaptic(selectedDate)
         .chartXScale(domain: points.map(\.dateString))
         .chartYScale(domain: yDomain)
-        .chartYAxis {
-            AxisMarks(values: .automatic(desiredCount: 5)) { value in
-                AxisGridLine()
-                AxisValueLabel {
-                    if let number = value.as(Double.self) {
-                        Text(formatter.temperatureAxis(number))
-                    }
-                }
-            }
-        }
+        .chartYAxis { ChartAxes.temperatureYAxis(formatter: formatter) }
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 14)) { value in
                 AxisValueLabel {
@@ -143,12 +213,13 @@ struct DailyTempChart: View {
                        let point = points.first(where: { $0.dateString == dateString }),
                        showsLabel(for: point) {
                         Text(point.label(timeZone: timeZone))
-                            .font(.system(size: 9, weight: point.isToday ? .bold : .regular))
+                            .font(.caption2.weight(point.isToday ? .bold : .regular))
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
         }
-        .frame(height: ChartKit.dailyHeight)
+        .frame(height: expanded ? ChartKit.dailyHeight + 60 : ChartKit.dailyHeight)
         .accessibilityLabel(series.accessibilityName)
         .accessibilityChartDescriptor(
             DailyTempChartDescriptor(
@@ -161,22 +232,5 @@ struct DailyTempChart: View {
     /// too — otherwise "Tue", "Today" and "Thu" overlap.
     private func showsLabel(for point: ChartSeries.DailyPoint) -> Bool {
         DayLabelDensity.shows(point, in: points)
-    }
-
-    private func scrubCard(_ point: ChartSeries.DailyPoint) -> some View {
-        let range: String
-        if let top = normalHigh(point), let bottom = normalLow(point) {
-            range = "\(formatter.temperatureShort(bottom))–\(formatter.temperatureShort(top))"
-        } else {
-            range = UnitFormatter.placeholder
-        }
-        return ScrubCard(
-            title: point.label(timeZone: timeZone),
-            tag: point.isPast ? "actual" : nil
-        ) {
-            ScrubRow(label: "High", value: formatter.temperature(high(point)), tint: Palette.hot)
-            ScrubRow(label: "Low", value: formatter.temperature(low(point)), tint: Palette.cold)
-            ScrubRow(label: "Hist. range", value: range, tint: .secondary)
-        }
     }
 }

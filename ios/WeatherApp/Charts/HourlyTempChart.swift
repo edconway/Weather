@@ -4,9 +4,6 @@ import WeatherCore
 
 /// §8.4.1 / §8.4.3 — up to 48 hourly points (±24 h around now) of temperature
 /// (or wet bulb) against the 5-year average for that hour of day.
-///
-/// One view covers both series because the only differences are which value is
-/// plotted and the scrub label; the web has two near-identical functions.
 struct HourlyTempChart: View {
     enum Series {
         case temperature
@@ -19,10 +16,24 @@ struct HourlyTempChart: View {
             }
         }
 
+        var eyebrow: String {
+            switch self {
+            case .temperature: return "48-Hour Temperature"
+            case .wetBulb: return "48-Hour Wet Bulb"
+            }
+        }
+
         var accessibilityName: String {
             switch self {
             case .temperature: return "48-hour temperature chart"
             case .wetBulb: return "48-hour wet bulb chart"
+            }
+        }
+
+        var legendLabel: String {
+            switch self {
+            case .temperature: return "Temperature"
+            case .wetBulb: return "Wet bulb"
             }
         }
     }
@@ -31,6 +42,10 @@ struct HourlyTempChart: View {
     let series: Series
     let formatter: UnitFormatter
     let timeZone: TimeZone
+    var detailText: String? = nil
+    var onOpenDetail: (() -> Void)? = nil
+    /// When true, the plot is taller (detail sheet).
+    var expanded: Bool = false
 
     @State private var liveSelection: Date?
     @State private var selectedDate: Date?
@@ -58,6 +73,10 @@ struct HourlyTempChart: View {
         points.first(where: { !$0.isPast })?.date
     }
 
+    private var nowPoint: ChartSeries.HourlyPoint? {
+        points.first(where: { !$0.isPast })
+    }
+
     private var selected: ChartSeries.HourlyPoint? {
         guard let selectedDate else { return nil }
         return points.min {
@@ -72,10 +91,72 @@ struct HourlyTempChart: View {
                 .map { $0.map(formatter.temperatureValue) })
     }
 
+    private var nightRanges: [NightRange] {
+        NightShading.ranges(in: points)
+    }
+
+    private var readout: ChartReadout {
+        let point = selected ?? nowPoint
+        guard let point, let value = value(point) else {
+            return .placeholder
+        }
+        let primary = formatter.temperatureShort(value)
+        let when: String
+        if selected == nil || point.date == nowDate {
+            when = "Now"
+        } else {
+            let day = point.date.formatted(
+                Date.FormatStyle().weekday(.abbreviated).hour(.defaultDigits(amPM: .abbreviated)),
+                in: timeZone)
+            when = day
+        }
+        let tag = point.isPast ? " · actual" : (selected == nil ? "" : " · forecast")
+        if let normal = normal(point) {
+            let delta = value - normal
+            let absDelta = formatter.temperatureShort(abs(delta))
+            let relation = delta > 0.05 ? "above" : (delta < -0.05 ? "below" : "near")
+            if abs(delta) <= 0.05 {
+                return ChartReadout(
+                    primary: primary,
+                    context: "\(when)\(tag) · near the 5-yr average",
+                    primaryTint: tint)
+            }
+            return ChartReadout(
+                primary: primary,
+                context: "\(when)\(tag) · \(absDelta) \(relation) 5-yr avg",
+                primaryTint: tint)
+        }
+        return ChartReadout(primary: primary, context: "\(when)\(tag)", primaryTint: tint)
+    }
+
+    private var legend: [ChartLegendItem] {
+        [
+            ChartLegendItem(series.legendLabel, swatch: .solid(tint)),
+            ChartLegendItem("5-yr average", swatch: .dashed(Palette.historical)),
+        ]
+    }
+
     var body: some View {
+        ChartModule(
+            eyebrow: series.eyebrow,
+            readout: readout,
+            detailText: detailText,
+            legend: legend,
+            onOpenDetail: onOpenDetail
+        ) {
+            plot
+        }
+    }
+
+    private var plot: some View {
         Chart {
-            // Past and future are separate series so the dash only applies
-            // forward; a single series with a conditional dash is not possible.
+            ForEach(nightRanges) { range in
+                RectangleMark(
+                    xStart: .value("Night start", range.start),
+                    xEnd: .value("Night end", range.end))
+                .foregroundStyle(Color.secondary.opacity(ChartKit.nightShadeOpacity))
+            }
+
             ForEach(points) { point in
                 if let value = value(point), point.isPast {
                     LineMark(
@@ -83,12 +164,11 @@ struct HourlyTempChart: View {
                         y: .value(series.scrubLabel, formatter.temperatureValue(value)),
                         series: .value("Series", "actual"))
                     .foregroundStyle(tint)
+                    .lineStyle(StrokeStyle(lineWidth: 2))
                     .interpolationMethod(.catmullRom)
                 }
             }
             ForEach(points) { point in
-                // The first forecast point is drawn in both series so the solid
-                // and dashed segments meet without a gap.
                 if let value = value(point), !point.isPast || isLastPast(point) {
                     LineMark(
                         x: .value("Time", point.date),
@@ -113,27 +193,27 @@ struct HourlyTempChart: View {
 
             if let nowDate {
                 RuleMark(x: .value("Now", nowDate))
-                    .foregroundStyle(.secondary.opacity(0.5))
+                    .foregroundStyle(.secondary.opacity(0.45))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
                     .annotation(position: .top, alignment: .center) {
-                        Text("Now")
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(.secondary)
+                        NowCapsule()
                     }
             }
 
             if let selected, let value = value(selected) {
                 RuleMark(x: .value("Selected", selected.date))
-                    .foregroundStyle(.secondary.opacity(0.35))
+                    .foregroundStyle(tint.opacity(0.45))
                     .lineStyle(StrokeStyle(lineWidth: 1))
-                    .scrubAnnotation {
-                        scrubCard(selected, value: value)
-                    }
                 PointMark(
                     x: .value("Time", selected.date),
                     y: .value(series.scrubLabel, formatter.temperatureValue(value)))
                 .foregroundStyle(tint)
-                .symbolSize(60)
+                .symbolSize(70)
+                .annotation(position: .overlay) {
+                    Circle()
+                        .strokeBorder(Color(.systemBackground), lineWidth: 2)
+                        .frame(width: 10, height: 10)
+                }
             }
         }
         .chartXSelection(value: $liveSelection)
@@ -141,29 +221,11 @@ struct HourlyTempChart: View {
         .stickyXSelection(
             id: scrubID, live: $liveSelection, sticky: $selectedDate,
             resetOn: points.first?.timeString ?? "")
+        .chartSelectionHaptic(selectedDate)
         .chartYScale(domain: yDomain)
-        .chartYAxis {
-            AxisMarks(values: .automatic(desiredCount: 5)) { value in
-                AxisGridLine()
-                AxisValueLabel {
-                    if let number = value.as(Double.self) {
-                        Text(formatter.temperatureAxis(number))
-                    }
-                }
-            }
-        }
-        .chartXAxis {
-            AxisMarks(values: .stride(by: .hour, count: 12)) { value in
-                AxisGridLine()
-                AxisValueLabel {
-                    if let date = value.as(Date.self) {
-                        let hour = Calendar.hour(of: date, in: timeZone)
-                        Text(hourLabel(hour))
-                    }
-                }
-            }
-        }
-        .frame(height: ChartKit.hourlyHeight)
+        .chartYAxis { ChartAxes.temperatureYAxis(formatter: formatter) }
+        .chartXAxis { ChartAxes.hourlyXAxis(timeZone: timeZone) }
+        .frame(height: expanded ? ChartKit.hourlyHeight + 60 : ChartKit.hourlyHeight)
         .accessibilityLabel(series.accessibilityName)
         .accessibilityChartDescriptor(
             HourlyTempChartDescriptor(
@@ -174,25 +236,6 @@ struct HourlyTempChart: View {
         guard let firstFuture = points.firstIndex(where: { !$0.isPast }), firstFuture > 0
         else { return false }
         return point.id == points[firstFuture - 1].id
-    }
-
-    private func scrubCard(_ point: ChartSeries.HourlyPoint, value: Double) -> some View {
-        let dayLabel = point.date.formatted(
-            Date.FormatStyle().weekday(.abbreviated).month(.abbreviated).day(),
-            in: timeZone)
-        return ScrubCard(
-            title: "\(dayLabel) \(hourLabel(point.hour))",
-            tag: point.isPast ? "actual" : nil
-        ) {
-            ScrubRow(
-                label: series.scrubLabel,
-                value: formatter.temperature(value),
-                tint: tint)
-            ScrubRow(
-                label: "5-yr avg",
-                value: formatter.temperature(normal(point)),
-                tint: .secondary)
-        }
     }
 }
 
