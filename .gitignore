@@ -8,3 +8,6 @@ ios/WeatherCore/.build/
 xcuserdata/
 *.xcuserstate
 DerivedData/
+
+# Illustrative design mockups (not shipping assets)
+ios/design-previews/

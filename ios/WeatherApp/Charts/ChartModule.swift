@@ -33,13 +33,22 @@ struct ChartModule<Chart: View, Detail: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(eyebrow)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-                .tracking(0.4)
+            // Tap the header (not the plot) to open the detail sheet so scrubbing
+            // the chart isn't stolen by the expand gesture.
+            VStack(alignment: .leading, spacing: 10) {
+                Text(eyebrow)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                    .tracking(0.4)
 
-            readoutHeader
+                readoutHeader
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .onTapGesture { onOpenDetail?() }
+            .accessibilityAddTraits(onOpenDetail == nil ? [] : .isButton)
+            .accessibilityHint(onOpenDetail == nil ? "" : "Shows a larger chart")
 
             chart()
 
@@ -50,10 +59,6 @@ struct ChartModule<Chart: View, Detail: View>: View {
             detail()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            onOpenDetail?()
-        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(eyebrow)
         .accessibilityValue("\(readout.primary). \(readout.context)")
@@ -71,6 +76,12 @@ struct ChartModule<Chart: View, Detail: View>: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
+            if onOpenDetail != nil {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
         }
         .accessibilityElement(children: .combine)
     }

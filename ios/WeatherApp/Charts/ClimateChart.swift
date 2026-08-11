@@ -9,31 +9,63 @@ import WeatherCore
 struct ClimateChart: View {
     let points: [ChartSeries.ClimatePoint]
     let formatter: UnitFormatter
+    var detailText: String? = nil
+    var onOpenDetail: (() -> Void)? = nil
+    var expanded: Bool = false
 
     @State private var selectedMonth: Int?
     @State private var scrubID: AnyHashable = UUID()
 
     @Environment(ActiveScrubCoordinator.self) private var coordinator
 
+    private var currentMonth: Int {
+        Calendar.current.component(.month, from: Date()) - 1
+    }
+
+    private var currentPoint: ChartSeries.ClimatePoint? {
+        points.first { $0.id == currentMonth }
+    }
+
     private var selected: ChartSeries.ClimatePoint? {
         selectedMonth.flatMap { month in points.first { $0.id == month } }
     }
 
+    private var readout: ChartReadout {
+        let point = selected ?? currentPoint ?? points.first
+        guard let point else { return .placeholder }
+        let when = selected == nil && point.id == currentMonth
+            ? "\(point.monthName) · this month"
+            : point.monthName
+        let high = formatter.temperatureShort(point.high)
+        let low = formatter.temperatureShort(point.low)
+        let rain = formatter.precipitationCompact(point.rain)
+        return ChartReadout(
+            primary: "\(high) / \(low)",
+            context: "\(when) · \(rain) rain")
+    }
+
+    private var legend: [ChartLegendItem] {
+        [
+            ChartLegendItem("Avg high", swatch: .solid(Palette.hot)),
+            ChartLegendItem("Avg low", swatch: .solid(Palette.cold)),
+            ChartLegendItem("Rainfall", swatch: .solid(Palette.rainSeries.opacity(0.85))),
+        ]
+    }
+
     var body: some View {
-        // The gap keeps the rainfall chart's top tick clear of the temperature
-        // chart's bottom tick.
-        VStack(alignment: .leading, spacing: 14) {
-            temperatureChart
-            rainfallChart
-            if let selected {
-                summary(selected)
+        ChartModule(
+            eyebrow: "Climate Overview",
+            readout: readout,
+            detailText: detailText,
+            legend: legend,
+            onOpenDetail: onOpenDetail
+        ) {
+            VStack(alignment: .leading, spacing: 14) {
+                temperatureChart
+                rainfallChart
             }
         }
-        // Drop the selection when the location changes, so the summary row never
-        // describes one city with another's numbers.
         .onChange(of: points.first?.high) { _, _ in selectedMonth = nil }
-        // See StickyXSelection: clears this chart's summary row when a
-        // different chart on the screen becomes active.
         .onChange(of: coordinator.activeID) { _, activeID in
             guard selectedMonth != nil, activeID != scrubID else { return }
             selectedMonth = nil
@@ -42,6 +74,11 @@ struct ClimateChart: View {
 
     private var temperatureChart: some View {
         Chart {
+            if let current = currentPoint {
+                RectangleMark(x: .value("Month", current.shortMonthName))
+                    .foregroundStyle(Color.yellow.opacity(0.09))
+            }
+
             ForEach(points) { point in
                 if let high = point.high {
                     LineMark(
@@ -50,6 +87,11 @@ struct ClimateChart: View {
                         series: .value("Series", "high"))
                     .foregroundStyle(Palette.hot)
                     .interpolationMethod(.catmullRom)
+                    PointMark(
+                        x: .value("Month", point.shortMonthName),
+                        y: .value("Avg high", formatter.temperatureValue(high)))
+                    .foregroundStyle(Palette.hot)
+                    .symbolSize(point.id == currentMonth ? 48 : 28)
                 }
                 if let low = point.low {
                     LineMark(
@@ -58,31 +100,30 @@ struct ClimateChart: View {
                         series: .value("Series", "low"))
                     .foregroundStyle(Palette.cold)
                     .interpolationMethod(.catmullRom)
+                    PointMark(
+                        x: .value("Month", point.shortMonthName),
+                        y: .value("Avg low", formatter.temperatureValue(low)))
+                    .foregroundStyle(Palette.cold)
+                    .symbolSize(point.id == currentMonth ? 48 : 28)
                 }
             }
+
             if let selected {
                 RuleMark(x: .value("Month", selected.shortMonthName))
                     .foregroundStyle(.secondary.opacity(0.35))
+                    .lineStyle(StrokeStyle(lineWidth: 1))
             }
         }
         .chartXSelection(value: monthSelection)
         .chartTapFallback(monthSelection)
-        // The month labels live under the rainfall chart only — the two charts
-        // share one x-axis, so repeating them would just be noise.
         .chartXAxis {
-            AxisMarks { _ in AxisGridLine() }
-        }
-        .chartYAxis {
-            AxisMarks(values: .automatic(desiredCount: 4)) { value in
-                AxisGridLine()
-                AxisValueLabel {
-                    if let number = value.as(Double.self) {
-                        Text(formatter.temperatureAxis(number))
-                    }
-                }
+            AxisMarks { _ in
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 3]))
+                    .foregroundStyle(Color.secondary.opacity(0.18))
             }
         }
-        .frame(height: ChartKit.climateTempHeight)
+        .chartYAxis { ChartAxes.temperatureYAxis(formatter: formatter) }
+        .frame(height: expanded ? ChartKit.climateTempHeight + 40 : ChartKit.climateTempHeight)
         .accessibilityLabel("Average monthly high and low temperature chart")
     }
 
@@ -92,7 +133,8 @@ struct ClimateChart: View {
                 if let rain = point.rain {
                     BarMark(
                         x: .value("Month", point.shortMonthName),
-                        y: .value("Avg rainfall", formatter.precipitationValue(rain)))
+                        y: .value("Avg rainfall", formatter.precipitationValue(rain)),
+                        width: .ratio(0.65))
                     .foregroundStyle(Palette.rainSeries.opacity(
                         selected == nil || selected?.id == point.id ? 0.85 : 0.35))
                     .cornerRadius(3)
@@ -101,17 +143,20 @@ struct ClimateChart: View {
         }
         .chartXSelection(value: monthSelection)
         .chartTapFallback(monthSelection)
-        .chartYAxis {
-            AxisMarks(values: .automatic(desiredCount: 3)) { value in
-                AxisGridLine()
+        .chartYAxis { ChartAxes.precipitationYAxis(formatter: formatter) }
+        .chartXAxis {
+            AxisMarks { value in
                 AxisValueLabel {
-                    if let number = value.as(Double.self) {
-                        Text(formatter.precipitationAxis(displayValue: number))
+                    if let name = value.as(String.self) {
+                        let isCurrent = points.first { $0.shortMonthName == name }?.id == currentMonth
+                        Text(name)
+                            .font(.caption2.weight(isCurrent ? .bold : .regular))
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
         }
-        .frame(height: ChartKit.climateRainHeight)
+        .frame(height: expanded ? ChartKit.climateRainHeight + 30 : ChartKit.climateRainHeight)
         .accessibilityLabel("Average monthly rainfall chart")
     }
 
@@ -127,21 +172,5 @@ struct ClimateChart: View {
                 selectedMonth = points.first { $0.shortMonthName == name }?.id
                 coordinator.activeID = scrubID
             })
-    }
-
-    private func summary(_ point: ChartSeries.ClimatePoint) -> some View {
-        HStack(spacing: 14) {
-            Text(point.monthName).font(.caption2.weight(.bold))
-            Label(formatter.temperature(point.high), systemImage: "arrow.up")
-                .font(.caption2).foregroundStyle(Palette.hot)
-            Label(formatter.temperature(point.low), systemImage: "arrow.down")
-                .font(.caption2).foregroundStyle(Palette.cold)
-            Label(formatter.precipitation(point.rain), systemImage: "drop.fill")
-                .font(.caption2).foregroundStyle(Palette.rainSeries)
-            Spacer(minLength: 0)
-        }
-        .labelStyle(.titleAndIcon)
-        .padding(.horizontal, 4)
-        .accessibilityElement(children: .combine)
     }
 }
