@@ -1,13 +1,17 @@
 import SwiftUI
 import WeatherCore
 
-/// The hero card (§8.2 item 2): current temperature, condition, feels-like and
-/// hi/lo, the progressive anomaly badges, and three stat tiles.
+/// Atmosphere-first hero: condition sky, giant temperature, one anomaly voice
+/// line, and a floating material strip for rain / wind / UV.
 struct HeroView: View {
     let conditions: CurrentConditions
     let badges: [Anomaly]
     let formatter: UnitFormatter
     let onBadgeTap: (PanelID) -> Void
+
+    private var atmosphere: Atmosphere.Colors {
+        Atmosphere.colors(code: conditions.conditionCode, isDay: conditions.isDay)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -16,32 +20,53 @@ struct HeroView: View {
                     temperature
                     Text(conditions.condition.label)
                         .font(.title3.weight(.medium))
+                        .foregroundStyle(atmosphere.foreground)
                     range
-                    if !badges.isEmpty {
-                        badgeRow
+                    if let voice = badges.first {
+                        Button {
+                            onBadgeTap(voice.panel)
+                        } label: {
+                            Text(voice.text)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(atmosphere.foreground.opacity(0.92))
+                                .multilineTextAlignment(.leading)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint(AnomalyBadge.hint(for: voice))
+                        .padding(.top, 2)
                     }
                 }
                 Spacer(minLength: 12)
                 Image(systemName: conditions.symbolName)
-                    .symbolRenderingMode(.multicolor)
-                    .font(.system(size: 52))
+                    .symbolRenderingMode(.hierarchical)
+                    .font(.system(size: 56))
+                    .foregroundStyle(atmosphere.foreground.opacity(0.92))
                     .accessibilityHidden(true)
             }
 
-            statTiles
+            materialStrip
+
+            if badges.count > 1 {
+                secondaryBadges
+            }
         }
-        .padding(18)
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 18))
+        .padding(.horizontal, 20)
+        .padding(.top, 96)
+        .padding(.bottom, 22)
+        .foregroundStyle(atmosphere.foreground)
+        .background {
+            AtmosphereBackground(colors: atmosphere)
+        }
     }
 
     private var temperature: some View {
         HStack(alignment: .top, spacing: 1) {
             Text(formatter.temperatureNumber(conditions.temperature).map(String.init) ?? "—")
-                .font(.system(size: 62, weight: .semibold, design: .rounded))
+                .font(.system(size: 72, weight: .semibold, design: .rounded))
             Text(formatter.temperatureUnit)
-                .font(.title3.weight(.medium))
-                .foregroundStyle(.secondary)
-                .padding(.top, 8)
+                .font(.title2.weight(.medium))
+                .foregroundStyle(atmosphere.secondaryForeground)
+                .padding(.top, 12)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Currently \(formatter.temperature(conditions.temperature)), "
@@ -51,41 +76,70 @@ struct HeroView: View {
     private var range: some View {
         HStack(spacing: 4) {
             if conditions.feelsLike != nil {
-                Text("Feels like \(formatter.temperature(conditions.feelsLike))")
-                    .foregroundStyle(.secondary)
-                Text("·").foregroundStyle(.tertiary)
+                Text("Feels \(formatter.temperature(conditions.feelsLike))")
+                Text("·").opacity(0.55)
             }
-            Text("↑\(formatter.temperature(conditions.high))")
-                .foregroundStyle(Palette.hot)
-            Text("/").foregroundStyle(.tertiary)
-            Text("↓\(formatter.temperature(conditions.low))")
-                .foregroundStyle(Palette.cold)
+            Text("H \(formatter.temperature(conditions.high))")
+            Text("/").opacity(0.55)
+            Text("L \(formatter.temperature(conditions.low))")
         }
         .font(.subheadline)
+        .foregroundStyle(atmosphere.secondaryForeground)
         .accessibilityElement(children: .combine)
     }
 
-    private var badgeRow: some View {
-        // Badges wrap rather than truncate — some read quite long.
-        FlowLayout(spacing: 6) {
-            ForEach(badges) { badge in
-                AnomalyBadge(anomaly: badge, action: onBadgeTap)
-            }
+    private var materialStrip: some View {
+        HStack(spacing: 0) {
+            stripItem(
+                symbol: "drop.fill",
+                label: "Rain",
+                value: formatter.rainChance(conditions.rainChance))
+            stripDivider
+            stripItem(
+                symbol: "wind",
+                label: "Wind",
+                value: formatter.wind(conditions.windSpeed))
+            stripDivider
+            stripItem(
+                symbol: "sun.max.fill",
+                label: "UV",
+                value: formatter.uvIndexCompact(conditions.uvIndex))
         }
-        .padding(.top, 2)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 8)
+        .background(.ultraThinMaterial, in: Capsule())
     }
 
-    private var statTiles: some View {
-        HStack(spacing: 10) {
-            StatTile(
-                symbol: "drop.fill", tint: Palette.rainSeries, label: "Rain chance",
-                value: formatter.rainChance(conditions.rainChance))
-            StatTile(
-                symbol: "wind", tint: .teal, label: "Wind",
-                value: formatter.wind(conditions.windSpeed))
-            StatTile(
-                symbol: "sun.max.fill", tint: .orange, label: "UV index",
-                value: formatter.uvIndex(conditions.uvIndex))
+    private func stripItem(symbol: String, label: String, value: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: symbol)
+                .font(.caption.weight(.semibold))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(label)
+                    .font(.caption2)
+                    .opacity(0.75)
+                Text(value)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label): \(value)")
+    }
+
+    private var stripDivider: some View {
+        Rectangle()
+            .fill(.primary.opacity(0.12))
+            .frame(width: 1, height: 28)
+    }
+
+    private var secondaryBadges: some View {
+        FlowLayout(spacing: 6) {
+            ForEach(badges.dropFirst()) { badge in
+                AnomalyBadge(anomaly: badge, action: onBadgeTap)
+            }
         }
     }
 }

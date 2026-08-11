@@ -2,12 +2,11 @@ import Charts
 import SwiftUI
 import WeatherCore
 
-/// Shared chart conventions (§8.4): a scrub annotation card replacing the web's
-/// DOM tooltip, and the "· actual" / "· forecast" tagging.
+/// Shared chart conventions for the native Health-style presentation.
 enum ChartKit {
-    static let hourlyHeight: CGFloat = 170
-    static let dailyHeight: CGFloat = 180
-    static let ytdHeight: CGFloat = 190
+    static let hourlyHeight: CGFloat = 200
+    static let dailyHeight: CGFloat = 210
+    static let ytdHeight: CGFloat = 220
     static let climateTempHeight: CGFloat = 150
     static let climateRainHeight: CGFloat = 90
 
@@ -15,9 +14,126 @@ enum ChartKit {
     static let forecastDash: [CGFloat] = [5, 4]
     /// Dash pattern for historical overlays.
     static let historicalDash: [CGFloat] = [4, 3]
+
+    static let nightShadeOpacity: Double = 0.05
+    static let normalBandOpacity: Double = 0.14
+    static let pastSeriesOpacity: Double = 0.4
 }
 
-/// One row of a scrub annotation.
+/// A contiguous night span for `RectangleMark` shading.
+struct NightRange: Identifiable, Equatable {
+    let id: Int
+    let start: Date
+    let end: Date
+}
+
+enum NightShading {
+    /// Collapse consecutive `!isDay` hourly points into shaded spans.
+    static func ranges(in points: [ChartSeries.HourlyPoint]) -> [NightRange] {
+        var result: [NightRange] = []
+        var runStart: Date?
+        var runEnd: Date?
+        var index = 0
+
+        func flush() {
+            guard let start = runStart, let end = runEnd else { return }
+            result.append(NightRange(id: index, start: start, end: end))
+            index += 1
+            runStart = nil
+            runEnd = nil
+        }
+
+        for point in points {
+            if !point.isDay {
+                if runStart == nil {
+                    runStart = point.date
+                }
+                // Extend half an hour past the hour so adjacent night hours join.
+                runEnd = point.date.addingTimeInterval(30 * 60)
+            } else {
+                flush()
+            }
+        }
+        flush()
+        return result
+    }
+}
+
+/// Shared axis styling — hairline dotted grids, leading Y axis, sparse labels.
+enum ChartAxes {
+    static func temperatureYAxis(formatter: UnitFormatter) -> some AxisContent {
+        AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
+            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 3]))
+                .foregroundStyle(Color.secondary.opacity(0.18))
+            AxisValueLabel {
+                if let number = value.as(Double.self) {
+                    Text(formatter.temperatureAxis(number))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    static func precipitationYAxis(formatter: UnitFormatter) -> some AxisContent {
+        AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
+            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 3]))
+                .foregroundStyle(Color.secondary.opacity(0.18))
+            AxisValueLabel {
+                if let number = value.as(Double.self) {
+                    Text(formatter.precipitationAxis(displayValue: number))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    static func hourlyXAxis(timeZone: TimeZone) -> some AxisContent {
+        AxisMarks(values: .stride(by: .hour, count: 12)) { value in
+            AxisValueLabel {
+                if let date = value.as(Date.self) {
+                    Text(hourLabel(Calendar.hour(of: date, in: timeZone)))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}
+
+/// Capsule annotation used for the "NOW" / "TODAY" marker.
+struct NowCapsule: View {
+    var label: String = "NOW"
+
+    var body: some View {
+        Text(label)
+            .font(.system(size: 8, weight: .bold))
+            .tracking(0.3)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(.background.secondary, in: Capsule())
+    }
+}
+
+extension ChartContent {
+    /// Positions a scrub annotation without letting it run off the plot area.
+    /// Kept for the climate / detail-sheet cases that still need an overlay.
+    func scrubAnnotation<Content: View>(
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some ChartContent {
+        annotation(
+            position: .top,
+            spacing: 2,
+            overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))
+        ) {
+            content()
+        }
+    }
+}
+
+/// One row of a scrub annotation (detail sheet / legacy).
 struct ScrubRow: View {
     let label: String
     let value: String
@@ -36,7 +152,7 @@ struct ScrubRow: View {
     }
 }
 
-/// The floating card shown while scrubbing.
+/// The floating card shown while scrubbing (detail sheet only).
 struct ScrubCard<Content: View>: View {
     let title: String
     /// " · actual" / " · forecast", matching the web's tooltip tags.
@@ -59,25 +175,7 @@ struct ScrubCard<Content: View>: View {
         .frame(minWidth: 130, alignment: .leading)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
         .shadow(radius: 3, y: 1)
-        // Keeps the card from being clipped at the chart's left/right edge.
         .padding(.horizontal, 4)
-    }
-}
-
-extension ChartContent {
-    /// Positions a scrub annotation without letting it run off the plot area.
-    func scrubAnnotation<Content: View>(
-        @ViewBuilder content: @escaping () -> Content
-    ) -> some ChartContent {
-        // Constrained on both axes: with `y: .disabled` the card floated above
-        // the plot and covered the section title.
-        annotation(
-            position: .top,
-            spacing: 2,
-            overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))
-        ) {
-            content()
-        }
     }
 }
 
@@ -117,5 +215,10 @@ extension View {
                     }
             }
         }
+    }
+
+    /// Selection haptic when the sticky scrub value changes.
+    func chartSelectionHaptic<Value: Equatable>(_ selection: Value?) -> some View {
+        sensoryFeedback(.selection, trigger: selection)
     }
 }

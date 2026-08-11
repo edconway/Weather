@@ -5,14 +5,17 @@ import WeatherCore
 /// §8.4.7 — cumulative rainfall this year vs. the historical average, with
 /// dashed continuations past the archive's edge.
 ///
-/// The heaviest chart in the app: up to ~365 points × 2 lines. `ChartSeries.ytd`
-/// takes a `thinning` factor; the caller passes 2 once the year is long enough
-/// that every point stops being distinguishable anyway.
+/// Lines only — the web chart has no area fill, so `AreaMark` is intentionally
+/// absent. The heaviest chart in the app: up to ~365 points × 2 lines;
+/// `ChartSeries.ytd` takes a `thinning` factor from the caller.
 struct YTDRainChart: View {
     let series: ChartSeries.YTDSeries
     let formatter: UnitFormatter
     let thisYear: Int
     let timeZone: TimeZone
+    var detailText: String? = nil
+    var onOpenDetail: (() -> Void)? = nil
+    var expanded: Bool = false
 
     @State private var liveSelection: Date?
     @State private var selectedDate: Date?
@@ -21,6 +24,8 @@ struct YTDRainChart: View {
     private enum Kind: String {
         case actual, historical, projection, historicalExtension
     }
+
+    private var lastActual: ChartSeries.YTDPoint? { series.actual.last }
 
     private var selectedActual: ChartSeries.YTDPoint? {
         guard let selectedDate else { return nil }
@@ -39,7 +44,61 @@ struct YTDRainChart: View {
         }
     }
 
+    private var readout: ChartReadout {
+        if let projected = selectedProjection {
+            return ChartReadout(
+                primary: formatter.precipitation(projected.value),
+                context: "\(label(projected)) · forecast",
+                primaryTint: Palette.rainSeries)
+        }
+        let point = selectedActual ?? lastActual
+        guard let point else { return .placeholder }
+        let average = series.historical.first { $0.monthDay == point.monthDay }?.value
+        let when = selectedActual == nil
+            ? "Through \(label(point))"
+            : label(point)
+        if let average {
+            let delta = point.value - average
+            let signed = (delta >= 0 ? "+" : "−") + formatter.precipitation(abs(delta))
+            let relation = delta > 0.05 ? "wetter" : (delta < -0.05 ? "drier" : "near")
+            if abs(delta) <= 0.05 {
+                return ChartReadout(
+                    primary: formatter.precipitation(point.value),
+                    context: "\(when) · near historical average",
+                    primaryTint: Palette.rainSeries)
+            }
+            return ChartReadout(
+                primary: formatter.precipitation(point.value),
+                context: "\(when) · \(signed) \(relation) than avg",
+                primaryTint: Palette.rainSeries)
+        }
+        return ChartReadout(
+            primary: formatter.precipitation(point.value),
+            context: when,
+            primaryTint: Palette.rainSeries)
+    }
+
+    private var legend: [ChartLegendItem] {
+        [
+            ChartLegendItem("\(thisYear)", swatch: .solid(Palette.rainSeries)),
+            ChartLegendItem("Hist. average", swatch: .solid(Palette.historical.opacity(0.7))),
+            ChartLegendItem("Forecast", swatch: .dashed(Palette.rainSeries)),
+        ]
+    }
+
     var body: some View {
+        ChartModule(
+            eyebrow: "Year-to-Date Rainfall",
+            readout: readout,
+            detailText: detailText,
+            legend: legend,
+            onOpenDetail: onOpenDetail
+        ) {
+            plot
+        }
+    }
+
+    private var plot: some View {
         Chart {
             ForEach(series.historical) { point in
                 LineMark(
@@ -60,13 +119,6 @@ struct YTDRainChart: View {
             }
 
             ForEach(series.actual) { point in
-                AreaMark(
-                    x: .value("Date", point.date),
-                    y: .value("Cumulative", formatter.precipitationValue(point.value)))
-                .foregroundStyle(
-                    .linearGradient(
-                        colors: [Palette.rainSeries.opacity(0.28), Palette.rainSeries.opacity(0.02)],
-                        startPoint: .top, endPoint: .bottom))
                 LineMark(
                     x: .value("Date", point.date),
                     y: .value("Cumulative", formatter.precipitationValue(point.value)),
@@ -84,21 +136,38 @@ struct YTDRainChart: View {
                 .lineStyle(StrokeStyle(lineWidth: 2, dash: ChartKit.forecastDash))
             }
 
+            // End-point marker matching the web's terminal circle + year label.
+            if let last = lastActual {
+                PointMark(
+                    x: .value("Date", last.date),
+                    y: .value("Cumulative", formatter.precipitationValue(last.value)))
+                .foregroundStyle(Palette.rainSeries)
+                .symbolSize(64)
+                .annotation(position: .trailing, spacing: 4) {
+                    Text(formatter.precipitationCompact(last.value))
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Palette.rainSeries)
+                }
+            }
+
             if let projected = selectedProjection {
                 RuleMark(x: .value("Selected", projected.date))
-                    .foregroundStyle(.secondary.opacity(0.35))
-                    .scrubAnnotation {
-                        ScrubCard(title: label(projected), tag: "forecast") {
-                            ScrubRow(
-                                label: "\(thisYear) (proj.)",
-                                value: formatter.precipitation(projected.value),
-                                tint: Palette.rainSeries)
-                        }
-                    }
+                    .foregroundStyle(Palette.rainSeries.opacity(0.4))
+                    .lineStyle(StrokeStyle(lineWidth: 1))
+                PointMark(
+                    x: .value("Date", projected.date),
+                    y: .value("Cumulative", formatter.precipitationValue(projected.value)))
+                .foregroundStyle(Palette.rainSeries)
+                .symbolSize(70)
             } else if let actual = selectedActual {
                 RuleMark(x: .value("Selected", actual.date))
-                    .foregroundStyle(.secondary.opacity(0.35))
-                    .scrubAnnotation { scrubCard(actual) }
+                    .foregroundStyle(Palette.rainSeries.opacity(0.4))
+                    .lineStyle(StrokeStyle(lineWidth: 1))
+                PointMark(
+                    x: .value("Date", actual.date),
+                    y: .value("Cumulative", formatter.precipitationValue(actual.value)))
+                .foregroundStyle(Palette.rainSeries)
+                .symbolSize(70)
             }
         }
         .chartXSelection(value: $liveSelection)
@@ -106,59 +175,29 @@ struct YTDRainChart: View {
         .stickyXSelection(
             id: scrubID, live: $liveSelection, sticky: $selectedDate,
             resetOn: series.latestDate + "-" + String(series.actual.count))
-        .chartYAxis {
-            AxisMarks(values: .automatic(desiredCount: 5)) { value in
-                AxisGridLine()
-                AxisValueLabel {
-                    if let number = value.as(Double.self) {
-                        Text(formatter.precipitationAxis(displayValue: number))
-                    }
-                }
-            }
-        }
+        .chartSelectionHaptic(selectedDate)
+        .chartYAxis { ChartAxes.precipitationYAxis(formatter: formatter) }
         .chartXAxis {
-            // Every other month: narrow initials would render "M, M" and "J, J",
-            // which is worse than fewer, unambiguous labels.
+            // Every other month: narrow initials would render "M, M" and "J, J".
             AxisMarks(values: .stride(by: .month, count: 2)) { value in
-                AxisGridLine()
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 3]))
+                    .foregroundStyle(Color.secondary.opacity(0.18))
                 AxisValueLabel {
                     if let date = value.as(Date.self) {
                         Text(date.formatted(
                             Date.FormatStyle().month(.abbreviated), in: timeZone))
-                            .font(.system(size: 9))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
         }
-        .frame(height: ChartKit.ytdHeight)
+        .frame(height: expanded ? ChartKit.ytdHeight + 60 : ChartKit.ytdHeight)
         .accessibilityLabel("Year-to-date rainfall chart")
     }
 
     private func label(_ point: ChartSeries.YTDPoint) -> String {
         point.date.formatted(
-            Date.FormatStyle().month(.abbreviated).day(), in: timeZone) + " YTD"
-    }
-
-    private func scrubCard(_ point: ChartSeries.YTDPoint) -> some View {
-        let average = series.historical.first { $0.monthDay == point.monthDay }?.value
-        let delta = average.map { point.value - $0 }
-        return ScrubCard(title: label(point), tag: nil) {
-            ScrubRow(
-                label: "\(thisYear)",
-                value: formatter.precipitation(point.value),
-                tint: Palette.rainSeries)
-            ScrubRow(
-                label: "Hist. avg",
-                value: formatter.precipitation(average),
-                tint: .secondary)
-            if let delta {
-                ScrubRow(
-                    label: "Delta",
-                    value: (delta >= 0 ? "+" : "−") + formatter.precipitation(abs(delta)),
-                    tint: delta > 0.05
-                        ? Palette.rainSeries
-                        : (delta < -0.05 ? Palette.hot : .secondary))
-            }
-        }
+            Date.FormatStyle().month(.abbreviated).day(), in: timeZone)
     }
 }
