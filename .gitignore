@@ -2,3 +2,9 @@
 .claude/
 codex-work/
 *.log
+
+# iOS build artefacts
+ios/WeatherCore/.build/
+xcuserdata/
+*.xcuserstate
+DerivedData/
