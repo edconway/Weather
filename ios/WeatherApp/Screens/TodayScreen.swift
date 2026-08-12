@@ -203,7 +203,13 @@ struct TodayScreen: View {
                 detailText: Subtitles.dailyTemp(store),
                 onOpenDetail: { detailKind = .dailyTemp })
         }
-        .onAppear { store.ensureClimatology() }
+        .onAppear {
+            // Kick off the slow archive fetches as soon as the first panel is
+            // on screen, so YTD/climate aren't still spinning when the user
+            // reaches the bottom.
+            store.ensureClimatology()
+            store.ensureYTD()
+        }
 
         WeatherSection(
             id: .wetBulb,
@@ -245,6 +251,9 @@ struct TodayScreen: View {
                     onOpenDetail: { detailKind = .ytdRain })
             } else {
                 ChartPlaceholder(message: "Loading year-to-date rainfall…")
+                    // Retry if the first archive fetch failed — section
+                    // `onAppear` only fires once.
+                    .onAppear { store.ensureYTD() }
             }
         }
         .onAppear { store.ensureYTD() }
@@ -262,8 +271,10 @@ struct TodayScreen: View {
                     onOpenDetail: { detailKind = .climate })
             } else {
                 ChartPlaceholder(message: "Loading climate data…")
+                    .onAppear { store.ensureClimatology() }
             }
         }
+        .onAppear { store.ensureClimatology() }
     }
 
     private var footer: some View {

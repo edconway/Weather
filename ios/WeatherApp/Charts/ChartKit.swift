@@ -207,7 +207,10 @@ extension View {
             GeometryReader { geo in
                 Rectangle().fill(.clear).contentShape(Rectangle())
                     .onTapGesture { location in
-                        let origin = geo[proxy.plotFrame!].origin
+                        // `plotFrame` can be nil during the first layout pass;
+                        // force-unwrapping here crashed the app on device.
+                        guard let plotFrame = proxy.plotFrame else { return }
+                        let origin = geo[plotFrame].origin
                         let x = location.x - origin.x
                         if let value: Value = proxy.value(atX: x) {
                             selection.wrappedValue = value
