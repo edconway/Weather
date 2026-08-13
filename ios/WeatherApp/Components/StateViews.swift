@@ -105,3 +105,41 @@ struct ChartPlaceholder: View {
         .accessibilityElement(children: .combine)
     }
 }
+
+/// Layout-matching placeholder shown while location / forecast loads.
+struct TodaySkeleton: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(.secondarySystemFill))
+                .frame(width: 120, height: 18)
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(.secondarySystemFill))
+                .frame(width: 180, height: 56)
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(.secondarySystemFill))
+                .frame(width: 220, height: 16)
+            Capsule()
+                .fill(Color(.secondarySystemFill))
+                .frame(height: 52)
+            HStack(spacing: 8) {
+                ForEach(0..<3, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(.secondarySystemFill))
+                        .frame(height: 32)
+                }
+            }
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.secondarySystemFill))
+                .frame(height: 200)
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.secondarySystemFill))
+                .frame(height: 200)
+            Spacer()
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .redacted(reason: .placeholder)
+        .accessibilityLabel("Loading weather")
+    }
+}

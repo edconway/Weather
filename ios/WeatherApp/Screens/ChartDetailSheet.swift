@@ -113,7 +113,7 @@ struct ChartDetailSheet: View {
                 points: store.dailyPoints,
                 formatter: store.formatter, timeZone: timeZone, expanded: true)
         case .ytdRain:
-            if let series = store.ytdSeries {
+            if let series = store.ytdSeriesFull {
                 YTDRainChart(
                     series: series, formatter: store.formatter,
                     thisYear: store.ytdRain?.thisYear ?? 0,

@@ -92,7 +92,9 @@ final class WatchStore {
 
     var hourlyPoints: [ChartSeries.HourlyPoint] {
         guard let forecast, let conditions else { return [] }
-        return ChartSeries.hourly(forecast: forecast, conditions: conditions, normals: nil)
+        return ChartSeries.hourly(
+            forecast: forecast, conditions: conditions,
+            normals: applicablePayload?.hourlyNormals)
     }
 
     /// The next 12 hours from now (§9.2 HourlyPage).

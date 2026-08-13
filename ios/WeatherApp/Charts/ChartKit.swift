@@ -2,7 +2,7 @@ import Charts
 import SwiftUI
 import WeatherCore
 
-/// Shared chart conventions for the native Health-style presentation.
+/// Shared chart conventions matching the original web SVG grammar in `charts.js`.
 enum ChartKit {
     static let hourlyHeight: CGFloat = 200
     static let dailyHeight: CGFloat = 210
@@ -10,14 +10,17 @@ enum ChartKit {
     static let climateTempHeight: CGFloat = 150
     static let climateRainHeight: CGFloat = 90
 
-    /// Dash pattern used for every "forecast" segment.
-    static let forecastDash: [CGFloat] = [5, 4]
-    /// Dash pattern for historical overlays.
+    /// Dash pattern for the **past** segment — the web's ghosted history.
+    static let pastDash: [CGFloat] = [5, 4]
+    /// Dash pattern for historical overlays (5-yr avg, hist. avg extension).
     static let historicalDash: [CGFloat] = [4, 3]
+    /// Dash pattern for a forecast *continuation* (YTD projection only).
+    static let forecastDash: [CGFloat] = [5, 4]
 
     static let nightShadeOpacity: Double = 0.05
     static let normalBandOpacity: Double = 0.14
-    static let pastSeriesOpacity: Double = 0.4
+    /// Web past polylines use opacity 0.55.
+    static let pastSeriesOpacity: Double = 0.55
 }
 
 /// A contiguous night span for `RectangleMark` shading.
@@ -48,7 +51,6 @@ enum NightShading {
                 if runStart == nil {
                     runStart = point.date
                 }
-                // Extend half an hour past the hour so adjacent night hours join.
                 runEnd = point.date.addingTimeInterval(30 * 60)
             } else {
                 flush()
@@ -114,6 +116,32 @@ struct NowCapsule: View {
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
             .background(.background.secondary, in: Capsule())
+    }
+}
+
+/// End-of-line series name, matching the web SVG labels ("High", "5-yr avg").
+struct ChartEndLabel: View {
+    let text: String
+    let color: Color
+    var weight: Font.Weight = .bold
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 9, weight: weight))
+            .foregroundStyle(color)
+            .padding(.leading, 2)
+    }
+}
+
+/// In-plot degree / mm label on a forecast point.
+struct ChartValueLabel: View {
+    let text: String
+    let color: Color
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 8, weight: .semibold))
+            .foregroundStyle(color)
     }
 }
 
@@ -197,28 +225,58 @@ extension Date {
     }
 }
 
+struct ChartAppearModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var appeared = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(appeared || reduceMotion ? 1 : 0)
+            .offset(y: appeared || reduceMotion ? 0 : 8)
+            .onAppear {
+                if reduceMotion {
+                    appeared = true
+                } else {
+                    withAnimation(.easeOut(duration: 0.45)) { appeared = true }
+                }
+            }
+    }
+}
+
 extension View {
-    /// `chartXSelection`'s built-in gesture doesn't reliably pick up every
-    /// tap (the same unreliability documented for the watchOS charts); this
-    /// explicit tap handler is a belt-and-braces fallback so scrubbing works
-    /// regardless of the underlying gesture recognizer.
-    func chartTapFallback<Value: Plottable>(_ selection: Binding<Value?>) -> some View {
+    /// Drag (and tap) scrubbing that owns the plot, Fitness-style. Replaces the
+    /// flaky `chartXSelection` tap recognizer; keep `chartXSelection` bound so
+    /// the system drag still feeds `StickyXSelection`.
+    func chartScrub<Value: Plottable>(_ selection: Binding<Value?>) -> some View {
         chartOverlay { proxy in
             GeometryReader { geo in
                 Rectangle().fill(.clear).contentShape(Rectangle())
-                    .onTapGesture { location in
-                        let origin = geo[proxy.plotFrame!].origin
-                        let x = location.x - origin.x
-                        if let value: Value = proxy.value(atX: x) {
-                            selection.wrappedValue = value
-                        }
-                    }
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                guard let frame = proxy.plotFrame else { return }
+                                let origin = geo[frame].origin
+                                let x = value.location.x - origin.x
+                                if let plotted: Value = proxy.value(atX: x) {
+                                    selection.wrappedValue = plotted
+                                }
+                            }
+                    )
             }
         }
+    }
+
+    /// Kept as a name the older charts used; forwards to `chartScrub`.
+    func chartTapFallback<Value: Plottable>(_ selection: Binding<Value?>) -> some View {
+        chartScrub(selection)
     }
 
     /// Selection haptic when the sticky scrub value changes.
     func chartSelectionHaptic<Value: Equatable>(_ selection: Value?) -> some View {
         sensoryFeedback(.selection, trigger: selection)
+    }
+
+    func chartAppear() -> some View {
+        modifier(ChartAppearModifier())
     }
 }

@@ -50,6 +50,8 @@ final class WeatherStore {
     private(set) var geoLocation: WeatherLocation?
     private(set) var customLocation: WeatherLocation?
     private(set) var activeSource: WeatherLocation.Source = .geo
+    private(set) var recentLocations: [WeatherLocation] = []
+    private(set) var favoriteLocations: [WeatherLocation] = []
 
     var imperial: Bool {
         didSet {
@@ -103,6 +105,8 @@ final class WeatherStore {
         self.geoLocation = prefs.lastGeoLocation
         self.customLocation = prefs.customLocation
         self.activeSource = prefs.activeSource
+        self.recentLocations = prefs.recentLocations
+        self.favoriteLocations = prefs.favoriteLocations
     }
 
     /// Both sources exist, so the toggle capsule is worth showing.
@@ -213,6 +217,9 @@ final class WeatherStore {
         }
 
         if forecast == nil { phase = .loading }
+
+        prefs.rememberRecent(target)
+        refreshPlaces()
 
         do {
             let fetched = try await repository.forecast(for: target)
@@ -356,7 +363,38 @@ final class WeatherStore {
             ytd: ytdRain,
             projection: ytdProjection,
             timeZone: forecast?.locationTimeZone ?? .current,
-            thinning: ytdRain.labels.count > 240 ? 2 : 1)
+            thinning: ytdRain.labels.count > 180 ? 3 : (ytdRain.labels.count > 120 ? 2 : 1))
+    }
+
+    /// Full-resolution YTD for the detail sheet.
+    var ytdSeriesFull: ChartSeries.YTDSeries? {
+        guard let ytdRain else { return nil }
+        return ChartSeries.ytd(
+            ytd: ytdRain,
+            projection: ytdProjection,
+            timeZone: forecast?.locationTimeZone ?? .current,
+            thinning: 1)
+    }
+
+    func isFavorite(_ location: WeatherLocation) -> Bool {
+        favoriteLocations.contains { $0.cacheKey == location.cacheKey }
+    }
+
+    func toggleFavorite(_ location: WeatherLocation) {
+        prefs.toggleFavorite(location)
+        refreshPlaces()
+    }
+
+    func loadFavorite(_ location: WeatherLocation) async {
+        let tagged = WeatherLocation(
+            latitude: location.latitude, longitude: location.longitude,
+            name: location.name, source: .custom)
+        await load(tagged)
+    }
+
+    private func refreshPlaces() {
+        recentLocations = prefs.recentLocations
+        favoriteLocations = prefs.favoriteLocations
     }
 
     // MARK: - Location switching

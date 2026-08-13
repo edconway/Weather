@@ -1,8 +1,7 @@
 import SwiftUI
 import WeatherCore
 
-/// City search (§8.3) — a port of `search.js`: 300 ms debounce, ≥1 character,
-/// Open-Meteo geocoding, and the same two failure messages.
+/// City search — recents and favorites when idle, Open-Meteo results while typing.
 struct SearchSheet: View {
     enum Status: Equatable {
         case idle
@@ -12,6 +11,7 @@ struct SearchSheet: View {
         case failed
     }
 
+    @Bindable var store: WeatherStore
     let onSelect: (GeocodingResponse.Result) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -27,9 +27,25 @@ struct SearchSheet: View {
             List {
                 switch status {
                 case .idle:
-                    Text("Search any city or town.")
-                        .foregroundStyle(.secondary)
-                        .listRowSeparator(.hidden)
+                    if !store.favoriteLocations.isEmpty {
+                        Section("Favorites") {
+                            ForEach(store.favoriteLocations, id: \.cacheKey) { place in
+                                locationRow(place, starred: true)
+                            }
+                        }
+                    }
+                    if !store.recentLocations.isEmpty {
+                        Section("Recent") {
+                            ForEach(store.recentLocations, id: \.cacheKey) { place in
+                                locationRow(place, starred: store.isFavorite(place))
+                            }
+                        }
+                    }
+                    if store.favoriteLocations.isEmpty && store.recentLocations.isEmpty {
+                        Text("Search any city or town.")
+                            .foregroundStyle(.secondary)
+                            .listRowSeparator(.hidden)
+                    }
                 case .searching:
                     HStack(spacing: 8) {
                         ProgressView()
@@ -95,6 +111,40 @@ struct SearchSheet: View {
             scheduleSearch(for: newValue)
         }
         .onDisappear { searchTask?.cancel() }
+    }
+
+    private func locationRow(_ place: WeatherLocation, starred: Bool) -> some View {
+        HStack {
+            Button {
+                Task { await store.loadFavorite(place) }
+                dismiss()
+            } label: {
+                HStack {
+                    Image(systemName: "mappin.circle.fill")
+                        .foregroundStyle(Palette.accent)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(place.shortName)
+                        if place.name != place.shortName {
+                            Text(place.name)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            Button {
+                store.toggleFavorite(place)
+            } label: {
+                Image(systemName: starred ? "star.fill" : "star")
+                    .foregroundStyle(starred ? Color.yellow : Color.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(starred ? "Remove from favorites" : "Add to favorites")
+        }
     }
 
     private func row(_ result: GeocodingResponse.Result) -> some View {

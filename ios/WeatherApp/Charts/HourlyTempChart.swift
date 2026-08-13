@@ -2,8 +2,10 @@ import Charts
 import SwiftUI
 import WeatherCore
 
-/// §8.4.1 / §8.4.3 — up to 48 hourly points (±24 h around now) of temperature
-/// (or wet bulb) against the 5-year average for that hour of day.
+/// 48-hour temperature (or wet bulb) against the 5-year average for that hour.
+///
+/// Grammar matches `makeHourlyTempChart` in charts.js: past is dashed/ghosted,
+/// forecast is solid with 6-hour labels, 5-yr avg is a grey dashed overlay.
 struct HourlyTempChart: View {
     enum Series {
         case temperature
@@ -44,7 +46,6 @@ struct HourlyTempChart: View {
     let timeZone: TimeZone
     var detailText: String? = nil
     var onOpenDetail: (() -> Void)? = nil
-    /// When true, the plot is taller (detail sheet).
     var expanded: Bool = false
 
     @State private var liveSelection: Date?
@@ -114,13 +115,13 @@ struct HourlyTempChart: View {
         if let normal = normal(point) {
             let delta = value - normal
             let absDelta = formatter.temperatureShort(abs(delta))
-            let relation = delta > 0.05 ? "above" : (delta < -0.05 ? "below" : "near")
             if abs(delta) <= 0.05 {
                 return ChartReadout(
                     primary: primary,
                     context: "\(when)\(tag) · near the 5-yr average",
                     primaryTint: tint)
             }
+            let relation = delta > 0.05 ? "above" : "below"
             return ChartReadout(
                 primary: primary,
                 context: "\(when)\(tag) · \(absDelta) \(relation) 5-yr avg",
@@ -129,19 +130,12 @@ struct HourlyTempChart: View {
         return ChartReadout(primary: primary, context: "\(when)\(tag)", primaryTint: tint)
     }
 
-    private var legend: [ChartLegendItem] {
-        [
-            ChartLegendItem(series.legendLabel, swatch: .solid(tint)),
-            ChartLegendItem("5-yr average", swatch: .dashed(Palette.historical)),
-        ]
-    }
-
     var body: some View {
         ChartModule(
             eyebrow: series.eyebrow,
             readout: readout,
             detailText: detailText,
-            legend: legend,
+            legend: [],
             onOpenDetail: onOpenDetail
         ) {
             plot
@@ -157,17 +151,19 @@ struct HourlyTempChart: View {
                 .foregroundStyle(Color.secondary.opacity(ChartKit.nightShadeOpacity))
             }
 
+            // Past — dashed ghost, matching the web polyline.
             ForEach(points) { point in
                 if let value = value(point), point.isPast {
                     LineMark(
                         x: .value("Time", point.date),
                         y: .value(series.scrubLabel, formatter.temperatureValue(value)),
                         series: .value("Series", "actual"))
-                    .foregroundStyle(tint)
-                    .lineStyle(StrokeStyle(lineWidth: 2))
+                    .foregroundStyle(tint.opacity(ChartKit.pastSeriesOpacity))
+                    .lineStyle(StrokeStyle(lineWidth: 2, dash: ChartKit.pastDash))
                     .interpolationMethod(.catmullRom)
                 }
             }
+            // Forecast — solid. Include the last past point so the join is continuous.
             ForEach(points) { point in
                 if let value = value(point), !point.isPast || isLastPast(point) {
                     LineMark(
@@ -175,7 +171,7 @@ struct HourlyTempChart: View {
                         y: .value(series.scrubLabel, formatter.temperatureValue(value)),
                         series: .value("Series", "forecast"))
                     .foregroundStyle(tint)
-                    .lineStyle(StrokeStyle(lineWidth: 2, dash: ChartKit.forecastDash))
+                    .lineStyle(StrokeStyle(lineWidth: 2))
                     .interpolationMethod(.catmullRom)
                 }
             }
@@ -188,6 +184,46 @@ struct HourlyTempChart: View {
                     .foregroundStyle(Palette.historical.opacity(0.55))
                     .lineStyle(StrokeStyle(lineWidth: 1.5, dash: ChartKit.historicalDash))
                     .interpolationMethod(.catmullRom)
+                }
+            }
+
+            // 6-hour dots; value labels only on the forecast, as in charts.js.
+            ForEach(points) { point in
+                if point.hour % 6 == 0, let value = value(point) {
+                    PointMark(
+                        x: .value("Time", point.date),
+                        y: .value(series.scrubLabel, formatter.temperatureValue(value)))
+                    .foregroundStyle(tint.opacity(point.isPast ? ChartKit.pastSeriesOpacity : 1))
+                    .symbolSize(point.isPast ? 20 : 36)
+                    if !point.isPast {
+                        PointMark(
+                            x: .value("Time", point.date),
+                            y: .value(series.scrubLabel, formatter.temperatureValue(value)))
+                        .opacity(0)
+                        .annotation(position: .top, spacing: 2) {
+                            ChartValueLabel(
+                                text: formatter.temperatureShort(value), color: tint)
+                        }
+                    }
+                }
+            }
+
+            if let last = points.last, let value = value(last) {
+                PointMark(
+                    x: .value("Time", last.date),
+                    y: .value(series.scrubLabel, formatter.temperatureValue(value)))
+                .opacity(0)
+                .annotation(position: .trailing, spacing: 4) {
+                    ChartEndLabel(text: "Forecast", color: tint)
+                }
+            }
+            if let last = points.last, let normal = normal(last) {
+                PointMark(
+                    x: .value("Time", last.date),
+                    y: .value("Normal", formatter.temperatureValue(normal)))
+                .opacity(0)
+                .annotation(position: .trailing, spacing: 4) {
+                    ChartEndLabel(text: "5-yr avg", color: Palette.historical, weight: .regular)
                 }
             }
 
@@ -217,7 +253,7 @@ struct HourlyTempChart: View {
             }
         }
         .chartXSelection(value: $liveSelection)
-        .chartTapFallback($liveSelection)
+        .chartScrub($liveSelection)
         .stickyXSelection(
             id: scrubID, live: $liveSelection, sticky: $selectedDate,
             resetOn: points.first?.timeString ?? "")
@@ -225,6 +261,7 @@ struct HourlyTempChart: View {
         .chartYScale(domain: yDomain)
         .chartYAxis { ChartAxes.temperatureYAxis(formatter: formatter) }
         .chartXAxis { ChartAxes.hourlyXAxis(timeZone: timeZone) }
+        .chartPlotStyle { $0.padding(.trailing, 44) }
         .frame(height: expanded ? ChartKit.hourlyHeight + 60 : ChartKit.hourlyHeight)
         .accessibilityLabel(series.accessibilityName)
         .accessibilityChartDescriptor(

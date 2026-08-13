@@ -1,12 +1,12 @@
 import SwiftUI
 import WeatherCore
 
-/// Atmosphere-first hero: condition sky, giant temperature, one anomaly voice
-/// line, and a floating material strip for rain / wind / UV.
+/// Compact atmospheric hero: temperature, date, equal anomaly badges, stats strip.
 struct HeroView: View {
     let conditions: CurrentConditions
     let badges: [Anomaly]
     let formatter: UnitFormatter
+    var dateLine: String = ""
     let onBadgeTap: (PanelID) -> Void
 
     private var atmosphere: Atmosphere.Colors {
@@ -14,59 +14,57 @@ struct HeroView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
+                    if !dateLine.isEmpty {
+                        Text(dateLine)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(atmosphere.secondaryForeground)
+                    }
                     temperature
                     Text(conditions.condition.label)
                         .font(.title3.weight(.medium))
                         .foregroundStyle(atmosphere.foreground)
                     range
-                    if let voice = badges.first {
-                        Button {
-                            onBadgeTap(voice.panel)
-                        } label: {
-                            Text(voice.text)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(atmosphere.foreground.opacity(0.92))
-                                .multilineTextAlignment(.leading)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityHint(AnomalyBadge.hint(for: voice))
-                        .padding(.top, 2)
-                    }
                 }
                 Spacer(minLength: 12)
                 Image(systemName: conditions.symbolName)
                     .symbolRenderingMode(.hierarchical)
-                    .font(.system(size: 56))
+                    .font(.system(size: 52))
                     .foregroundStyle(atmosphere.foreground.opacity(0.92))
                     .accessibilityHidden(true)
             }
 
-            materialStrip
-
-            if badges.count > 1 {
-                secondaryBadges
+            if !badges.isEmpty {
+                FlowLayout(spacing: 6) {
+                    ForEach(badges) { badge in
+                        AnomalyBadge(anomaly: badge, action: onBadgeTap)
+                    }
+                }
             }
+
+            materialStrip
         }
         .padding(.horizontal, 20)
-        .padding(.top, 96)
-        .padding(.bottom, 22)
+        .padding(.top, 88)
+        .padding(.bottom, 18)
         .foregroundStyle(atmosphere.foreground)
         .background {
-            AtmosphereBackground(colors: atmosphere)
+            AtmosphereBackground(colors: atmosphere, compact: true)
         }
     }
 
     private var temperature: some View {
         HStack(alignment: .top, spacing: 1) {
             Text(formatter.temperatureNumber(conditions.temperature).map(String.init) ?? "—")
-                .font(.system(size: 72, weight: .semibold, design: .rounded))
+                .font(.system(size: 64, weight: .semibold, design: .rounded))
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
             Text(formatter.temperatureUnit)
                 .font(.title2.weight(.medium))
                 .foregroundStyle(atmosphere.secondaryForeground)
-                .padding(.top, 12)
+                .padding(.top, 10)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Currently \(formatter.temperature(conditions.temperature)), "
@@ -77,14 +75,16 @@ struct HeroView: View {
         HStack(spacing: 4) {
             if conditions.feelsLike != nil {
                 Text("Feels \(formatter.temperature(conditions.feelsLike))")
+                    .foregroundStyle(atmosphere.secondaryForeground)
                 Text("·").opacity(0.55)
             }
             Text("H \(formatter.temperature(conditions.high))")
+                .foregroundStyle(Palette.hot)
             Text("/").opacity(0.55)
             Text("L \(formatter.temperature(conditions.low))")
+                .foregroundStyle(Palette.cold)
         }
-        .font(.subheadline)
-        .foregroundStyle(atmosphere.secondaryForeground)
+        .font(.subheadline.weight(.medium))
         .accessibilityElement(children: .combine)
     }
 
@@ -133,14 +133,6 @@ struct HeroView: View {
         Rectangle()
             .fill(.primary.opacity(0.12))
             .frame(width: 1, height: 28)
-    }
-
-    private var secondaryBadges: some View {
-        FlowLayout(spacing: 6) {
-            ForEach(badges.dropFirst()) { badge in
-                AnomalyBadge(anomaly: badge, action: onBadgeTap)
-            }
-        }
     }
 }
 

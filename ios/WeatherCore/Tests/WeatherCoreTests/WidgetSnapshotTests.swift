@@ -178,4 +178,20 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssertEqual(entries.count, 3)
         XCTAssertEqual(entries.map(\.temperature), [20, 21, 22])
     }
+
+    func testWatchPayloadDecodesWithoutTemperatureNormals() throws {
+        let old = WatchSyncPayload(
+            latitude: 51.5, longitude: -0.12, name: "London", imperial: false,
+            dailyAvg: [], monthlyNormals: [], wbAvgByHour: [Double?](repeating: 10, count: 24),
+            generatedAt: Fixture.now)
+        let data = try JSONEncoder().encode(old)
+        var object = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        object.removeValue(forKey: "tempAvgByHour")
+        let stripped = try JSONSerialization.data(withJSONObject: object)
+        let decoded = try JSONDecoder().decode(WatchSyncPayload.self, from: stripped)
+        XCTAssertTrue(decoded.tempAvgByHour.isEmpty)
+        XCTAssertEqual(decoded.wbAvgByHour.count, 24)
+        XCTAssertNotNil(decoded.wetBulbNormals)
+        XCTAssertNil(decoded.temperatureNormals)
+    }
 }

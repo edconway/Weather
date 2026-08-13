@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// Apple Health–style chart container: eyebrow, value readout, plot, legend.
+/// Compact chart container: eyebrow, subtitle, one-line readout, plot.
 ///
-/// The readout is the scrub target — dragging a chart rewrites `readout`
-/// instead of floating a tooltip card over the plot.
+/// The readout is the scrub target — dragging a chart rewrites it instead of
+/// floating a tooltip over the plot. Large Health-style numbers are gone so
+/// the plot (the original DNA) gets the space.
 struct ChartModule<Chart: View, Detail: View>: View {
     let eyebrow: String
     let readout: ChartReadout
@@ -32,15 +33,21 @@ struct ChartModule<Chart: View, Detail: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Tap the header (not the plot) to open the detail sheet so scrubbing
-            // the chart isn't stolen by the expand gesture.
-            VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(eyebrow)
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
                     .tracking(0.4)
+
+                if let detailText, !detailText.isEmpty {
+                    Text(detailText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(2)
+                }
 
                 readoutHeader
             }
@@ -51,6 +58,7 @@ struct ChartModule<Chart: View, Detail: View>: View {
             .accessibilityHint(onOpenDetail == nil ? "" : "Shows a larger chart")
 
             chart()
+                .chartAppear()
 
             if !legend.isEmpty {
                 ChartLegendRow(items: legend)
@@ -65,9 +73,9 @@ struct ChartModule<Chart: View, Detail: View>: View {
     }
 
     private var readoutHeader: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text(readout.primary)
-                .font(.system(size: 34, weight: .semibold, design: .rounded))
+                .font(.title3.weight(.semibold).monospacedDigit())
                 .foregroundStyle(readout.primaryTint ?? .primary)
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)

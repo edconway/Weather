@@ -65,12 +65,7 @@ struct HourlyRainChart: View {
         return ChartReadout(primary: primary, context: context, primaryTint: Palette.rainSeries)
     }
 
-    private var legend: [ChartLegendItem] {
-        [
-            ChartLegendItem("Precipitation", swatch: .solid(Palette.rainSeries)),
-            ChartLegendItem("Past", swatch: .solid(Palette.rainSeries.opacity(0.45))),
-        ]
-    }
+    private var legend: [ChartLegendItem] { [] }
 
     var body: some View {
         ChartModule(
@@ -135,7 +130,7 @@ struct HourlyRainChart: View {
             }
         }
         .chartXSelection(value: $liveSelection)
-        .chartTapFallback($liveSelection)
+        .chartScrub($liveSelection)
         .stickyXSelection(
             id: scrubID, live: $liveSelection, sticky: $selectedDate,
             resetOn: points.first?.timeString ?? "")
@@ -199,12 +194,7 @@ struct DailyRainChart: View {
         return ChartReadout(primary: primary, context: context, primaryTint: Palette.rainSeries)
     }
 
-    private var legend: [ChartLegendItem] {
-        [
-            ChartLegendItem("Forecast", swatch: .solid(Palette.rainSeries)),
-            ChartLegendItem("Actual", swatch: .solid(Palette.rainSeries.opacity(0.4))),
-        ]
-    }
+    private var legend: [ChartLegendItem] { [] }
 
     var body: some View {
         ChartModule(
@@ -232,7 +222,7 @@ struct DailyRainChart: View {
                     width: .ratio(0.6))
                 .foregroundStyle(point.isPast
                     ? Palette.rainSeries.opacity(0.4)
-                    : Palette.rainSeries)
+                    : Palette.rainClass(point.rainNormal?.classification))
                 .cornerRadius(3)
             }
 
@@ -269,7 +259,7 @@ struct DailyRainChart: View {
             }
         }
         .chartXSelection(value: $liveSelection)
-        .chartTapFallback($liveSelection)
+        .chartScrub($liveSelection)
         .stickyXSelection(
             id: scrubID, live: $liveSelection, sticky: $selectedDate,
             resetOn: points.first?.dateString ?? "")
