@@ -104,10 +104,10 @@ The plan's own §1.4 deviations are all implemented. Beyond those:
    sticky selection; `ActiveScrubCoordinator` (shared via `.environment(_:)` from
    `TodayScreen`) broadcasts which chart is active so scrubbing a new chart
    clears whichever other chart's card was still pinned, instead of leaving
-   several tooltips stuck on screen at once. `chartXSelection`'s built-in
-   gesture also didn't reliably respond to every tap in the simulator (same
-   issue as the watch charts); `chartTapFallback` in `ChartKit.swift` adds the
-   same explicit `.chartOverlay` tap handler as a fallback.
+   several tooltips stuck on screen at once. Plot scrubbing is a `DragGesture`
+   overlay (`chartScrub` in `ChartKit.swift`) so it does not rely on the flaky
+   `chartXSelection` tap recognizer; `chartXSelection` is still bound so the
+   coordinator stays in sync.
 7. **Daily charts use a categorical x-axis** on the date string: weekday names
    repeat across 14 days, and a `Date` axis bins bars to day boundaries, which
    pushed the "Today" rule half a slot off.
@@ -129,6 +129,24 @@ The plan's own §1.4 deviations are all implemented. Beyond those:
     window**, not just the TTL. A blob built in late December is still within
     its 30-day TTL through most of January while describing the wrong decade
     — see `WeatherRepository.climatology`/`.hourlyNormals`.
+14. **Chart grammar follows the web SVG, not Apple Health.** Past is dashed and
+    ghosted; forecast is solid and labelled; series names sit on the line ends;
+    "Hist. avg" sits in the band. The Health-style 34 pt readout above every
+    plot was replaced by a one-line scrub readout plus the original subtitle.
+    Temperature / Rain / Climate is a segmented control; wet bulb is nested
+    under Temperature. Jump chips are gone.
+
+## Interface notes (2026-08)
+
+The Today screen is anomaly-first: compact atmospheric wash (not a full-bleed
+Apple Weather sky), all three comparison badges equally visible, H/L tinted
+hot/cold, location menu with GPS / saved / favorites / search. iPad uses a
+sidebar of favorites and recents.
+
+Watch Now is glance-sized (temp + one anomaly); units toggle is a toolbar
+`°C`/`°F` control. Hourly keeps the watch-native gradient line and scrubs with
+the Digital Crown. Daily is seven range-bar rows vs the historical band, not a
+miniature iPhone chart.
 
 ## The corner complication
 

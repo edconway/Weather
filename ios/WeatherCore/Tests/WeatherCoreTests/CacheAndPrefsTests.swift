@@ -234,4 +234,36 @@ final class CacheAndPrefsTests: XCTestCase {
         prefs.imperial = false
         XCTAssertFalse(prefs.imperial, "an explicit false must stick, not fall back to the locale")
     }
+
+    func testPrefsRecentsAndFavorites() throws {
+        let (prefs, defaults, suite) = try makePrefs()
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let paris = WeatherLocation(
+            latitude: 48.8534, longitude: 2.3488, name: "Paris, France", source: .custom)
+        let london = WeatherLocation(
+            latitude: 51.5074, longitude: -0.1278, name: "London, England", source: .geo)
+        let singapore = WeatherLocation(
+            latitude: 1.35, longitude: 103.82, name: "Singapore", source: .custom)
+
+        XCTAssertTrue(prefs.recentLocations.isEmpty)
+        XCTAssertTrue(prefs.favoriteLocations.isEmpty)
+
+        prefs.rememberRecent(paris)
+        prefs.rememberRecent(london)
+        prefs.rememberRecent(paris)
+        XCTAssertEqual(prefs.recentLocations.map(\.cacheKey), [paris.cacheKey, london.cacheKey],
+                       "re-remembering moves a place to the front and dedupes")
+
+        XCTAssertFalse(prefs.isFavorite(paris))
+        prefs.toggleFavorite(paris)
+        XCTAssertTrue(prefs.isFavorite(paris))
+        prefs.toggleFavorite(singapore)
+        XCTAssertEqual(prefs.favoriteLocations.map(\.shortName), ["Singapore", "Paris"])
+        prefs.toggleFavorite(paris)
+        XCTAssertFalse(prefs.isFavorite(paris))
+        XCTAssertEqual(prefs.favoriteLocations.map(\.shortName), ["Singapore"])
+
+        XCTAssertEqual(Prefs(defaults: defaults).favoriteLocations.first?.shortName, "Singapore")
+    }
 }

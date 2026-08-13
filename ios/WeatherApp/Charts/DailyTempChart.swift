@@ -2,12 +2,11 @@ import Charts
 import SwiftUI
 import WeatherCore
 
-/// §8.4.2 / §8.4.4 — 14 days of high/low against the grey rolling-normal band.
+/// 14 days of high/low against the grey rolling-normal band.
 ///
-/// The x-axis is **categorical on the date string**, not on `Date`: weekday
-/// names repeat across a 14-day window ("Wed" appears twice), and a `Date` axis
-/// bins bar/point marks to day boundaries, which pushed the "Today" rule half a
-/// slot away from today's data.
+/// Grammar matches `makeTempChart` in charts.js: past dashed/ghosted, forecast
+/// solid with degree labels, "Hist. avg" sitting in the band, High/Low at the
+/// right edge. Categorical x on the date string so weekday names don't collide.
 struct DailyTempChart: View {
     enum Series {
         case temperature
@@ -55,6 +54,9 @@ struct DailyTempChart: View {
     private func normalLow(_ point: ChartSeries.DailyPoint) -> Double? {
         series == .temperature ? point.normal?.tMin : point.normal?.wbMin
     }
+
+    private var highTint: Color { series == .temperature ? Palette.hot : Palette.wetBulb }
+    private var lowTint: Color { series == .temperature ? Palette.cold : Palette.wetBulb.opacity(0.75) }
 
     private var todayDateString: String? {
         points.first(where: \.isToday)?.dateString
@@ -106,20 +108,12 @@ struct DailyTempChart: View {
             context: "\(when)\(tag)")
     }
 
-    private var legend: [ChartLegendItem] {
-        [
-            ChartLegendItem("High", swatch: .solid(Palette.hot)),
-            ChartLegendItem("Low", swatch: .solid(Palette.cold)),
-            ChartLegendItem("Normal range", swatch: .band(Palette.historical.opacity(0.35))),
-        ]
-    }
-
     var body: some View {
         ChartModule(
             eyebrow: series.eyebrow,
             readout: readout,
             detailText: detailText,
-            legend: legend,
+            legend: [],
             onOpenDetail: onOpenDetail
         ) {
             plot
@@ -139,41 +133,118 @@ struct DailyTempChart: View {
                 }
             }
 
+            if let first = points.first,
+               let top = normalHigh(first), let bottom = normalLow(first) {
+                PointMark(
+                    x: .value("Day", first.dateString),
+                    y: .value(
+                        "Band mid",
+                        formatter.temperatureValue((top + bottom) / 2)))
+                .opacity(0)
+                .annotation(position: .overlay, alignment: .leading) {
+                    Text("Hist. avg")
+                        .font(.system(size: 8.5))
+                        .foregroundStyle(.secondary.opacity(0.8))
+                        .padding(.leading, 2)
+                }
+            }
+
             if let todayDateString {
                 RectangleMark(x: .value("Today", todayDateString))
                     .foregroundStyle(Color.secondary.opacity(0.08))
             }
 
+            // Past (including today for a continuous join) — dashed ghost.
             ForEach(points) { point in
-                if let value = high(point) {
+                if point.isPast || point.isToday, let value = high(point) {
                     LineMark(
                         x: .value("Day", point.dateString),
                         y: .value("High", formatter.temperatureValue(value)),
-                        series: .value("Series", "high"))
-                    .foregroundStyle(Palette.hot)
+                        series: .value("Series", "high-past"))
+                    .foregroundStyle(highTint.opacity(ChartKit.pastSeriesOpacity))
+                    .lineStyle(StrokeStyle(lineWidth: 2, dash: ChartKit.pastDash))
                     .interpolationMethod(.catmullRom)
-                    .opacity(point.isPast ? ChartKit.pastSeriesOpacity : 1)
-                    PointMark(
-                        x: .value("Day", point.dateString),
-                        y: .value("High", formatter.temperatureValue(value)))
-                    .foregroundStyle(Palette.hot)
-                    .symbolSize(point.isPast ? 16 : 30)
-                    .opacity(point.isPast ? ChartKit.pastSeriesOpacity : 1)
                 }
-                if let value = low(point) {
+                if point.isPast || point.isToday, let value = low(point) {
                     LineMark(
                         x: .value("Day", point.dateString),
                         y: .value("Low", formatter.temperatureValue(value)),
-                        series: .value("Series", "low"))
-                    .foregroundStyle(Palette.cold)
+                        series: .value("Series", "low-past"))
+                    .foregroundStyle(lowTint.opacity(ChartKit.pastSeriesOpacity))
+                    .lineStyle(StrokeStyle(lineWidth: 2, dash: ChartKit.pastDash))
                     .interpolationMethod(.catmullRom)
-                    .opacity(point.isPast ? ChartKit.pastSeriesOpacity : 1)
+                }
+            }
+
+            // Forecast (including today) — solid, labelled.
+            ForEach(points) { point in
+                if !point.isPast, let value = high(point) {
+                    LineMark(
+                        x: .value("Day", point.dateString),
+                        y: .value("High", formatter.temperatureValue(value)),
+                        series: .value("Series", "high-forecast"))
+                    .foregroundStyle(highTint)
+                    .interpolationMethod(.catmullRom)
+                    PointMark(
+                        x: .value("Day", point.dateString),
+                        y: .value("High", formatter.temperatureValue(value)))
+                    .foregroundStyle(highTint)
+                    .symbolSize(30)
+                    .annotation(position: .top, spacing: 2) {
+                        ChartValueLabel(
+                            text: formatter.temperatureShort(value), color: highTint)
+                    }
+                }
+                if !point.isPast, let value = low(point) {
+                    LineMark(
+                        x: .value("Day", point.dateString),
+                        y: .value("Low", formatter.temperatureValue(value)),
+                        series: .value("Series", "low-forecast"))
+                    .foregroundStyle(lowTint)
+                    .interpolationMethod(.catmullRom)
                     PointMark(
                         x: .value("Day", point.dateString),
                         y: .value("Low", formatter.temperatureValue(value)))
-                    .foregroundStyle(Palette.cold)
-                    .symbolSize(point.isPast ? 16 : 30)
-                    .opacity(point.isPast ? ChartKit.pastSeriesOpacity : 1)
+                    .foregroundStyle(lowTint)
+                    .symbolSize(30)
+                    .annotation(position: .bottom, spacing: 2) {
+                        ChartValueLabel(
+                            text: formatter.temperatureShort(value), color: lowTint)
+                    }
+                }
+            }
+
+            ForEach(points) { point in
+                if point.isPast, let value = high(point) {
+                    PointMark(
+                        x: .value("Day", point.dateString),
+                        y: .value("High", formatter.temperatureValue(value)))
+                    .foregroundStyle(highTint.opacity(ChartKit.pastSeriesOpacity))
+                    .symbolSize(16)
+                }
+                if point.isPast, let value = low(point) {
+                    PointMark(
+                        x: .value("Day", point.dateString),
+                        y: .value("Low", formatter.temperatureValue(value)))
+                    .foregroundStyle(lowTint.opacity(ChartKit.pastSeriesOpacity))
+                    .symbolSize(16)
+                }
+            }
+
+            if let last = points.last, let hi = high(last), let lo = low(last) {
+                PointMark(
+                    x: .value("Day", last.dateString),
+                    y: .value("High", formatter.temperatureValue(hi)))
+                .opacity(0)
+                .annotation(position: .trailing, spacing: 4) {
+                    ChartEndLabel(text: "High", color: highTint)
+                }
+                PointMark(
+                    x: .value("Day", last.dateString),
+                    y: .value("Low", formatter.temperatureValue(lo)))
+                .opacity(0)
+                .annotation(position: .trailing, spacing: 4) {
+                    ChartEndLabel(text: "Low", color: lowTint)
                 }
             }
 
@@ -188,17 +259,17 @@ struct DailyTempChart: View {
 
             if let selected, let hi = high(selected) {
                 RuleMark(x: .value("Selected", selected.dateString))
-                    .foregroundStyle(Palette.hot.opacity(0.4))
+                    .foregroundStyle(highTint.opacity(0.4))
                     .lineStyle(StrokeStyle(lineWidth: 1))
                 PointMark(
                     x: .value("Day", selected.dateString),
                     y: .value("High", formatter.temperatureValue(hi)))
-                .foregroundStyle(Palette.hot)
+                .foregroundStyle(highTint)
                 .symbolSize(70)
             }
         }
         .chartXSelection(value: $liveSelection)
-        .chartTapFallback($liveSelection)
+        .chartScrub($liveSelection)
         .stickyXSelection(
             id: scrubID, live: $liveSelection, sticky: $selectedDate,
             resetOn: points.first?.dateString ?? "")
@@ -219,6 +290,7 @@ struct DailyTempChart: View {
                 }
             }
         }
+        .chartPlotStyle { $0.padding(.trailing, 36) }
         .frame(height: expanded ? ChartKit.dailyHeight + 60 : ChartKit.dailyHeight)
         .accessibilityLabel(series.accessibilityName)
         .accessibilityChartDescriptor(
@@ -227,9 +299,6 @@ struct DailyTempChart: View {
                 formatter: formatter, timeZone: timeZone))
     }
 
-    /// 14 weekday labels will not fit; show today plus every other day, which is
-    /// what the web does below 480 px. Today's immediate neighbours are dropped
-    /// too — otherwise "Tue", "Today" and "Thu" overlap.
     private func showsLabel(for point: ChartSeries.DailyPoint) -> Bool {
         DayLabelDensity.shows(point, in: points)
     }

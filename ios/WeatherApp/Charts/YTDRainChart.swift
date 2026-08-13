@@ -78,13 +78,7 @@ struct YTDRainChart: View {
             primaryTint: Palette.rainSeries)
     }
 
-    private var legend: [ChartLegendItem] {
-        [
-            ChartLegendItem("\(thisYear)", swatch: .solid(Palette.rainSeries)),
-            ChartLegendItem("Hist. average", swatch: .solid(Palette.historical.opacity(0.7))),
-            ChartLegendItem("Forecast", swatch: .dashed(Palette.rainSeries)),
-        ]
-    }
+    private var legend: [ChartLegendItem] { [] }
 
     var body: some View {
         ChartModule(
@@ -144,10 +138,28 @@ struct YTDRainChart: View {
                 .foregroundStyle(Palette.rainSeries)
                 .symbolSize(64)
                 .annotation(position: .trailing, spacing: 4) {
-                    Text(formatter.precipitationCompact(last.value))
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(Palette.rainSeries)
+                    ChartEndLabel(text: String(thisYear), color: Palette.rainSeries)
                 }
+            }
+
+            if let lastHist = series.historicalExtension.last ?? series.historical.last {
+                PointMark(
+                    x: .value("Date", lastHist.date),
+                    y: .value("Cumulative", formatter.precipitationValue(lastHist.value)))
+                .opacity(0)
+                .annotation(position: .trailing, spacing: 4) {
+                    ChartEndLabel(
+                        text: "Hist. avg", color: Palette.historical, weight: .regular)
+                }
+            }
+
+            if let last = lastActual, !series.projection.isEmpty {
+                RuleMark(x: .value("Today", last.date))
+                    .foregroundStyle(.secondary.opacity(0.45))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                    .annotation(position: .top, alignment: .center) {
+                        NowCapsule(label: "TODAY")
+                    }
             }
 
             if let projected = selectedProjection {
@@ -171,7 +183,7 @@ struct YTDRainChart: View {
             }
         }
         .chartXSelection(value: $liveSelection)
-        .chartTapFallback($liveSelection)
+        .chartScrub($liveSelection)
         .stickyXSelection(
             id: scrubID, live: $liveSelection, sticky: $selectedDate,
             resetOn: series.latestDate + "-" + String(series.actual.count))
@@ -192,6 +204,7 @@ struct YTDRainChart: View {
                 }
             }
         }
+        .chartPlotStyle { $0.padding(.trailing, 44) }
         .frame(height: expanded ? ChartKit.ytdHeight + 60 : ChartKit.ytdHeight)
         .accessibilityLabel("Year-to-date rainfall chart")
     }

@@ -60,7 +60,7 @@ struct ClimateChart: View {
             legend: legend,
             onOpenDetail: onOpenDetail
         ) {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 8) {
                 temperatureChart
                 rainfallChart
             }
@@ -115,7 +115,7 @@ struct ClimateChart: View {
             }
         }
         .chartXSelection(value: monthSelection)
-        .chartTapFallback(monthSelection)
+        .chartScrub(monthSelection)
         .chartXAxis {
             AxisMarks { _ in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 3]))
@@ -142,7 +142,7 @@ struct ClimateChart: View {
             }
         }
         .chartXSelection(value: monthSelection)
-        .chartTapFallback(monthSelection)
+        .chartScrub(monthSelection)
         .chartYAxis { ChartAxes.precipitationYAxis(formatter: formatter) }
         .chartXAxis {
             AxisMarks { value in

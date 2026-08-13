@@ -2,16 +2,14 @@ import Charts
 import SwiftUI
 import WeatherCore
 
-/// §9.2 — the next 12 hours as a chart: an icon/temperature row, a bold
-/// gradient temperature line, and a slim precipitation strip — styled after
-/// watchOS's own charts (Activity, Heart Rate) rather than the list this used
-/// to be. No gridlines, no y-axis, large glanceable numbers, color doing the
-/// work.
+/// Next 12 hours: watch-native gradient line, thin 5-yr avg, rain strip, Digital Crown scrub.
 struct HourlyPage: View {
     let store: WatchStore
 
     @State private var liveSelection: Date?
     @State private var selectedDate: Date?
+    @State private var crownValue: Double = 0
+    @FocusState private var crownFocused: Bool
 
     private var points: [ChartSeries.HourlyPoint] { store.next12Hours }
 
@@ -23,9 +21,6 @@ struct HourlyPage: View {
         }
     }
 
-    /// A handful of hours get an icon/temperature callout, evenly spread
-    /// rather than on every point — this is what keeps a 12-point line from
-    /// turning into a wall of glyphs on a 40mm screen.
     private var tickIndices: [Int] {
         guard points.count > 1 else { return points.indices.map { $0 } }
         let count = min(4, points.count)
@@ -35,8 +30,6 @@ struct HourlyPage: View {
     }
 
     private var temperatureDomain: ClosedRange<Double> {
-        // Includes the 5-yr average so the dashed line never clips at the
-        // edge of the domain on days that run unusually hot or cold.
         let values = points.flatMap { [$0.temperature, $0.normalTemperature] }
             .compactMap { $0 }.map(store.formatter.temperatureValue)
         guard let lo = values.min(), let hi = values.max() else { return 0...1 }
@@ -67,6 +60,27 @@ struct HourlyPage: View {
                         .frame(height: 22)
                 }
                 .padding(.horizontal, 2)
+                .focusable()
+                .focused($crownFocused)
+                .digitalCrownRotation(
+                    $crownValue,
+                    from: 0,
+                    through: Double(max(0, points.count - 1)),
+                    by: 1.0,
+                    sensitivity: .medium,
+                    isContinuous: false,
+                    isHapticFeedbackEnabled: true)
+                .onAppear {
+                    crownFocused = true
+                    crownValue = 0
+                    selectedDate = points.first?.date
+                }
+                .onChange(of: crownValue) { _, value in
+                    let index = min(max(0, Int(value.rounded())), max(0, points.count - 1))
+                    if points.indices.contains(index) {
+                        selectedDate = points[index].date
+                    }
+                }
             }
         }
         .navigationTitle("Hourly")
@@ -74,11 +88,6 @@ struct HourlyPage: View {
         .accessibilityLabel("12-hour temperature and rain chance chart")
     }
 
-    // MARK: - Icon/temperature row
-
-    /// A plain HStack, not chart geometry — four evenly-spaced call-outs read
-    /// clearly as "start / +a few hours / +more / end" without needing to
-    /// track exact pixel positions on the line beneath it.
     private var tickRow: some View {
         HStack(spacing: 0) {
             ForEach(tickIndices, id: \.self) { index in
@@ -99,8 +108,6 @@ struct HourlyPage: View {
         }
     }
 
-    // MARK: - Temperature
-
     private var temperatureChart: some View {
         Chart {
             ForEach(points) { point in
@@ -112,28 +119,26 @@ struct HourlyPage: View {
                         yEnd: .value("Temp", converted))
                     .foregroundStyle(
                         .linearGradient(
-                            colors: [WatchPalette.hot.opacity(0.45), WatchPalette.hot.opacity(0.02)],
+                            colors: [Palette.hot.opacity(0.45), Palette.hot.opacity(0.02)],
                             startPoint: .top, endPoint: .bottom))
                     .interpolationMethod(.catmullRom)
 
                     LineMark(
                         x: .value("Time", point.date),
                         y: .value("Temp", converted))
-                    .foregroundStyle(WatchPalette.hot)
+                    .foregroundStyle(Palette.hot)
                     .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
                     .interpolationMethod(.catmullRom)
                 }
             }
 
-            // Dashed 5-yr average, as per the iOS app's HourlyTempChart —
-            // drawn on top of the solid line so the comparison reads clearly.
             ForEach(points) { point in
                 if let normal = point.normalTemperature {
                     LineMark(
                         x: .value("Time", point.date),
                         y: .value("Normal", store.formatter.temperatureValue(normal)),
                         series: .value("Series", "normal"))
-                    .foregroundStyle(WatchPalette.historical.opacity(0.6))
+                    .foregroundStyle(Palette.historical.opacity(0.6))
                     .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
                     .interpolationMethod(.catmullRom)
                 }
@@ -158,19 +163,20 @@ struct HourlyPage: View {
         .chartYScale(domain: temperatureDomain)
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
-        // `chartXSelection`'s built-in gesture did not respond to taps in the
-        // watchOS simulator; this explicit tap handler is a belt-and-braces
-        // fallback so scrubbing works regardless.
         .chartOverlay { proxy in
             GeometryReader { geo in
                 Rectangle().fill(.clear).contentShape(Rectangle())
-                    .onTapGesture { location in
-                        let origin = geo[proxy.plotFrame!].origin
-                        let x = location.x - origin.x
-                        if let date: Date = proxy.value(atX: x) {
-                            selectedDate = date
-                        }
-                    }
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                guard let frame = proxy.plotFrame else { return }
+                                let origin = geo[frame].origin
+                                let x = value.location.x - origin.x
+                                if let date: Date = proxy.value(atX: x) {
+                                    selectedDate = date
+                                }
+                            }
+                    )
             }
         }
     }
@@ -182,12 +188,12 @@ struct HourlyPage: View {
             if let normal = point.normalTemperature {
                 Text(store.formatter.temperatureShort(normal))
                     .font(.system(size: 9))
-                    .foregroundStyle(WatchPalette.historical)
+                    .foregroundStyle(Palette.historical)
             }
             if let probability = point.probability, probability > 0 {
                 Text("\(probability)%")
                     .font(.system(size: 9))
-                    .foregroundStyle(WatchPalette.rain)
+                    .foregroundStyle(Palette.rainSeries)
             }
         }
         .padding(.horizontal, 5)
@@ -195,14 +201,12 @@ struct HourlyPage: View {
         .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 6))
     }
 
-    // MARK: - Precipitation
-
     private var precipitationChart: some View {
         Chart(points) { point in
             BarMark(
                 x: .value("Time", point.date, unit: .hour),
                 y: .value("Precip", store.formatter.precipitationValue(point.precipitation)))
-            .foregroundStyle(WatchPalette.rain.opacity(point.isPast ? 0.4 : 0.85))
+            .foregroundStyle(Palette.rainSeries.opacity(point.isPast ? 0.4 : 0.85))
             .cornerRadius(1)
         }
         .chartXSelection(value: $liveSelection)
@@ -211,7 +215,6 @@ struct HourlyPage: View {
         .chartYAxis(.hidden)
     }
 
-    /// Compact form of the shared hour label — "12a", "3p", "Noon" is too wide here.
     private func hourLabel(_ hour: Int) -> String {
         switch hour {
         case 0: return "12a"

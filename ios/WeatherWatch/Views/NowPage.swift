@@ -1,10 +1,15 @@
 import SwiftUI
 import WeatherCore
 
-/// §9.1 — location, condition, big temperature, hi/lo, feels-like, a glyph row,
-/// and the single highest-priority anomaly badge.
+/// Location, condition, big temperature, hi/lo, one anomaly. Units live in the toolbar.
 struct NowPage: View {
     let store: WatchStore
+
+    private var atmosphere: Atmosphere.Colors {
+        Atmosphere.colors(
+            code: store.conditions?.conditionCode,
+            isDay: store.conditions?.isDay ?? true)
+    }
 
     var body: some View {
         ScrollView {
@@ -43,45 +48,35 @@ struct NowPage: View {
 
                     HStack(spacing: 6) {
                         Text("↑\(store.formatter.temperature(conditions.high))")
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(Palette.hot)
                         Text("↓\(store.formatter.temperature(conditions.low))")
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(Palette.cold)
                     }
                     .font(.caption2)
 
-                    if conditions.feelsLike != nil {
-                        Text("Feels \(store.formatter.temperature(conditions.feelsLike))")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    statGlyphs(conditions)
                     badgeOrFallback
-                    unitsToggle
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .containerBackground(.blue.gradient.opacity(0.25), for: .navigation)
+        .containerBackground(
+            LinearGradient(
+                colors: [atmosphere.top, atmosphere.mid, atmosphere.bottom],
+                startPoint: .top, endPoint: .bottom).opacity(0.85),
+            for: .navigation)
         .navigationTitle("Now")
-    }
-
-    private func statGlyphs(_ conditions: CurrentConditions) -> some View {
-        HStack(spacing: 8) {
-            Label(
-                store.formatter.rainChance(conditions.rainChance),
-                systemImage: "drop.fill")
-            Label(
-                store.formatter.wind(conditions.windSpeed),
-                systemImage: "wind")
-            Label(
-                store.formatter.uvIndexCompact(conditions.uvIndex),
-                systemImage: "sun.max.fill")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    store.imperial.toggle()
+                } label: {
+                    Text(store.imperial ? "°F" : "°C")
+                        .font(.caption2.weight(.semibold))
+                }
+                .accessibilityLabel("Units")
+                .accessibilityHint("Switches between Celsius and Fahrenheit")
+            }
         }
-        .font(.system(size: 11))
-        .foregroundStyle(.secondary)
-        .labelStyle(.titleAndIcon)
-        .padding(.top, 2)
     }
 
     @ViewBuilder
@@ -91,48 +86,14 @@ struct NowPage: View {
                 .font(.system(size: 11, weight: .semibold))
                 .padding(.horizontal, 7)
                 .padding(.vertical, 3)
-                .background(badgeTint(badge.kind).opacity(0.22), in: Capsule())
-                .foregroundStyle(badgeTint(badge.kind))
+                .background(Palette.badgeBackground(badge.kind), in: Capsule())
+                .foregroundStyle(Palette.badgeForeground(badge.kind))
                 .padding(.top, 4)
         } else if !store.hasContext {
-            // §9.2 — never fake context; say plainly that it hasn't arrived.
             Text("Open the iPhone app for historical context")
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
                 .padding(.top, 4)
-        }
-    }
-
-    /// §9 asked for a local imperial/metric toggle alongside the phone-synced
-    /// default. `WatchStore.imperial` is `@Observable` and persists via its own
-    /// `didSet`, so this button only needs to flip it.
-    ///
-    /// Note: the next phone sync overwrites this choice
-    /// (`applySyncedPayload` sets `imperial = payload.imperial`), matching the
-    /// plan's "units synced from phone prefs, plus local toggle" — the local
-    /// toggle is an override until the next sync, not a permanent split.
-    private var unitsToggle: some View {
-        Button {
-            store.imperial.toggle()
-        } label: {
-            Text(store.imperial ? "Switch to °C" : "Switch to °F")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .padding(.top, 6)
-        .accessibilityHint("Changes temperature and wind units")
-    }
-
-    private func badgeTint(_ kind: AnomalyKind) -> Color {
-        switch kind {
-        case .warm: return .orange
-        case .cold: return .blue
-        case .wet: return .teal
-        case .dry: return .gray
-        case .muggy: return .purple
-        case .muggyLow: return .mint
-        case .neutral: return .secondary
         }
     }
 }

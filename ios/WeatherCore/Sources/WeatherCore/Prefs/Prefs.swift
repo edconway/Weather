@@ -27,6 +27,8 @@ public struct Prefs: @unchecked Sendable {
         static let lastGeoLat = "lastGeoLat"
         static let lastGeoLon = "lastGeoLon"
         static let lastGeoName = "lastGeoName"
+        static let recents = "recentLocations"
+        static let favorites = "favoriteLocations"
     }
 
     private let defaults: UserDefaults
@@ -96,6 +98,49 @@ public struct Prefs: @unchecked Sendable {
 
     public func location(for source: WeatherLocation.Source) -> WeatherLocation? {
         source == .custom ? customLocation : lastGeoLocation
+    }
+
+    // MARK: - Recents & favorites
+
+    /// Most recently loaded places, newest first. Capped at 8.
+    public var recentLocations: [WeatherLocation] {
+        get { decodeLocations(Key.recents) }
+        nonmutating set { encodeLocations(Array(newValue.prefix(8)), key: Key.recents) }
+    }
+
+    /// User-starred places, newest first. Capped at 8.
+    public var favoriteLocations: [WeatherLocation] {
+        get { decodeLocations(Key.favorites) }
+        nonmutating set { encodeLocations(Array(newValue.prefix(8)), key: Key.favorites) }
+    }
+
+    public func rememberRecent(_ location: WeatherLocation) {
+        var list = recentLocations.filter { $0.cacheKey != location.cacheKey }
+        list.insert(location, at: 0)
+        recentLocations = list
+    }
+
+    public func isFavorite(_ location: WeatherLocation) -> Bool {
+        favoriteLocations.contains { $0.cacheKey == location.cacheKey }
+    }
+
+    public func toggleFavorite(_ location: WeatherLocation) {
+        if isFavorite(location) {
+            favoriteLocations = favoriteLocations.filter { $0.cacheKey != location.cacheKey }
+        } else {
+            var list = favoriteLocations.filter { $0.cacheKey != location.cacheKey }
+            list.insert(location, at: 0)
+            favoriteLocations = list
+        }
+    }
+
+    private func decodeLocations(_ key: String) -> [WeatherLocation] {
+        guard let data = defaults.data(forKey: key) else { return [] }
+        return (try? JSONDecoder().decode([WeatherLocation].self, from: data)) ?? []
+    }
+
+    private func encodeLocations(_ locations: [WeatherLocation], key: String) {
+        defaults.set(try? JSONEncoder().encode(locations), forKey: key)
     }
 
     private func location(

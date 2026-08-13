@@ -55,6 +55,29 @@ extension WatchSyncPayload {
         return HourAverages(avgByHour: wbAvgByHour, yearStart: 0, yearEnd: 0)
     }
 
+    /// Rebuilds the hourly temperature normals used by the watch hourly chart.
+    public var temperatureNormals: HourAverages? {
+        guard tempAvgByHour.count == 24 else { return nil }
+        return HourAverages(avgByHour: tempAvgByHour, yearStart: 0, yearEnd: 0)
+    }
+
+    /// Combined hourly normals for `ChartSeries.hourly`. Rain buckets stay empty
+    /// — the watch never plots hourly rain against a historical p90.
+    public var hourlyNormals: HourlyNormals? {
+        let temp = temperatureNormals
+        let wetBulb = wetBulbNormals
+        guard temp != nil || wetBulb != nil else { return nil }
+        let emptyHour = [Double?](repeating: nil, count: 24)
+        return HourlyNormals(
+            temp: temp ?? HourAverages(avgByHour: emptyHour, yearStart: 0, yearEnd: 0),
+            wetBulb: wetBulb ?? HourAverages(avgByHour: emptyHour, yearStart: 0, yearEnd: 0),
+            rain: RainHourNormals(
+                avgByHour: [Double](repeating: 0, count: 24),
+                wetHourProbabilityByHour: [Double](repeating: 0, count: 24),
+                p90ByHour: [Double](repeating: 0, count: 24),
+                yearStart: 0, yearEnd: 0))
+    }
+
     public init(
         location: WeatherLocation,
         imperial: Bool,
@@ -71,11 +94,12 @@ extension WatchSyncPayload {
             dailyAvg: tempBand?.dailyAvg ?? [],
             monthlyNormals: climatology?.months ?? [],
             wbAvgByHour: hourlyNormals?.wetBulb.avgByHour ?? [],
+            tempAvgByHour: hourlyNormals?.temp.avgByHour ?? [],
             generatedAt: generatedAt)
     }
 
     /// Nothing useful to send yet.
     public var isEmpty: Bool {
-        dailyAvg.isEmpty && monthlyNormals.isEmpty && wbAvgByHour.isEmpty
+        dailyAvg.isEmpty && monthlyNormals.isEmpty && wbAvgByHour.isEmpty && tempAvgByHour.isEmpty
     }
 }
