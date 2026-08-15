@@ -35,7 +35,8 @@ final class PhoneSessionManager: NSObject, WCSessionDelegate {
     func send(_ payload: WatchSyncPayload) {
         guard !payload.isEmpty else { return }
         let descriptor = "\(payload.latitude),\(payload.longitude),\(payload.imperial),"
-            + "\(payload.dailyAvg.count),\(payload.monthlyNormals.count),\(payload.wbAvgByHour.count)"
+            + "\(payload.dailyAvg.count),\(payload.monthlyNormals.count),"
+            + "\(payload.wbAvgByHour.count),\(payload.tempAvgByHour.count)"
         guard descriptor != lastSentDescriptor else { return }
 
         guard let context = try? WatchSyncEnvelope.encode(payload) else { return }

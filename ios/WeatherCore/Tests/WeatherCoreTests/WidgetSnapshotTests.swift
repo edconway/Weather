@@ -15,6 +15,7 @@ final class WidgetSnapshotTests: XCTestCase {
             },
             monthlyNormals: [],
             wbAvgByHour: [Double?](repeating: 15, count: 24),
+            tempAvgByHour: [Double?](repeating: 16, count: 24),
             generatedAt: Fixture.now)
     }
 
