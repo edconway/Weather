@@ -253,12 +253,15 @@ public struct WatchSyncPayload: Codable, Sendable, Equatable {
     public let dailyAvg: [DayNormal]        // 14
     public let monthlyNormals: [MonthNormal] // 12
     public let wbAvgByHour: [Double?]       // 24
+    /// Hourly temperature normals (24). Optional on decode so older phone
+    /// payloads (wet-bulb-only) still load.
+    public let tempAvgByHour: [Double?]
     public let generatedAt: Date
 
     public init(
         latitude: Double, longitude: Double, name: String, imperial: Bool,
         dailyAvg: [DayNormal], monthlyNormals: [MonthNormal], wbAvgByHour: [Double?],
-        generatedAt: Date
+        tempAvgByHour: [Double?] = [], generatedAt: Date
     ) {
         self.latitude = latitude
         self.longitude = longitude
@@ -267,7 +270,21 @@ public struct WatchSyncPayload: Codable, Sendable, Equatable {
         self.dailyAvg = dailyAvg
         self.monthlyNormals = monthlyNormals
         self.wbAvgByHour = wbAvgByHour
+        self.tempAvgByHour = tempAvgByHour
         self.generatedAt = generatedAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        latitude = try c.decode(Double.self, forKey: .latitude)
+        longitude = try c.decode(Double.self, forKey: .longitude)
+        name = try c.decode(String.self, forKey: .name)
+        imperial = try c.decode(Bool.self, forKey: .imperial)
+        dailyAvg = try c.decode([DayNormal].self, forKey: .dailyAvg)
+        monthlyNormals = try c.decode([MonthNormal].self, forKey: .monthlyNormals)
+        wbAvgByHour = try c.decode([Double?].self, forKey: .wbAvgByHour)
+        tempAvgByHour = try c.decodeIfPresent([Double?].self, forKey: .tempAvgByHour) ?? []
+        generatedAt = try c.decode(Date.self, forKey: .generatedAt)
     }
 
     public var location: WeatherLocation {

@@ -72,32 +72,117 @@ final class WatchStore {
 
     var hasContext: Bool { applicablePayload?.tempBand != nil }
 
-    /// The single highest-priority badge (§9.1). `nil` renders the
-    /// "no context yet" fallback rather than an empty gap.
+    /// The single highest-priority badge (§9.1). Prefers phone-synced climate
+    /// normals; falls back to a recent-days comparison so the watch still
+    /// speaks without the iPhone.
     var badge: Anomaly? {
-        guard let conditions, let payload = applicablePayload else { return nil }
-        return AnomalyEngine.watchBadge(
-            conditions: conditions,
-            tempBand: payload.tempBand,
-            dailyRain: [],
-            hourlyNormals: payload.wetBulbNormals.map {
-                HourlyNormals(
-                    temp: $0, wetBulb: $0,
-                    rain: RainHourNormals(
-                        avgByHour: [], wetHourProbabilityByHour: [], p90ByHour: [],
-                        yearStart: 0, yearEnd: 0))
-            },
-            formatter: formatter)
+        guard let conditions else { return nil }
+
+        if let payload = applicablePayload {
+            if let synced = AnomalyEngine.watchBadge(
+                conditions: conditions,
+                tempBand: payload.tempBand,
+                dailyRain: [],
+                hourlyNormals: payload.chartHourlyNormals,
+                formatter: formatter)
+            {
+                return Self.watchWording(synced, formatter: formatter)
+            }
+            if payload.tempBand != nil {
+                return Anomaly(
+                    text: "Near usual", kind: .neutral, panel: .temperature,
+                    detail: "Today's high/low average is within 1°C of the usual "
+                        + "reading for this date.")
+            }
+        }
+        return recentDaysBadge
+    }
+
+    /// Compare today's mean to the mean of the past days already in the
+    /// forecast window — no archive required.
+    private var recentDaysBadge: Anomaly? {
+        guard let today = dailyPoints.first(where: \.isToday),
+              let todayHigh = today.high, let todayLow = today.low
+        else { return nil }
+        let past = dailyPoints.filter(\.isPast)
+        let pastMeans = past.compactMap { point -> Double? in
+            guard let h = point.high, let l = point.low else { return nil }
+            return (h + l) / 2
+        }
+        guard !pastMeans.isEmpty else { return nil }
+
+        let todayMean = (todayHigh + todayLow) / 2
+        let baseline = pastMeans.reduce(0, +) / Double(pastMeans.count)
+        let delta = todayMean - baseline
+        let magnitude = abs(delta)
+
+        if magnitude < 1 {
+            return Anomaly(
+                text: "Similar to recent days", kind: .neutral, panel: .temperature,
+                detail: "Today's average is within 1°C of the last "
+                    + "\(pastMeans.count) day" + (pastMeans.count == 1 ? "" : "s") + ".")
+        }
+
+        let displayed = Int(formatter.temperatureDelta(magnitude).rounded())
+        let hotter = delta > 0
+        let text: String
+        if pastMeans.count == 1 {
+            text = hotter
+                ? "\(displayed)° hotter than yesterday"
+                : "\(displayed)° colder than yesterday"
+        } else {
+            text = hotter
+                ? "\(displayed)° hotter than usual lately"
+                : "\(displayed)° colder than usual lately"
+        }
+        return Anomaly(
+            text: text,
+            kind: hotter ? .warm : .cold,
+            panel: .temperature,
+            detail: "Compared with the last \(pastMeans.count) day"
+                + (pastMeans.count == 1 ? "" : "s")
+                + " already on the watch.")
+    }
+
+    /// Friendlier watch copy for climate-backed badges ("hotter than usual"
+    /// reads clearer at a glance than "warmer than normal").
+    private static func watchWording(_ anomaly: Anomaly, formatter: UnitFormatter) -> Anomaly {
+        switch anomaly.kind {
+        case .warm:
+            let rewritten = anomaly.text
+                .replacingOccurrences(
+                    of: formatter.temperatureUnit + " warmer than normal",
+                    with: "° hotter than usual")
+                .replacingOccurrences(of: " warmer than normal", with: " hotter than usual")
+            return Anomaly(
+                text: rewritten, kind: anomaly.kind, panel: anomaly.panel,
+                detail: anomaly.detail)
+        case .cold:
+            let rewritten = anomaly.text
+                .replacingOccurrences(
+                    of: formatter.temperatureUnit + " colder than normal",
+                    with: "° colder than usual")
+                .replacingOccurrences(of: " colder than normal", with: " colder than usual")
+            return Anomaly(
+                text: rewritten, kind: anomaly.kind, panel: anomaly.panel,
+                detail: anomaly.detail)
+        default:
+            return anomaly
+        }
     }
 
     var hourlyPoints: [ChartSeries.HourlyPoint] {
         guard let forecast, let conditions else { return [] }
-        return ChartSeries.hourly(forecast: forecast, conditions: conditions, normals: nil)
+        return ChartSeries.hourly(
+            forecast: forecast, conditions: conditions,
+            normals: applicablePayload?.chartHourlyNormals)
     }
 
-    /// The next 12 hours from now (§9.2 HourlyPage).
-    var next12Hours: [ChartSeries.HourlyPoint] {
-        Array(hourlyPoints.filter { !$0.isPast }.prefix(12))
+    /// Last 6 hours + next 6 hours (12 points straddling now).
+    var recentAndNextHours: [ChartSeries.HourlyPoint] {
+        let past = Array(hourlyPoints.filter(\.isPast).suffix(6))
+        let future = Array(hourlyPoints.filter { !$0.isPast }.prefix(6))
+        return past + future
     }
 
     var dailyPoints: [ChartSeries.DailyPoint] {
@@ -107,9 +192,11 @@ final class WatchStore {
             tempBand: applicablePayload?.tempBand, dailyRain: [])
     }
 
-    /// The 7 forecast days, today first.
-    var forecastDays: [ChartSeries.DailyPoint] {
-        Array(dailyPoints.drop { $0.isPast }.prefix(7))
+    /// Last 3 days + today + next 3 (7 points straddling today).
+    var recentAndForecastDays: [ChartSeries.DailyPoint] {
+        let past = Array(dailyPoints.filter(\.isPast).suffix(3))
+        let todayAndNext = Array(dailyPoints.filter { !$0.isPast }.prefix(4))
+        return past + todayAndNext
     }
 
     // MARK: - Boot (§9.1)

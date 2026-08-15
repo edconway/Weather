@@ -7,61 +7,59 @@ struct NowPage: View {
     let store: WatchStore
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 6) {
-                if let name = store.location?.shortName, !name.isEmpty {
-                    Text(name)
-                        .id(name)
+        VStack(alignment: .leading, spacing: 5) {
+            if let name = store.location?.shortName, !name.isEmpty {
+                Text(name)
+                    .id(name)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            if let conditions = store.conditions {
+                HStack(alignment: .top, spacing: 6) {
+                    Text(store.formatter.temperatureNumber(conditions.temperature)
+                            .map(String.init) ?? "—")
+                        .font(.system(size: 40, weight: .semibold, design: .rounded))
+                    Text(store.formatter.temperatureUnit)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 6)
+                    Spacer(minLength: 0)
+                    Image(systemName: conditions.symbolName)
+                        .symbolRenderingMode(.multicolor)
+                        .font(.title3)
+                        .padding(.top, 4)
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(
+                    "\(store.formatter.temperature(conditions.temperature)), "
+                    + conditions.condition.label)
+
+                Text(conditions.condition.label)
+                    .font(.caption)
+                    .lineLimit(1)
+
+                HStack(spacing: 6) {
+                    Text("↑\(store.formatter.temperature(conditions.high))")
+                        .foregroundStyle(.orange)
+                    Text("↓\(store.formatter.temperature(conditions.low))")
+                        .foregroundStyle(.blue)
+                }
+                .font(.caption2)
+
+                if conditions.feelsLike != nil {
+                    Text("Feels \(store.formatter.temperature(conditions.feelsLike))")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
                 }
 
-                if let conditions = store.conditions {
-                    HStack(alignment: .top, spacing: 6) {
-                        Text(store.formatter.temperatureNumber(conditions.temperature)
-                                .map(String.init) ?? "—")
-                            .font(.system(size: 42, weight: .semibold, design: .rounded))
-                        Text(store.formatter.temperatureUnit)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 6)
-                        Spacer(minLength: 0)
-                        Image(systemName: conditions.symbolName)
-                            .symbolRenderingMode(.multicolor)
-                            .font(.title3)
-                            .padding(.top, 4)
-                    }
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(
-                        "\(store.formatter.temperature(conditions.temperature)), "
-                        + conditions.condition.label)
-
-                    Text(conditions.condition.label)
-                        .font(.caption)
-                        .lineLimit(1)
-
-                    HStack(spacing: 6) {
-                        Text("↑\(store.formatter.temperature(conditions.high))")
-                            .foregroundStyle(.orange)
-                        Text("↓\(store.formatter.temperature(conditions.low))")
-                            .foregroundStyle(.blue)
-                    }
-                    .font(.caption2)
-
-                    if conditions.feelsLike != nil {
-                        Text("Feels \(store.formatter.temperature(conditions.feelsLike))")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    statGlyphs(conditions)
-                    badgeOrFallback
-                    unitsToggle
-                }
+                statGlyphs(conditions)
+                badgeOrFallback
+                unitsToggle
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .containerBackground(.blue.gradient.opacity(0.25), for: .navigation)
         .navigationTitle("Now")
     }
@@ -94,11 +92,14 @@ struct NowPage: View {
                 .background(badgeTint(badge.kind).opacity(0.22), in: Capsule())
                 .foregroundStyle(badgeTint(badge.kind))
                 .padding(.top, 4)
+                .accessibilityLabel(badge.text)
         } else if !store.hasContext {
-            // §9.2 — never fake context; say plainly that it hasn't arrived.
-            Text("Open the iPhone app for historical context")
+            // Climate normals still need the phone; recent-day badges cover most
+            // cases without it. This only shows when even that is unavailable.
+            Text("Open iPhone for climate normals")
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
                 .padding(.top, 4)
         }
     }

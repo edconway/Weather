@@ -6,6 +6,11 @@ import WeatherCore
 /// lines + rainfall bars) becomes two stacked charts sharing the month axis,
 /// because Swift Charts has no second y-axis. Scrubbing either one selects the
 /// same month in both.
+///
+/// Month labels stay categorical **strings**, but the domain is locked to
+/// Jan…Dec order and high/low are drawn in separate passes. (An earlier Int
+/// x-scale + `chartXSelection` path crashed Charts on device when this panel
+/// appeared.)
 struct ClimateChart: View {
     let points: [ChartSeries.ClimatePoint]
     let formatter: UnitFormatter
@@ -21,6 +26,8 @@ struct ClimateChart: View {
     private var currentMonth: Int {
         Calendar.current.component(.month, from: Date()) - 1
     }
+
+    private var monthNames: [String] { points.map(\.shortMonthName) }
 
     private var currentPoint: ChartSeries.ClimatePoint? {
         points.first { $0.id == currentMonth }
@@ -86,7 +93,23 @@ struct ClimateChart: View {
                         y: .value("Avg high", formatter.temperatureValue(high)),
                         series: .value("Series", "high"))
                     .foregroundStyle(Palette.hot)
-                    .interpolationMethod(.catmullRom)
+                    .lineStyle(StrokeStyle(lineWidth: 2))
+                    .interpolationMethod(.linear)
+                }
+            }
+            ForEach(points) { point in
+                if let low = point.low {
+                    LineMark(
+                        x: .value("Month", point.shortMonthName),
+                        y: .value("Avg low", formatter.temperatureValue(low)),
+                        series: .value("Series", "low"))
+                    .foregroundStyle(Palette.cold)
+                    .lineStyle(StrokeStyle(lineWidth: 2))
+                    .interpolationMethod(.linear)
+                }
+            }
+            ForEach(points) { point in
+                if let high = point.high {
                     PointMark(
                         x: .value("Month", point.shortMonthName),
                         y: .value("Avg high", formatter.temperatureValue(high)))
@@ -94,12 +117,6 @@ struct ClimateChart: View {
                     .symbolSize(point.id == currentMonth ? 48 : 28)
                 }
                 if let low = point.low {
-                    LineMark(
-                        x: .value("Month", point.shortMonthName),
-                        y: .value("Avg low", formatter.temperatureValue(low)),
-                        series: .value("Series", "low"))
-                    .foregroundStyle(Palette.cold)
-                    .interpolationMethod(.catmullRom)
                     PointMark(
                         x: .value("Month", point.shortMonthName),
                         y: .value("Avg low", formatter.temperatureValue(low)))
@@ -116,8 +133,9 @@ struct ClimateChart: View {
         }
         .chartXSelection(value: monthSelection)
         .chartTapFallback(monthSelection)
+        .chartXScale(domain: monthNames)
         .chartXAxis {
-            AxisMarks { _ in
+            AxisMarks(values: monthNames) { _ in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 3]))
                     .foregroundStyle(Color.secondary.opacity(0.18))
             }
@@ -143,14 +161,15 @@ struct ClimateChart: View {
         }
         .chartXSelection(value: monthSelection)
         .chartTapFallback(monthSelection)
+        .chartXScale(domain: monthNames)
         .chartYAxis { ChartAxes.precipitationYAxis(formatter: formatter) }
         .chartXAxis {
-            AxisMarks { value in
+            AxisMarks(values: monthNames) { value in
                 AxisValueLabel {
-                    if let name = value.as(String.self) {
-                        let isCurrent = points.first { $0.shortMonthName == name }?.id == currentMonth
+                    if let name = value.as(String.self),
+                       let point = points.first(where: { $0.shortMonthName == name }) {
                         Text(name)
-                            .font(.caption2.weight(isCurrent ? .bold : .regular))
+                            .font(.caption2.weight(point.id == currentMonth ? .bold : .regular))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -161,9 +180,6 @@ struct ClimateChart: View {
     }
 
     /// Both charts bind to the same month so a scrub in either highlights both.
-    ///
-    /// The setter ignores `nil`, which `chartXSelection` sends when the gesture
-    /// ends — see `StickyXSelection` for why the selection has to persist.
     private var monthSelection: Binding<String?> {
         Binding(
             get: { selected?.shortMonthName },
