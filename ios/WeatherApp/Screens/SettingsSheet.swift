@@ -11,11 +11,11 @@ struct SettingsSheet: View {
         NavigationStack {
             Form {
                 Section("Units") {
-                    Picker("Temperature", selection: $store.imperial) {
-                        Text("Celsius, km/h, mm").tag(false)
-                        Text("Fahrenheit, mph, inches").tag(true)
+                    Picker("Units", selection: $store.imperial) {
+                        Text("°C · km/h · mm").tag(false)
+                        Text("°F · mph · in").tag(true)
                     }
-                    .pickerStyle(.inline)
+                    .pickerStyle(.segmented)
                     .labelsHidden()
                 }
 

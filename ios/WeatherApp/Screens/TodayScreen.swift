@@ -11,6 +11,11 @@ struct TodayScreen: View {
     /// Shared across every chart on this screen so scrubbing one clears
     /// whichever other chart's readout was pinned — see `StickyXSelection`.
     @State private var scrubCoordinator = ActiveScrubCoordinator()
+    @State private var pinProgress: CGFloat = 0
+    @State private var topInset: CGFloat = 47
+    @State private var selectedPanel: PanelID = .temperature
+    @State private var segmentLock: PanelID?
+    @State private var wetBulbExpanded = false
 
     var body: some View {
         NavigationStack {
@@ -59,60 +64,179 @@ struct TodayScreen: View {
 
     private var loadedScroll: some View {
         ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    ZStack(alignment: .top) {
-                        if let conditions = store.conditions {
+            ZStack(alignment: .top) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        if let conditions = store.conditions, let forecast = store.forecast {
                             HeroView(
+                                placeName: placeName,
+                                showsGPS: store.activeSource == .geo,
                                 conditions: conditions,
-                                badges: store.heroBadges,
-                                formatter: store.formatter
-                            ) { panel in
-                                withAnimation { proxy.scrollTo(panel, anchor: .top) }
-                            }
-                        }
-                        chromeHeader(overAtmosphere: true)
-                    }
-                    .id(ScrollAnchor.top)
-
-                    VStack(alignment: .leading, spacing: 22) {
-                        if let banner = store.banner {
-                            BannerView(message: banner) { store.dismissBanner() }
-                        }
-
-                        panelJump(proxy: proxy)
-
-                        if store.showsSourceToggle {
-                            SourceToggle(
-                                activeSource: store.activeSource,
-                                customShortName: store.customLocation?.shortName ?? "Custom"
-                            ) { source in
-                                Task { await store.switchSource(to: source) }
+                                voice: voice(forecast: forecast, conditions: conditions),
+                                range: ScreenPresentation.todayRange(
+                                    conditions: conditions, normal: store.tempBand?.today),
+                                outlook: outlook(forecast: forecast, conditions: conditions),
+                                topInset: topInset,
+                                formatter: store.formatter,
+                                onSearch: { showingSearch = true },
+                                onSettings: { showingSettings = true },
+                                onVoice: { jump($0, proxy: proxy) }
+                            )
+                            .background {
+                                GeometryReader { geo in
+                                    Color.clear.preference(
+                                        key: HeroBottomPreference.self,
+                                        value: geo.frame(in: .named("today")).maxY)
+                                }
                             }
                         }
 
-                        panels
-
-                        footer
+                        sheet(proxy: proxy)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 18)
-                    .padding(.bottom, 24)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(.systemBackground))
+                }
+                .coordinateSpace(name: "today")
+                .ignoresSafeArea(edges: .top)
+                .refreshable { await store.refresh() }
+                .onPreferenceChange(HeroBottomPreference.self) { bottom in
+                    pinProgress = min(1, max(0, (118 - bottom) / 24))
+                }
+                .onPreferenceChange(SectionTopsPreference.self) { tops in
+                    guard segmentLock == nil else { return }
+                    let bar: CGFloat = pinProgress > 0.55 ? 120 : 24
+                    var current = PanelID.temperature
+                    for panel in [PanelID.temperature, .wetBulb, .rain, .climate] {
+                        if let top = tops[panel], top - bar <= 56 { current = panel }
+                    }
+                    if selectedPanel != current { selectedPanel = current }
+                }
+                .onChange(of: store.pendingPanelJump) { _, panel in
+                    guard let panel else { return }
+                    jump(panel, proxy: proxy)
+                    store.pendingPanelJump = nil
+                }
+                .onChange(of: store.location?.cacheKey) { _, _ in
+                    wetBulbExpanded = false
+                }
+
+                if let conditions = store.conditions, pinProgress > 0.02 {
+                    PinnedHeader(
+                        placeName: placeName,
+                        showsGPS: store.activeSource == .geo,
+                        nowLine: nowLine(conditions),
+                        updated: ScreenPresentation.updatedPhrase(
+                            fetchedAt: store.forecastUpdatedAt,
+                            now: Date(),
+                            timeZone: store.locationTimeZone).text,
+                        selected: selectedPanel,
+                        onPlace: { showingSearch = true },
+                        onSelect: { jump($0, proxy: proxy) }
+                    )
+                    .opacity(pinProgress)
+                    .allowsHitTesting(pinProgress > 0.55)
+                    .accessibilityHidden(pinProgress < 0.55)
                 }
             }
-            .ignoresSafeArea(edges: .top)
-            .refreshable { await store.refresh() }
-            .onChange(of: store.pendingPanelJump) { _, panel in
-                guard let panel else { return }
-                withAnimation { proxy.scrollTo(panel, anchor: .top) }
-                store.pendingPanelJump = nil
+            .background {
+                WindowTopInset(top: $topInset)
             }
         }
     }
 
-    private enum ScrollAnchor: Hashable { case top }
+    private var placeName: String {
+        ScreenPresentation.shortPlaceName(store.location?.name ?? "Choose a place")
+    }
+
+    private func nowLine(_ conditions: CurrentConditions) -> String {
+        let temp = store.formatter.temperatureNumber(conditions.temperature).map { "\($0)°" } ?? "—"
+        return "\(temp) · \(conditions.condition.label)"
+    }
+
+    private func voice(
+        forecast: ForecastResponse, conditions: CurrentConditions
+    ) -> ScreenPresentation.HeroVoice? {
+        ScreenPresentation.heroVoice(
+            forecast: forecast, conditions: conditions,
+            hourlyNormals: store.hourlyNormals, tempBand: store.tempBand,
+            dailyRain: store.dailyRain, formatter: store.formatter)
+    }
+
+    private func outlook(
+        forecast: ForecastResponse, conditions: CurrentConditions
+    ) -> ScreenPresentation.RainOutlook {
+        ScreenPresentation.rainOutlook(
+            forecast: forecast, conditions: conditions, formatter: store.formatter)
+    }
+
+    private func jump(_ panel: PanelID, proxy: ScrollViewProxy) {
+        selectedPanel = panel
+        segmentLock = panel
+        withAnimation { proxy.scrollTo(panel, anchor: UnitPoint(x: 0.5, y: 0.12)) }
+        Task {
+            try? await Task.sleep(for: .milliseconds(700))
+            if segmentLock == panel { segmentLock = nil }
+        }
+    }
+
+    private func sheet(proxy: ScrollViewProxy) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if let banner = store.banner {
+                BannerView(message: banner) { store.dismissBanner() }
+            }
+
+            SectionSegmentBar(selected: selectedPanel) { jump($0, proxy: proxy) }
+
+            if let forecast = store.forecast, let conditions = store.conditions {
+                rainLead(forecast: forecast, conditions: conditions)
+            }
+
+            if store.showsSourceToggle {
+                SourceToggle(
+                    activeSource: store.activeSource,
+                    customShortName: store.customLocation?.shortName ?? "Custom"
+                ) { source in
+                    Task { await store.switchSource(to: source) }
+                }
+            }
+
+            panels
+
+            footer
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+        .padding(.bottom, 24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .clipShape(UnevenRoundedRectangle(
+            cornerRadii: RectangleCornerRadii(topLeading: 26, bottomLeading: 0, bottomTrailing: 0, topTrailing: 26),
+            style: .continuous))
+        .padding(.top, -26)
+    }
+
+    @ViewBuilder
+    private func rainLead(forecast: ForecastResponse, conditions: CurrentConditions) -> some View {
+        let minutes = store.appleWeather?.displayMinutes ?? []
+        let appleWet = minutes.contains { $0.intensityMillimetresPerHour > 0 }
+        let hourly = outlook(forecast: forecast, conditions: conditions)
+        if !minutes.isEmpty {
+            NextHourCard(
+                minutes: minutes,
+                attribution: store.appleWeather?.attribution,
+                formatter: store.formatter,
+                timeZone: store.locationTimeZone,
+                emphasize: appleWet)
+        }
+        if minutes.isEmpty || (!appleWet && hourly.state != .dry) {
+            OutlookCard(outlook: hourly)
+        }
+        if let alerts = store.appleWeather?.alerts, !alerts.isEmpty,
+           store.appleWeather?.failure == nil {
+            AppleAlertsList(alerts: alerts)
+            if minutes.isEmpty, let attribution = store.appleWeather?.attribution {
+                AppleAttributionView(attribution: attribution)
+            }
+        }
+    }
 
     // MARK: - Chrome
 
@@ -154,33 +278,6 @@ struct TodayScreen: View {
         .foregroundStyle(overAtmosphere ? Color.primary : Color.primary)
     }
 
-    private func panelJump(proxy: ScrollViewProxy) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                jumpChip("Temp", panel: .temperature, proxy: proxy)
-                jumpChip("Wet bulb", panel: .wetBulb, proxy: proxy)
-                jumpChip("Rain", panel: .rain, proxy: proxy)
-                jumpChip("Climate", panel: .climate, proxy: proxy)
-            }
-        }
-        .accessibilityLabel("Jump to section")
-    }
-
-    private func jumpChip(_ title: String, panel: PanelID, proxy: ScrollViewProxy) -> some View {
-        Button {
-            withAnimation { proxy.scrollTo(panel, anchor: .top) }
-        } label: {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(Color(.secondarySystemFill), in: Capsule())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-        .accessibilityHint("Scrolls to the \(title.lowercased()) section")
-    }
-
     // MARK: - Panels
 
     @ViewBuilder
@@ -203,6 +300,7 @@ struct TodayScreen: View {
                 detailText: Subtitles.dailyTemp(store),
                 onOpenDetail: { detailKind = .dailyTemp })
         }
+        .background { sectionTop(.temperature) }
         .onAppear {
             // Kick off the slow archive fetches as soon as the first panel is
             // on screen, so YTD/climate aren't still spinning when the user
@@ -213,40 +311,44 @@ struct TodayScreen: View {
 
         WeatherSection(
             id: .wetBulb,
-            title: "Wet Bulb",
-            caption: "Feels-like heat stress"
+            title: "Wet bulb",
+            caption: wetBulbCollapsed ? "No heat stress" : "Heat stress"
         ) {
-            HourlyTempChart(
-                points: store.hourlyPoints, series: .wetBulb,
-                formatter: store.formatter, timeZone: timeZone,
-                detailText: Subtitles.hourlyWetBulb(store),
-                onOpenDetail: { detailKind = .hourlyWetBulb })
-            DailyTempChart(
-                points: store.dailyPoints, series: .wetBulb,
-                formatter: store.formatter, timeZone: timeZone,
-                detailText: Subtitles.dailyWetBulb(store),
-                onOpenDetail: { detailKind = .dailyWetBulb })
+            if wetBulbCollapsed {
+                WetBulbCollapsedCard(
+                    now: store.formatter.temperatureShort(store.conditions?.wetBulbNow),
+                    detail: wetBulbHiddenDetail,
+                    onExpand: { wetBulbExpanded = true })
+            } else {
+                if wetBulbExpanded, let peak = wetBulbPeak, peak < 15 {
+                    Button("Hide charts") { wetBulbExpanded = false }
+                        .font(.subheadline.weight(.semibold))
+                        .buttonStyle(.plain)
+                }
+                HourlyTempChart(
+                    points: store.hourlyPoints, series: .wetBulb,
+                    formatter: store.formatter, timeZone: timeZone,
+                    detailText: Subtitles.hourlyWetBulb(store),
+                    onOpenDetail: { detailKind = .hourlyWetBulb })
+                DailyTempChart(
+                    points: store.dailyPoints, series: .wetBulb,
+                    formatter: store.formatter, timeZone: timeZone,
+                    detailText: Subtitles.dailyWetBulb(store),
+                    onOpenDetail: { detailKind = .dailyWetBulb })
+            }
         }
+        .background { sectionTop(.wetBulb) }
 
         WeatherSection(
             id: .rain,
             title: "Rain",
             caption: "Precipitation"
         ) {
-            if let apple = store.appleWeather, !apple.displayMinutes.isEmpty {
-                NextHourCard(
-                    minutes: apple.displayMinutes,
-                    attribution: apple.attribution,
-                    formatter: store.formatter,
-                    timeZone: timeZone)
-            }
-            if let alerts = store.appleWeather?.alerts, !alerts.isEmpty,
-               store.appleWeather?.failure == nil {
-                AppleAlertsList(alerts: alerts)
-                if store.appleWeather?.displayMinutes.isEmpty == true,
-                   let attribution = store.appleWeather?.attribution {
-                    AppleAttributionView(attribution: attribution)
-                }
+            if let forecast = store.forecast, let conditions = store.conditions {
+                RainTotalsRow(
+                    totals: ScreenPresentation.rainTotals(
+                        forecast: forecast, conditions: conditions, dailyRain: store.dailyRain),
+                    formatter: store.formatter)
             }
             HourlyRainChart(
                 points: store.hourlyPoints,
@@ -271,6 +373,7 @@ struct TodayScreen: View {
                     .onAppear { store.ensureYTD() }
             }
         }
+        .background { sectionTop(.rain) }
         .onAppear { store.ensureYTD() }
 
         WeatherSection(
@@ -289,7 +392,33 @@ struct TodayScreen: View {
                     .onAppear { store.ensureClimatology() }
             }
         }
+        .background { sectionTop(.climate) }
         .onAppear { store.ensureClimatology() }
+    }
+
+    private func sectionTop(_ panel: PanelID) -> some View {
+        GeometryReader { geo in
+            Color.clear.preference(
+                key: SectionTopsPreference.self,
+                value: [panel: geo.frame(in: .named("today")).minY])
+        }
+    }
+
+    private var wetBulbPeak: Double? {
+        store.forecast.flatMap(ScreenPresentation.maxWetBulb)
+    }
+
+    private var wetBulbCollapsed: Bool {
+        guard !wetBulbExpanded, let peak = wetBulbPeak else { return false }
+        return peak < 15
+    }
+
+    private var wetBulbHiddenDetail: String {
+        guard let conditions = store.conditions else {
+            return "Charts hidden while it stays under 15°."
+        }
+        return ScreenPresentation.wetBulbHiddenDetail(
+            conditions: conditions, hourlyNormals: store.hourlyNormals, formatter: store.formatter)
     }
 
     private var footer: some View {
