@@ -3,13 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Weather</title>
+<title>Weather World</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20250707">
+<link rel="stylesheet" href="styles.css?v=20261114">
 </head>
 <body>
+<div id="sky" class="sky" hidden></div>
 <div id="app">
   <div id="tt" class="tt hidden"></div>
   <div id="loading" class="loading">
@@ -23,6 +24,7 @@
     <button class="btn" onclick="init()">Try Again</button>
   </div>
   <div id="main" class="hidden">
+    <div id="pinbar" class="pinbar" aria-hidden="true"></div>
     <div class="hdr-wrap">
       <div id="app-hdr"></div>
       <div id="search-drop" class="search-drop hidden"></div>
@@ -30,10 +32,20 @@
     <div id="content"></div>
   </div>
 </div>
+<div id="settings-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+  <div class="modal-card" id="settings-card"></div>
+</div>
+<div id="place-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="place-title">
+  <div class="modal-card" id="place-card"></div>
+</div>
+<div id="detail-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+  <div class="modal-card" id="detail-card"></div>
+</div>
 
-<script src="icons.js?v=20250707"></script>
-<script src="app.js?v=20250707"></script>
-<script src="charts.js?v=20250707"></script>
-<script src="search.js?v=20250707"></script>
+<script src="icons.js?v=20261114"></script>
+<script src="app.js?v=20261114"></script>
+<script src="charts.js?v=20261114"></script>
+<script src="screen.js?v=20261114"></script>
+<script src="search.js?v=20261114"></script>
 </body>
 </html>

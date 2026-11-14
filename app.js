@@ -25,6 +25,40 @@ function localDateStr(d = new Date()) {
   return `${d.getFullYear()}-${padDate(d.getMonth() + 1)}-${padDate(d.getDate())}`;
 }
 
+// Clock at the forecast location. Open-Meteo times are local there, not in the browser.
+function placeNowParts(){
+  const off=fcData?.utc_offset_seconds;
+  const shifted=Date.now()+((off||0)*1000);
+  const d=new Date(shifted);
+  const utc=off!=null;
+  const year=utc?d.getUTCFullYear():d.getFullYear();
+  const month=utc?d.getUTCMonth():d.getMonth();
+  const day=utc?d.getUTCDate():d.getDate();
+  const hour=utc?d.getUTCHours():d.getHours();
+  const minute=utc?d.getUTCMinutes():d.getMinutes();
+  const dateStr=`${year}-${padDate(month+1)}-${padDate(day)}`;
+  return {year,month,day,hour,minute,dateStr,hourStr:`${dateStr}T${padDate(hour)}:00`};
+}
+
+function precipParts(mm){
+  if(mm==null||isNaN(+mm)) return {num:'—',unit:''};
+  const v=+mm;
+  if(imp){
+    if(v<=0) return {num:'0',unit:' in'};
+    if(v<0.1) return {num:'<0.01',unit:' in'};
+    const inches=mm2in(v);
+    return {num:inches>=10?String(Math.round(inches)):inches.toFixed(2), unit:' in'};
+  }
+  if(v<=0) return {num:'0',unit:' mm'};
+  if(v<0.1) return {num:'<0.1',unit:' mm'};
+  if(v>=100) return {num:String(Math.round(v)),unit:' mm'};
+  return {num:v.toFixed(1),unit:' mm'};
+}
+function precipReadout(mm){
+  const p=precipParts(mm);
+  return `${p.num}${p.unit}`;
+}
+
 function loadPrefs() {
   try { return JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; }
   catch { return {}; }
@@ -74,7 +108,11 @@ function anomalyBadge(text, kind, opts) {
 function scrollToPanel(id){
   const el=document.getElementById(id);
   if(!el) return;
-  el.scrollIntoView({behavior:'smooth',block:'start'});
+  const pin=document.getElementById('pinbar');
+  const h=(pin&&pin.classList.contains('is-on')?pin.offsetHeight:96)+8;
+  const top=el.getBoundingClientRect().top+window.scrollY-h;
+  const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  window.scrollTo({top:Math.max(0,top),behavior:reduce?'auto':'smooth'});
 }
 
 function rainAnomalyKind(text) {
@@ -115,7 +153,7 @@ let myLat=null, myLon=null, myName=null;       // GPS location
 let customLat=_prefs.customLat??null, customLon=_prefs.customLon??null, customName=_prefs.customName??null; // searched location
 let activeSource=_prefs.activeSource||'geo'; // 'geo' | 'custom'
 let ytdData=null, hourlyHistData=null, hourlyWbHistData=null, hourlyRainHistData=null, dailyRainHistData=null, climatologyData=null;
-let _tempData=null,_rainData=null,_hourlyData=null,_hourlyWbData=null,_wetBulbData=null,_hourlyRainData=null,_dailyRainData=null,_climateData=null;
+let _tempData=null,_rainData=null,_hourlyData=null,_hourlyWbData=null,_wetBulbData=null,_hourlyRainData=null,_dailyRainData=null,_climateData=null,_climateRainData=null,_hourlyGap=null,_wbGap=null;
 
 // ── Unit helpers ───────────────────────────────────────
 const c2f=c=>c*9/5+32, k2m=k=>k*.621371, mm2in=m=>m*.0393701;
@@ -451,24 +489,44 @@ async function geocode(lat,lon){
     const d=await r.json(), a=d.address||{};
     const city=a.city||a.town||a.village||a.municipality||a.county||'';
     const region=a.state||a.country||'';
-    return city?`${city}${region?', '+region:''}`:`${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+    if(!city) return `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+    if(!region || region.toLowerCase()===city.toLowerCase()) return city;
+    return `${city}, ${region}`;
   }catch{return`${lat.toFixed(2)}, ${lon.toFixed(2)}`}
 }
 
 async function getForecast(lat,lon){
   const p=new URLSearchParams({
     latitude:lat,longitude:lon,timezone:'auto',forecast_days:7,past_days:7,
-    daily:'weather_code,temperature_2m_max,temperature_2m_min,wet_bulb_temperature_2m_max,wet_bulb_temperature_2m_min,apparent_temperature_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max',
+    daily:'weather_code,temperature_2m_max,temperature_2m_min,wet_bulb_temperature_2m_max,wet_bulb_temperature_2m_min,apparent_temperature_max,precipitation_sum,precipitation_hours,precipitation_probability_max,wind_speed_10m_max,uv_index_max,sunrise,sunset',
     past_hours:24,forecast_hours:48,
-    hourly:'temperature_2m,wet_bulb_temperature_2m,apparent_temperature,precipitation,precipitation_probability,rain,showers,snowfall,weather_code'
+    hourly:'temperature_2m,wet_bulb_temperature_2m,apparent_temperature,precipitation,precipitation_probability,rain,showers,snowfall,weather_code,is_day,wind_speed_10m,uv_index'
   });
-  const r=await fetch(`https://api.open-meteo.com/v1/forecast?${p}`);
+  const m=new URLSearchParams({
+    latitude:lat,longitude:lon,timezone:'auto',
+    minutely_15:'precipitation,rain,snowfall',
+    forecast_minutely_15:'8',
+    past_minutely_15:'1'
+  });
+  const [r,mr]=await Promise.all([
+    fetch(`https://api.open-meteo.com/v1/forecast?${p}`),
+    fetch(`https://api.open-meteo.com/v1/forecast?${m}`).catch(()=>null)
+  ]);
   if(!r.ok) throw new Error('Forecast API error.');
-  return r.json();
+  const data=await r.json();
+  data._fetchedAt=Date.now();
+  if(mr&&mr.ok){
+    try{
+      const md=await mr.json();
+      if(md.minutely_15?.time?.length) data.minutely_15=md.minutely_15;
+    }catch{}
+  }
+  return data;
 }
 
 async function getRainYTD(lat,lon){
-  const now=new Date();
+  const parts=typeof placeNowParts==='function'?placeNowParts():null;
+  const now=parts?new Date(parts.year, parts.month, parts.day):new Date();
   const thisYear=now.getFullYear();
   const pad=n=>String(n).padStart(2,'0');
   const todayStr=`${thisYear}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
@@ -476,18 +534,35 @@ async function getRainYTD(lat,lon){
   const p=new URLSearchParams({
     latitude:lat,longitude:lon,timezone:'auto',
     start_date:`${startYear}-01-01`,end_date:todayStr,
-    daily:'precipitation_sum'
+    daily:'precipitation_sum,temperature_2m_max,temperature_2m_min'
   });
   const r=await archiveFetch(`https://archive-api.open-meteo.com/v1/archive?${p}`);
   if(!r.ok) throw new Error('YTD API error.');
   const data=await r.json();
   // Group by year -> MM-DD -> precip value
   const byYear={};
+  const monthly=Array.from({length:12},()=>({sumMax:0,nMax:0,sumMin:0,nMin:0,rain:0,days:0}));
   data.daily.time.forEach((t,i)=>{
     const yr=+t.slice(0,4), mmdd=t.slice(5);
+    const precip=data.daily.precipitation_sum[i]??0;
     if(!byYear[yr]) byYear[yr]={};
-    byYear[yr][mmdd]=data.daily.precipitation_sum[i]??0;
+    byYear[yr][mmdd]=precip;
+    if(yr===thisYear && t<=todayStr){
+      const mo=+t.slice(5,7)-1;
+      const mx=data.daily.temperature_2m_max?.[i];
+      const mn=data.daily.temperature_2m_min?.[i];
+      if(mx!=null){monthly[mo].sumMax+=mx;monthly[mo].nMax++;}
+      if(mn!=null){monthly[mo].sumMin+=mn;monthly[mo].nMin++;}
+      monthly[mo].rain+=precip;
+      monthly[mo].days++;
+    }
   });
+  const monthlyActual=monthly.map(m=>({
+    tMax:m.nMax?m.sumMax/m.nMax:null,
+    tMin:m.nMin?m.sumMin/m.nMin:null,
+    rain:m.days?m.rain:null,
+    days:m.days
+  }));
   // Build MM-DD labels from Jan 1 to today
   const labels=[];
   const d=new Date(thisYear,0,1);
@@ -525,7 +600,20 @@ async function getRainYTD(lat,lon){
     extCum+=vals.reduce((a,b)=>a+b,0)/(vals.length||1);
     cumHistAvgExt.push(extCum);
   }
-  return{labels,cumCurrentYear,cumHistAvg,cumHistAvgExt,thisYear,startYear,histYears:histYears.length,latestDate};
+  let prevCum=0;
+  if(now.getMonth()>0){
+    const lastPrev=new Date(thisYear, now.getMonth(), 0);
+    const key=`${pad(lastPrev.getMonth()+1)}-${pad(lastPrev.getDate())}`;
+    const idx=labels.indexOf(key);
+    if(idx>=0) prevCum=cumCurrentYear[idx];
+  }
+  let monthToDateMm=(cumCurrentYear[cumCurrentYear.length-1]||0)-prevCum;
+  if(typeof fcData!=='undefined'&&fcData?.daily){
+    fcData.daily.time.forEach((t,i)=>{
+      if(t>latestDate && t<=todayStr) monthToDateMm+=(fcData.daily.precipitation_sum[i]||0);
+    });
+  }
+  return{labels,cumCurrentYear,cumHistAvg,cumHistAvgExt,thisYear,startYear,histYears:histYears.length,latestDate,monthly:monthlyActual,monthToDateMm};
 }
 
 // Merged hourly normals — one archive request per year for temp, wet bulb & rain.
@@ -656,14 +744,16 @@ function _mmddDist(a,b){
 // Replaces the old getHistorical (which fired 5 separate archive requests).
 function deriveTempBand(climate){
   if(!climate?.byMMDD) return null;
-  const now=new Date(), pad=n=>String(n).padStart(2,'0');
-  const thisYear=now.getFullYear(), mo=now.getMonth(), dy=now.getDate();
+  const parts=placeNowParts();
+  const pad=n=>String(n).padStart(2,'0');
   const arrAvg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;
   const entries=Object.entries(climate.byMMDD);
   const dailyAvg=[];
+  const base=Date.UTC(parts.year, parts.month, parts.day);
   for(let i=-7;i<=6;i++){
-    const tmp=new Date(thisYear,mo,dy+i);
-    const mmdd=`${pad(tmp.getMonth()+1)}-${pad(tmp.getDate())}`;
+    const tmp=new Date(base+i*86400000);
+    const dateStr=`${tmp.getUTCFullYear()}-${pad(tmp.getUTCMonth()+1)}-${pad(tmp.getUTCDate())}`;
+    const mmdd=dateStr.slice(5);
     const maxes=[],mins=[],wbMaxes=[],wbMins=[];
     entries.forEach(([am,v])=>{
       if(_mmddDist(mmdd,am)<=3){
@@ -671,13 +761,14 @@ function deriveTempBand(climate){
         wbMaxes.push(...(v.wbMaxes||[])); wbMins.push(...(v.wbMins||[]));
       }
     });
-    dailyAvg.push({tMax:arrAvg(maxes),tMin:arrAvg(mins),wbMax:arrAvg(wbMaxes),wbMin:arrAvg(wbMins)});
+    dailyAvg.push({date:dateStr,tMax:arrAvg(maxes),tMin:arrAvg(mins),wbMax:arrAvg(wbMaxes),wbMin:arrAvg(wbMins)});
   }
+  const today=dailyAvg.find(a=>a.date===parts.dateStr)||dailyAvg[7];
   return{
     dailyAvg,
-    tMax:dailyAvg[7]?.tMax??null, tMin:dailyAvg[7]?.tMin??null,
+    tMax:today?.tMax??null, tMin:today?.tMin??null,
     precip:null, wind:null, nextMonth:null,
-    month:now.toLocaleString('en-US',{month:'long'}),
+    month:new Date(base).toLocaleString('en-US',{month:'long',timeZone:'UTC'}),
     histYearStart:climate.yearStart, histYearEnd:climate.yearEnd
   };
 }
@@ -686,20 +777,18 @@ function deriveTempBand(climate){
 // Replaces the old getDailyRainHistorical (which fired 5 separate archive requests).
 function deriveDailyRain(climate){
   if(!climate?.byMMDD||!fcData?.daily) return null;
-  const t0=Math.min(7,fcData.daily.time.length-1);
-  const fcDates=fcData.daily.time.slice(t0,t0+7);
   const entries=Object.entries(climate.byMMDD);
   const arrAvg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:0;
   const arrMedian=arr=>{if(!arr.length)return 0;const s=[...arr].sort((a,b)=>a-b),m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2;};
   const arrP90=arr=>{if(!arr.length)return 0;const s=[...arr].sort((a,b)=>a-b);return s[Math.floor(s.length*0.9)]??0;};
-  return fcDates.map((dateStr,idx)=>{
+  return fcData.daily.time.map((dateStr,idx)=>{
     const mmdd=dateStr.slice(5);
     const vals=[];
     entries.forEach(([am,v])=>{ if(_mmddDist(mmdd,am)<=3) vals.push(...v.rains); });
     return{
       date:dateStr,
-      forecastMm:fcData.daily.precipitation_sum[t0+idx]??0,
-      probabilityMax:fcData.daily.precipitation_probability_max[t0+idx]??null,
+      forecastMm:fcData.daily.precipitation_sum[idx]??0,
+      probabilityMax:fcData.daily.precipitation_probability_max[idx]??null,
       histMeanMm:arrAvg(vals),
       histMedianMm:arrMedian(vals),
       wetDayProbability:vals.length?vals.filter(v=>v>=0.1).length/vals.length:0,
@@ -760,7 +849,8 @@ function setLoad(msg){
       temp: _tempData, rain: _rainData, hourly: _hourlyData, 'hourly-wb': _hourlyWbData,
       'wet-bulb': _wetBulbData,
       'hourly-rain': _hourlyRainData, 'daily-rain': _dailyRainData,
-      climate: _climateData
+      climate: _climateData,
+      'climate-rain': _climateRainData
     };
     const d = dataMap[chartType];
     if (!d) return;
@@ -792,7 +882,8 @@ function setLoad(msg){
         hourly: '48-hour temperature chart', 'hourly-wb': '48-hour wet bulb chart',
         'wet-bulb': '14-day wet bulb chart',
         'hourly-rain': '48-hour rainfall chart',
-        'daily-rain': '14-day rainfall chart', climate: 'Climate overview chart'
+        'daily-rain': '14-day rainfall chart', climate: 'Monthly temperature chart',
+        'climate-rain': 'Monthly rainfall chart'
       };
       svg.setAttribute('aria-label', labels[svg.dataset.chart] || 'Weather chart');
       svg.addEventListener('focus', () => {
@@ -814,34 +905,39 @@ function setLoad(msg){
     _origRenderContent();
     bindChartAccessibility();
   };
+  window.bindChartAccessibility = bindChartAccessibility;
 
   // Tooltip helpers
-  function showTT(svgX,chartType,cx,cy){
+  function showTT(svgX,chartType,cx,cy,root){
     const tt=document.getElementById('tt');
     if(!tt) return;
+    const g=id=>(root&&root.querySelector('#'+id))||document.getElementById(id);
     let html='';
+    let scrubIdx=-1;
     if(chartType==='temp'&&_tempData){
       const{labels,maxV,minV,dailyAvg,pL,cW,n,todayIdx}=_tempData;
-      const i=Math.max(0,Math.min(n-1,Math.round((svgX-pL)/cW*(n-1))));
+      const i=scrubIdx=Math.max(0,Math.min(n-1,Math.round((svgX-pL)/cW*(n-1))));
       const u=uT();
       const hi=maxV[i]!=null?Math.round(maxV[i]):'—';
       const lo=minV[i]!=null?Math.round(minV[i]):'—';
       const da=dailyAvg?.[i];
       const hr=da?.tMax!=null&&da?.tMin!=null?`${Math.round(nT(da.tMin))}–${Math.round(nT(da.tMax))}°`:'—';
       const isActual=todayIdx!=null&&i<todayIdx;
-      const tag=isActual?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · actual</span>':'';
+      const tag=isActual?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · Observed</span>':'';
       const gx=(pL+i/(n-1)*cW).toFixed(1);
-      document.getElementById('ttg-temp')?.setAttribute('x1',gx);
-      document.getElementById('ttg-temp')?.setAttribute('x2',gx);
-      document.getElementById('ttg-temp')?.setAttribute('visibility','visible');
+      g('ttg-temp')?.setAttribute('x1',gx);
+      g('ttg-temp')?.setAttribute('x2',gx);
+      g('ttg-temp')?.setAttribute('visibility','visible');
       html=`<div class="tt-title">${labels[i]}${tag}</div>
         <div class="tt-row"><span class="tt-lbl">High</span><span class="tt-hot">${hi}${hi!=='—'?u:''}</span></div>
         <div class="tt-row"><span class="tt-lbl">Low</span><span class="tt-cold">${lo}${lo!=='—'?u:''}</span></div>
-        <div class="tt-row"><span class="tt-lbl">Hist. range</span><span class="tt-muted">${hr}</span></div>`;
+        <div class="tt-row"><span class="tt-lbl">Normal range</span><span class="tt-muted">${hr}</span></div>`;
     } else if(chartType==='rain'&&_rainData){
       const{labels,curV,avgV,thisYear,pL,cW,n,fcV,numFc,totalN,fcstDates}=_rainData;
       const tN=totalN||n;
-      const i=Math.max(0,Math.min(tN-1,Math.round((svgX-pL)/cW*(tN-1))));
+      const span=(_rainData.yearDays||tN)-1;
+      const day=Math.max(0,Math.min(span,Math.round((svgX-pL)/Math.max(cW,1)*span)));
+      const i=scrubIdx=Math.max(0,Math.min(tN-1,day));
       const isFc=i>=n&&fcV&&(i-n)<fcV.length;
       const fmt=v=>imp?(v<1?v.toFixed(2):v.toFixed(1))+'"':(v<10?v.toFixed(1):Math.round(v))+'mm';
       let dl;
@@ -853,11 +949,11 @@ function setLoad(msg){
       }
       const c=isFc?fcV[i-n]:curV[i];
       const a=isFc?null:avgV[i];
-      const gx=(pL+i/Math.max(tN-1,1)*cW).toFixed(1);
-      document.getElementById('ttg-rain')?.setAttribute('x1',gx);
-      document.getElementById('ttg-rain')?.setAttribute('x2',gx);
-      document.getElementById('ttg-rain')?.setAttribute('visibility','visible');
-      const tag=isFc?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · forecast</span>':'';
+      const gx=(pL+(i/Math.max(span,1))*cW).toFixed(1);
+      g('ttg-rain')?.setAttribute('x1',gx);
+      g('ttg-rain')?.setAttribute('x2',gx);
+      g('ttg-rain')?.setAttribute('visibility','visible');
+      const tag=isFc?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · Forecast</span>':'';
       if(isFc){
         html=`<div class="tt-title">${dl} YTD${tag}</div>
           <div class="tt-row"><span class="tt-lbl">${thisYear} (proj.)</span><span class="tt-cur">${fmt(c)}</span></div>`;
@@ -865,100 +961,98 @@ function setLoad(msg){
         const d=c-a, dc=d>0.05?'tt-pos':d<-0.05?'tt-neg':'tt-muted';
         html=`<div class="tt-title">${dl} YTD</div>
           <div class="tt-row"><span class="tt-lbl">${thisYear}</span><span class="tt-cur">${fmt(c)}</span></div>
-          <div class="tt-row"><span class="tt-lbl">Hist. avg</span><span class="tt-muted">${fmt(a)}</span></div>
+          <div class="tt-row"><span class="tt-lbl">Normal</span><span class="tt-muted">${fmt(a)}</span></div>
           <div class="tt-row"><span class="tt-lbl">Delta</span><span class="${dc}">${(d>=0?'+':'')+fmt(Math.abs(d))}</span></div>`;
       }
     } else if(chartType==='hourly'&&_hourlyData){
       const{temps,histLine,pL,cW,n,nowIdx,times}=_hourlyData;
-      const i=Math.max(0,Math.min(n-1,Math.round((svgX-pL)/cW*(n-1))));
+      const i=scrubIdx=Math.max(0,Math.min(n-1,Math.round((svgX-pL)/cW*(n-1))));
       const t=times[i];
       const hr=+t.slice(11,13);
       const isPast=i<nowIdx;
-      const tag=isPast?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · actual</span>':'';
+      const tag=isPast?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · Observed</span>':'';
       const lbl=hr===0?'Midnight':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
       const dateStr=new Date(t.replace('T',' ')).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
       const u=uT();
       const tv=temps[i]!=null?Math.round(temps[i]):'—';
       const hv=histLine[i]!=null?Math.round(histLine[i]):'—';
       const gx=(pL+i/(n-1)*cW).toFixed(1);
-      document.getElementById('ttg-hourly')?.setAttribute('x1',gx);
-      document.getElementById('ttg-hourly')?.setAttribute('x2',gx);
-      document.getElementById('ttg-hourly')?.setAttribute('visibility','visible');
+      g('ttg-hourly')?.setAttribute('x1',gx);
+      g('ttg-hourly')?.setAttribute('x2',gx);
+      g('ttg-hourly')?.setAttribute('visibility','visible');
       html=`<div class="tt-title">${dateStr} ${lbl}${tag}</div>
         <div class="tt-row"><span class="tt-lbl">Temp</span><span class="tt-hot">${tv}${tv!=='—'?u:''}</span></div>
-        <div class="tt-row"><span class="tt-lbl">5-yr avg</span><span class="tt-muted">${hv}${hv!=='—'?u:''}</span></div>`;
+        <div class="tt-row"><span class="tt-lbl">5-yr average</span><span class="tt-muted">${hv}${hv!=='—'?u:''}</span></div>`;
     } else if(chartType==='hourly-wb'&&_hourlyWbData){
       const{vals,histLine,pL,cW,n,nowIdx,times}=_hourlyWbData;
-      const i=Math.max(0,Math.min(n-1,Math.round((svgX-pL)/cW*(n-1))));
+      const i=scrubIdx=Math.max(0,Math.min(n-1,Math.round((svgX-pL)/cW*(n-1))));
       const t=times[i];
       const hr=+t.slice(11,13);
       const isPast=i<nowIdx;
-      const tag=isPast?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · actual</span>':'';
+      const tag=isPast?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · Observed</span>':'';
       const lbl=hr===0?'Midnight':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
       const dateStr=new Date(t.replace('T',' ')).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
       const u=uT();
       const tv=vals[i]!=null?Math.round(vals[i]):'—';
       const hv=histLine[i]!=null?Math.round(histLine[i]):'—';
       const gx=(pL+i/(n-1)*cW).toFixed(1);
-      document.getElementById('ttg-hourly-wb')?.setAttribute('x1',gx);
-      document.getElementById('ttg-hourly-wb')?.setAttribute('x2',gx);
-      document.getElementById('ttg-hourly-wb')?.setAttribute('visibility','visible');
+      g('ttg-hourly-wb')?.setAttribute('x1',gx);
+      g('ttg-hourly-wb')?.setAttribute('x2',gx);
+      g('ttg-hourly-wb')?.setAttribute('visibility','visible');
       html=`<div class="tt-title">${dateStr} ${lbl}${tag}</div>
         <div class="tt-row"><span class="tt-lbl">Wet bulb</span><span class="tt-hot">${tv}${tv!=='—'?u:''}</span></div>
-        <div class="tt-row"><span class="tt-lbl">5-yr avg</span><span class="tt-muted">${hv}${hv!=='—'?u:''}</span></div>`;
+        <div class="tt-row"><span class="tt-lbl">5-yr average</span><span class="tt-muted">${hv}${hv!=='—'?u:''}</span></div>`;
     } else if(chartType==='wet-bulb'&&_wetBulbData){
       const{labels,maxV,minV,dailyAvg,pL,cW,n,todayIdx}=_wetBulbData;
-      const i=Math.max(0,Math.min(n-1,Math.round((svgX-pL)/cW*(n-1))));
+      const i=scrubIdx=Math.max(0,Math.min(n-1,Math.round((svgX-pL)/cW*(n-1))));
       const u=uT();
       const hi=maxV[i]!=null?Math.round(maxV[i]):'—';
       const lo=minV[i]!=null?Math.round(minV[i]):'—';
       const da=dailyAvg?.[i];
       const hr=da?.wbMax!=null&&da?.wbMin!=null?`${Math.round(nT(da.wbMin))}–${Math.round(nT(da.wbMax))}°`:'—';
       const isActual=todayIdx!=null&&i<todayIdx;
-      const tag=isActual?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · actual</span>':'';
+      const tag=isActual?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · Observed</span>':'';
       const gx=(pL+i/(n-1)*cW).toFixed(1);
-      document.getElementById('ttg-wet-bulb')?.setAttribute('x1',gx);
-      document.getElementById('ttg-wet-bulb')?.setAttribute('x2',gx);
-      document.getElementById('ttg-wet-bulb')?.setAttribute('visibility','visible');
+      g('ttg-wet-bulb')?.setAttribute('x1',gx);
+      g('ttg-wet-bulb')?.setAttribute('x2',gx);
+      g('ttg-wet-bulb')?.setAttribute('visibility','visible');
       html=`<div class="tt-title">${labels[i]}${tag}</div>
         <div class="tt-row"><span class="tt-lbl">High</span><span class="tt-hot">${hi}${hi!=='—'?u:''}</span></div>
         <div class="tt-row"><span class="tt-lbl">Low</span><span class="tt-cold">${lo}${lo!=='—'?u:''}</span></div>
-        <div class="tt-row"><span class="tt-lbl">Hist. range</span><span class="tt-muted">${hr}</span></div>`;
+        <div class="tt-row"><span class="tt-lbl">Normal range</span><span class="tt-muted">${hr}</span></div>`;
     } else if(chartType==='hourly-rain'&&_hourlyRainData){
       const{precip,prob,pL,slotW,n,relNow,times}=_hourlyRainData;
-      const i=Math.max(0,Math.min(n-1,Math.floor((svgX-pL)/slotW)));
+      const i=scrubIdx=Math.max(0,Math.min(n-1,Math.floor((svgX-pL)/slotW)));
       const t=times[i], hr=+t.slice(11,13), isPast=relNow!=null&&i<relNow;
-      const tag=isPast?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · actual</span>':'';
+      const tag=isPast?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · Observed</span>':'';
       const lbl=hr===0?'Midnight':hr===12?'Noon':hr<12?`${hr}am`:`${hr-12}pm`;
       const dl=new Date(t.slice(0,10)+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-      const fmtMm=v=>imp?(v<0.01?'—':v.toFixed(2)+'"'):(v<0.1?'—':v.toFixed(1)+'mm');
       const pv=precip[i]??0;
       const pct=prob[i]!=null?`${prob[i]}%`:'—';
       const gx=(pL+(i+0.5)*slotW).toFixed(1);
-      document.getElementById('ttg-hourly-rain')?.setAttribute('x1',gx);
-      document.getElementById('ttg-hourly-rain')?.setAttribute('x2',gx);
-      document.getElementById('ttg-hourly-rain')?.setAttribute('visibility','visible');
+      g('ttg-hourly-rain')?.setAttribute('x1',gx);
+      g('ttg-hourly-rain')?.setAttribute('x2',gx);
+      g('ttg-hourly-rain')?.setAttribute('visibility','visible');
       html=`<div class="tt-title">${dl} ${lbl}${tag}</div>
-        <div class="tt-row"><span class="tt-lbl">Precip</span><span class="tt-cur">${fmtMm(pv)}</span></div>
+        <div class="tt-row"><span class="tt-lbl">Precip</span><span class="tt-cur">${precipReadout(pv)}</span></div>
         ${!isPast&&pct!=='—'?`<div class="tt-row"><span class="tt-lbl">Probability</span><span class="tt-muted">${pct}</span></div>`:''}`;
     } else if(chartType==='daily-rain'&&_dailyRainData){
       const{dates,precip,probs,pL,slotW,n,todayIdx}=_dailyRainData;
-      const i=Math.max(0,Math.min(n-1,Math.floor((svgX-pL)/slotW)));
+      const i=scrubIdx=Math.max(0,Math.min(n-1,Math.floor((svgX-pL)/slotW)));
       const isPast=i<todayIdx, isToday=i===todayIdx;
-      const tag=isPast?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · actual</span>':'';
+      const tag=isPast?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · Observed</span>':'';
       const dl=isToday?'Today':new Date(dates[i]+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-      const fmtMm=v=>imp?(v<0.1?'—':v.toFixed(2)+'"'):(v<0.1?'—':v.toFixed(1)+'mm');
       const mm=precip[i]??0, prob=probs[i];
       const gx=(pL+(i+0.5)*slotW).toFixed(1);
-      document.getElementById('ttg-daily-rain')?.setAttribute('x1',gx);
-      document.getElementById('ttg-daily-rain')?.setAttribute('x2',gx);
-      document.getElementById('ttg-daily-rain')?.setAttribute('visibility','visible');
+      g('ttg-daily-rain')?.setAttribute('x1',gx);
+      g('ttg-daily-rain')?.setAttribute('x2',gx);
+      g('ttg-daily-rain')?.setAttribute('visibility','visible');
       html=`<div class="tt-title">${dl}${tag}</div>
-        <div class="tt-row"><span class="tt-lbl">${isPast?'Actual':'Forecast'}</span><span class="tt-cur">${fmtMm(mm)}</span></div>
+        <div class="tt-row"><span class="tt-lbl">${isPast?'Observed':'Forecast'}</span><span class="tt-cur">${precipReadout(mm)}</span></div>
         ${!isPast&&prob!=null?`<div class="tt-row"><span class="tt-lbl">Probability</span><span class="tt-muted">${prob}%</span></div>`:''}`;
     } else if(chartType==='climate'&&_climateData){
       const{data,pL,slotW,n}=_climateData;
-      const i=Math.max(0,Math.min(n-1,Math.floor((svgX-pL)/slotW)));
+      const i=scrubIdx=Math.max(0,Math.min(n-1,Math.floor((svgX-pL)/slotW)));
       const MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
       const d=data[i];
       const fmtT=v=>v!=null?`${Math.round(nT(v))}${uT()}`:'—';
@@ -967,7 +1061,18 @@ function setLoad(msg){
         <div class="tt-row"><span class="tt-lbl">Avg high</span><span class="tt-hot">${fmtT(d.tMax)}</span></div>
         <div class="tt-row"><span class="tt-lbl">Avg low</span><span class="tt-cold">${fmtT(d.tMin)}</span></div>
         <div class="tt-row"><span class="tt-lbl">Avg rainfall</span><span class="tt-muted">${fmtR(d.rain)}</span></div>`;
+    } else if(chartType==='climate-rain'&&_climateRainData){
+      const{data,actual,pL,slotW,n}=_climateRainData;
+      const i=scrubIdx=Math.max(0,Math.min(n-1,Math.floor((svgX-pL)/slotW)));
+      const MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
+      const d=data[i];
+      const a=actual?.[i];
+      const fmtR=v=>v!=null?precipReadout(v):'—';
+      html=`<div class="tt-title">${MON[i]}</div>
+        <div class="tt-row"><span class="tt-lbl">Normal</span><span class="tt-muted">${fmtR(d.rain)}</span></div>
+        <div class="tt-row"><span class="tt-lbl">This year</span><span class="tt-cur">${a&&a.days?fmtR(a.rain):'—'}</span></div>`;
     } else return;
+    if(typeof window.updateChartReadout==='function' && typeof scrubIdx==='number') window.updateChartReadout(chartType, scrubIdx);
     tt.innerHTML=html;
     const mg=14;
     let tx=cx+mg, ty=cy-100;
@@ -982,14 +1087,9 @@ function setLoad(msg){
     tt.classList.remove('hidden');
   }
   function hideTT(){
+    if(typeof window.restoreChartReadout==='function') window.restoreChartReadout();
     document.getElementById('tt')?.classList.add('hidden');
-    document.getElementById('ttg-temp')?.setAttribute('visibility','hidden');
-    document.getElementById('ttg-rain')?.setAttribute('visibility','hidden');
-    document.getElementById('ttg-hourly')?.setAttribute('visibility','hidden');
-    document.getElementById('ttg-hourly-wb')?.setAttribute('visibility','hidden');
-    document.getElementById('ttg-wet-bulb')?.setAttribute('visibility','hidden');
-    document.getElementById('ttg-hourly-rain')?.setAttribute('visibility','hidden');
-    document.getElementById('ttg-daily-rain')?.setAttribute('visibility','hidden');
+    document.querySelectorAll('[id^="ttg-"]').forEach(el=>el.setAttribute('visibility','hidden'));
   }
   const content=document.getElementById('content');
   content.addEventListener('click',e=>{
@@ -1004,13 +1104,13 @@ function setLoad(msg){
     e.preventDefault();
     scrollToPanel(badge.dataset.panelJump);
   });
-  content.addEventListener('mousemove',e=>{
-    const svg=e.target.closest('svg[data-chart]');
-    if(!svg){hideTT();return;}
+  document.addEventListener('mousemove',e=>{
+    const svg=e.target.closest&&e.target.closest('svg[data-chart]');
+    if(!svg||!svg.closest('#content, #detail-card')){hideTT();return;}
     const rect=svg.getBoundingClientRect();
     const vb=svg.viewBox.baseVal;
     const svgX=(e.clientX-rect.left)/rect.width*vb.width;
-    showTT(svgX,svg.dataset.chart,e.clientX,e.clientY);
+    showTT(svgX,svg.dataset.chart,e.clientX,e.clientY,svg);
   });
   content.addEventListener('mouseleave',hideTT);
 
@@ -1144,7 +1244,8 @@ function beginLocationWeather(fc,lat,lon,name,source){
 }
 
 async function loadWeather(lat,lon,name,source){
-  setLoad('Loading weather…');
+  if(typeof showSkeleton==='function') showSkeleton(name);
+  else setLoad('Loading weather…');
   const fc=await getForecast(lat,lon);
   beginLocationWeather(fc,lat,lon,name,source);
 }
