@@ -132,6 +132,7 @@ WATCH_WIDGETS = Target(
     bundle_id=BUNDLE_WATCH_WIDGETS,
     settings={
         "INFOPLIST_FILE": "Support/WeatherWatchWidgets-Info.plist",
+        "INFOPLIST_KEY_CFBundleDisplayName": "Weather",
         "CODE_SIGN_ENTITLEMENTS": "Support/WeatherWatchWidgets.entitlements",
         "TARGETED_DEVICE_FAMILY": "4",
         "WATCHOS_DEPLOYMENT_TARGET": WATCH_MIN,
@@ -150,6 +151,7 @@ IOS_WIDGETS = Target(
     bundle_id=BUNDLE_IOS_WIDGETS,
     settings={
         "INFOPLIST_FILE": "Support/WeatherWidgets-Info.plist",
+        "INFOPLIST_KEY_CFBundleDisplayName": "Weather",
         "CODE_SIGN_ENTITLEMENTS": "Support/WeatherWidgets.entitlements",
         "TARGETED_DEVICE_FAMILY": '"1,2"',
         "IPHONEOS_DEPLOYMENT_TARGET": IOS_MIN,

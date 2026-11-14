@@ -607,6 +607,7 @@
 				DEVELOPMENT_TEAM = 8UMB36YLV4;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Support/WeatherWatchWidgets-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Weather;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = uk.co.materialworld.weatherworld.watchkitapp.widgets;
 				PRODUCT_NAME = WeatherWatchWidgets;
@@ -630,6 +631,7 @@
 				DEVELOPMENT_TEAM = 8UMB36YLV4;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Support/WeatherWatchWidgets-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Weather;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = uk.co.materialworld.weatherworld.watchkitapp.widgets;
 				PRODUCT_NAME = WeatherWatchWidgets;
@@ -653,6 +655,7 @@
 				DEVELOPMENT_TEAM = 8UMB36YLV4;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Support/WeatherWidgets-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Weather;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = uk.co.materialworld.weatherworld.widgets;
@@ -673,6 +676,7 @@
 				DEVELOPMENT_TEAM = 8UMB36YLV4;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Support/WeatherWidgets-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Weather;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = uk.co.materialworld.weatherworld.widgets;
