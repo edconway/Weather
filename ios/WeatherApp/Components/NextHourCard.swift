@@ -52,12 +52,8 @@ struct NextHourCard: View {
             .chartXAxis {
                 AxisMarks(values: .stride(by: .minute, count: 15)) { value in
                     AxisGridLine()
-                    AxisValueLabel {
-                        if let date = value.as(Date.self) {
-                            var style = Date.FormatStyle().hour().minute()
-                            style.timeZone = timeZone
-                            Text(date.formatted(style))
-                        }
+                    if let label = minuteAxisLabel(for: value) {
+                        AxisValueLabel(label)
                     }
                 }
             }
@@ -86,6 +82,16 @@ struct NextHourCard: View {
     private var yTop: Double {
         let displayed = formatter.precipitationValue(peak)
         return max(displayed * 1.25, formatter.precipitationValue(0.5))
+    }
+
+    /// Hour:minute label for a date axis value. `AxisValueLabel` takes the
+    /// string directly; a trailing closure that does not return a view is
+    /// type-checked as `() -> ()` and rejected.
+    private func minuteAxisLabel(for value: AxisValue) -> String? {
+        guard let date = value.as(Date.self) else { return nil }
+        var style = Date.FormatStyle().hour().minute()
+        style.timeZone = timeZone
+        return date.formatted(style)
     }
 }
 
