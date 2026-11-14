@@ -233,6 +233,21 @@ struct TodayScreen: View {
             title: "Rain",
             caption: "Precipitation"
         ) {
+            if let apple = store.appleWeather, !apple.displayMinutes.isEmpty {
+                NextHourCard(
+                    minutes: apple.displayMinutes,
+                    attribution: apple.attribution,
+                    formatter: store.formatter,
+                    timeZone: timeZone)
+            }
+            if let alerts = store.appleWeather?.alerts, !alerts.isEmpty,
+               store.appleWeather?.failure == nil {
+                AppleAlertsList(alerts: alerts)
+                if store.appleWeather?.displayMinutes.isEmpty == true,
+                   let attribution = store.appleWeather?.attribution {
+                    AppleAttributionView(attribution: attribution)
+                }
+            }
             HourlyRainChart(
                 points: store.hourlyPoints,
                 formatter: store.formatter, timeZone: timeZone,

@@ -37,6 +37,11 @@ final class WeatherStore {
     private(set) var ytdRain: YTDRain?
     private(set) var ytdProjection: [YTDRainBuilder.ProjectionPoint] = []
 
+    /// Minute rain and alerts from on-device WeatherKit. Nil until the first reply.
+    private(set) var appleWeather: AppleWeatherSnapshot?
+    private(set) var forecastIsStale = false
+    private(set) var forecastUpdatedAt: Date?
+
     /// Set by a widget/complication deep link; `TodayScreen` observes this to
     /// scroll to the matching panel, then clears it.
     var pendingPanelJump: PanelID?
@@ -78,6 +83,7 @@ final class WeatherStore {
     private let locationProvider: LocationProvider
     private let geocoder: ReverseGeocoder
     private let prefs: Prefs
+    private let appleClient: AppleWeatherClient
     private let now: () -> Date
 
     /// Guards against a slow response for a location the user has left.
@@ -91,12 +97,14 @@ final class WeatherStore {
         locationProvider: LocationProvider = LocationProvider(),
         geocoder: ReverseGeocoder = ReverseGeocoder(),
         prefs: Prefs = Prefs(),
+        appleClient: AppleWeatherClient = .shared,
         now: @escaping () -> Date = { Date() }
     ) {
         self.repository = repository
         self.locationProvider = locationProvider
         self.geocoder = geocoder
         self.prefs = prefs
+        self.appleClient = appleClient
         self.now = now
         self.imperial = prefs.imperial
         self.theme = prefs.theme
@@ -213,6 +221,7 @@ final class WeatherStore {
         }
 
         if forecast == nil { phase = .loading }
+        startAppleWeather(for: target, bypassHoldOff: false)
 
         do {
             let fetched = try await repository.forecast(for: target)
@@ -220,6 +229,8 @@ final class WeatherStore {
 
             forecast = fetched.value
             conditions = CurrentConditions(forecast: fetched.value, now: now())
+            forecastIsStale = fetched.isStale
+            forecastUpdatedAt = fetched.savedAt ?? now()
             phase = .loaded
             banner = fetched.isStale ? Self.staleBannerText(savedAt: fetched.savedAt) : nil
             onDataChanged?()
@@ -255,11 +266,14 @@ final class WeatherStore {
             guard currentKey == location.cacheKey else { return }
             forecast = response
             conditions = CurrentConditions(forecast: response, now: now())
+            forecastIsStale = false
+            forecastUpdatedAt = now()
             banner = nil
             onDataChanged?()
         } catch {
             banner = error.localizedDescription
         }
+        await loadAppleWeather(for: location, bypassHoldOff: true)
     }
 
     private static func staleBannerText(savedAt: Date?) -> String {
@@ -276,6 +290,21 @@ final class WeatherStore {
         loadTasks.append(Task { [weak self] in
             await self?.loadHourlyNormals(for: target)
         })
+    }
+
+    private func startAppleWeather(for target: WeatherLocation, bypassHoldOff: Bool) {
+        loadTasks.append(Task { [weak self] in
+            await self?.loadAppleWeather(for: target, bypassHoldOff: bypassHoldOff)
+        })
+    }
+
+    private func loadAppleWeather(for target: WeatherLocation, bypassHoldOff: Bool) async {
+        let snapshot = await appleClient.fetch(
+            latitude: target.latitude,
+            longitude: target.longitude,
+            bypassHoldOff: bypassHoldOff)
+        guard !Task.isCancelled, currentKey == target.cacheKey else { return }
+        appleWeather = snapshot
     }
 
     private func loadHourlyNormals(for target: WeatherLocation) async {
@@ -405,6 +434,7 @@ final class WeatherStore {
         ytdSeries = nil
         ytdRequested = false
         climatologyRequested = false
+        appleWeather = nil
         banner = nil
     }
 }
