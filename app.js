@@ -908,9 +908,10 @@ function setLoad(msg){
   window.bindChartAccessibility = bindChartAccessibility;
 
   // Tooltip helpers
-  function showTT(svgX,chartType,cx,cy){
+  function showTT(svgX,chartType,cx,cy,root){
     const tt=document.getElementById('tt');
     if(!tt) return;
+    const g=id=>(root&&root.querySelector('#'+id))||document.getElementById(id);
     let html='';
     let scrubIdx=-1;
     if(chartType==='temp'&&_tempData){
@@ -924,9 +925,9 @@ function setLoad(msg){
       const isActual=todayIdx!=null&&i<todayIdx;
       const tag=isActual?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · Observed</span>':'';
       const gx=(pL+i/(n-1)*cW).toFixed(1);
-      document.getElementById('ttg-temp')?.setAttribute('x1',gx);
-      document.getElementById('ttg-temp')?.setAttribute('x2',gx);
-      document.getElementById('ttg-temp')?.setAttribute('visibility','visible');
+      g('ttg-temp')?.setAttribute('x1',gx);
+      g('ttg-temp')?.setAttribute('x2',gx);
+      g('ttg-temp')?.setAttribute('visibility','visible');
       html=`<div class="tt-title">${labels[i]}${tag}</div>
         <div class="tt-row"><span class="tt-lbl">High</span><span class="tt-hot">${hi}${hi!=='—'?u:''}</span></div>
         <div class="tt-row"><span class="tt-lbl">Low</span><span class="tt-cold">${lo}${lo!=='—'?u:''}</span></div>
@@ -949,9 +950,9 @@ function setLoad(msg){
       const c=isFc?fcV[i-n]:curV[i];
       const a=isFc?null:avgV[i];
       const gx=(pL+(i/Math.max(span,1))*cW).toFixed(1);
-      document.getElementById('ttg-rain')?.setAttribute('x1',gx);
-      document.getElementById('ttg-rain')?.setAttribute('x2',gx);
-      document.getElementById('ttg-rain')?.setAttribute('visibility','visible');
+      g('ttg-rain')?.setAttribute('x1',gx);
+      g('ttg-rain')?.setAttribute('x2',gx);
+      g('ttg-rain')?.setAttribute('visibility','visible');
       const tag=isFc?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · Forecast</span>':'';
       if(isFc){
         html=`<div class="tt-title">${dl} YTD${tag}</div>
@@ -976,9 +977,9 @@ function setLoad(msg){
       const tv=temps[i]!=null?Math.round(temps[i]):'—';
       const hv=histLine[i]!=null?Math.round(histLine[i]):'—';
       const gx=(pL+i/(n-1)*cW).toFixed(1);
-      document.getElementById('ttg-hourly')?.setAttribute('x1',gx);
-      document.getElementById('ttg-hourly')?.setAttribute('x2',gx);
-      document.getElementById('ttg-hourly')?.setAttribute('visibility','visible');
+      g('ttg-hourly')?.setAttribute('x1',gx);
+      g('ttg-hourly')?.setAttribute('x2',gx);
+      g('ttg-hourly')?.setAttribute('visibility','visible');
       html=`<div class="tt-title">${dateStr} ${lbl}${tag}</div>
         <div class="tt-row"><span class="tt-lbl">Temp</span><span class="tt-hot">${tv}${tv!=='—'?u:''}</span></div>
         <div class="tt-row"><span class="tt-lbl">5-yr average</span><span class="tt-muted">${hv}${hv!=='—'?u:''}</span></div>`;
@@ -995,9 +996,9 @@ function setLoad(msg){
       const tv=vals[i]!=null?Math.round(vals[i]):'—';
       const hv=histLine[i]!=null?Math.round(histLine[i]):'—';
       const gx=(pL+i/(n-1)*cW).toFixed(1);
-      document.getElementById('ttg-hourly-wb')?.setAttribute('x1',gx);
-      document.getElementById('ttg-hourly-wb')?.setAttribute('x2',gx);
-      document.getElementById('ttg-hourly-wb')?.setAttribute('visibility','visible');
+      g('ttg-hourly-wb')?.setAttribute('x1',gx);
+      g('ttg-hourly-wb')?.setAttribute('x2',gx);
+      g('ttg-hourly-wb')?.setAttribute('visibility','visible');
       html=`<div class="tt-title">${dateStr} ${lbl}${tag}</div>
         <div class="tt-row"><span class="tt-lbl">Wet bulb</span><span class="tt-hot">${tv}${tv!=='—'?u:''}</span></div>
         <div class="tt-row"><span class="tt-lbl">5-yr average</span><span class="tt-muted">${hv}${hv!=='—'?u:''}</span></div>`;
@@ -1012,9 +1013,9 @@ function setLoad(msg){
       const isActual=todayIdx!=null&&i<todayIdx;
       const tag=isActual?'<span style="color:var(--muted);font-weight:400;font-size:.68rem"> · Observed</span>':'';
       const gx=(pL+i/(n-1)*cW).toFixed(1);
-      document.getElementById('ttg-wet-bulb')?.setAttribute('x1',gx);
-      document.getElementById('ttg-wet-bulb')?.setAttribute('x2',gx);
-      document.getElementById('ttg-wet-bulb')?.setAttribute('visibility','visible');
+      g('ttg-wet-bulb')?.setAttribute('x1',gx);
+      g('ttg-wet-bulb')?.setAttribute('x2',gx);
+      g('ttg-wet-bulb')?.setAttribute('visibility','visible');
       html=`<div class="tt-title">${labels[i]}${tag}</div>
         <div class="tt-row"><span class="tt-lbl">High</span><span class="tt-hot">${hi}${hi!=='—'?u:''}</span></div>
         <div class="tt-row"><span class="tt-lbl">Low</span><span class="tt-cold">${lo}${lo!=='—'?u:''}</span></div>
@@ -1029,9 +1030,9 @@ function setLoad(msg){
       const pv=precip[i]??0;
       const pct=prob[i]!=null?`${prob[i]}%`:'—';
       const gx=(pL+(i+0.5)*slotW).toFixed(1);
-      document.getElementById('ttg-hourly-rain')?.setAttribute('x1',gx);
-      document.getElementById('ttg-hourly-rain')?.setAttribute('x2',gx);
-      document.getElementById('ttg-hourly-rain')?.setAttribute('visibility','visible');
+      g('ttg-hourly-rain')?.setAttribute('x1',gx);
+      g('ttg-hourly-rain')?.setAttribute('x2',gx);
+      g('ttg-hourly-rain')?.setAttribute('visibility','visible');
       html=`<div class="tt-title">${dl} ${lbl}${tag}</div>
         <div class="tt-row"><span class="tt-lbl">Precip</span><span class="tt-cur">${precipReadout(pv)}</span></div>
         ${!isPast&&pct!=='—'?`<div class="tt-row"><span class="tt-lbl">Probability</span><span class="tt-muted">${pct}</span></div>`:''}`;
@@ -1043,9 +1044,9 @@ function setLoad(msg){
       const dl=isToday?'Today':new Date(dates[i]+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
       const mm=precip[i]??0, prob=probs[i];
       const gx=(pL+(i+0.5)*slotW).toFixed(1);
-      document.getElementById('ttg-daily-rain')?.setAttribute('x1',gx);
-      document.getElementById('ttg-daily-rain')?.setAttribute('x2',gx);
-      document.getElementById('ttg-daily-rain')?.setAttribute('visibility','visible');
+      g('ttg-daily-rain')?.setAttribute('x1',gx);
+      g('ttg-daily-rain')?.setAttribute('x2',gx);
+      g('ttg-daily-rain')?.setAttribute('visibility','visible');
       html=`<div class="tt-title">${dl}${tag}</div>
         <div class="tt-row"><span class="tt-lbl">${isPast?'Observed':'Forecast'}</span><span class="tt-cur">${precipReadout(mm)}</span></div>
         ${!isPast&&prob!=null?`<div class="tt-row"><span class="tt-lbl">Probability</span><span class="tt-muted">${prob}%</span></div>`:''}`;
@@ -1088,13 +1089,7 @@ function setLoad(msg){
   function hideTT(){
     if(typeof window.restoreChartReadout==='function') window.restoreChartReadout();
     document.getElementById('tt')?.classList.add('hidden');
-    document.getElementById('ttg-temp')?.setAttribute('visibility','hidden');
-    document.getElementById('ttg-rain')?.setAttribute('visibility','hidden');
-    document.getElementById('ttg-hourly')?.setAttribute('visibility','hidden');
-    document.getElementById('ttg-hourly-wb')?.setAttribute('visibility','hidden');
-    document.getElementById('ttg-wet-bulb')?.setAttribute('visibility','hidden');
-    document.getElementById('ttg-hourly-rain')?.setAttribute('visibility','hidden');
-    document.getElementById('ttg-daily-rain')?.setAttribute('visibility','hidden');
+    document.querySelectorAll('[id^="ttg-"]').forEach(el=>el.setAttribute('visibility','hidden'));
   }
   const content=document.getElementById('content');
   content.addEventListener('click',e=>{
@@ -1109,13 +1104,13 @@ function setLoad(msg){
     e.preventDefault();
     scrollToPanel(badge.dataset.panelJump);
   });
-  content.addEventListener('mousemove',e=>{
-    const svg=e.target.closest('svg[data-chart]');
-    if(!svg){hideTT();return;}
+  document.addEventListener('mousemove',e=>{
+    const svg=e.target.closest&&e.target.closest('svg[data-chart]');
+    if(!svg||!svg.closest('#content, #detail-card')){hideTT();return;}
     const rect=svg.getBoundingClientRect();
     const vb=svg.viewBox.baseVal;
     const svgX=(e.clientX-rect.left)/rect.width*vb.width;
-    showTT(svgX,svg.dataset.chart,e.clientX,e.clientY);
+    showTT(svgX,svg.dataset.chart,e.clientX,e.clientY,svg);
   });
   content.addEventListener('mouseleave',hideTT);
 

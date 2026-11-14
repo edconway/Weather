@@ -513,10 +513,11 @@ function minuteSvg(story){
   const yMax=Math.max(8, ...rates)*1.05;
   const cW=W-pL-pR, cH=H-pT-pB;
   const yf=v=>pT+(1-Math.min(v,yMax)/yMax)*cH;
+  const dark=typeof _chartDark==='function'&&_chartDark();
   const bands=[
-    [0,2.5,0.05,'Light'],
-    [2.5,7.6,0.09,'Moderate'],
-    [7.6,yMax,0.14,'Heavy']
+    [0,2.5,dark?0.09:0.05,'Light'],
+    [2.5,7.6,dark?0.14:0.09,'Moderate'],
+    [7.6,yMax,dark?0.22:0.14,'Heavy']
   ];
   const bandSvg=bands.map(([a,b,op,label])=>{
     const y1=yf(b), y2=yf(a);
@@ -682,7 +683,7 @@ function rangeBar(){
     </div>
     <span class="range-lo" style="left:${l1.toFixed(1)}%">${fTn(Math.min(lo,hi))}°</span>
     <span class="range-hi" style="left:${l2.toFixed(1)}%">${fTn(Math.max(lo,hi))}°</span>
-    <div class="range-cap">normal ${fTn(band.tMin)}°–${fTn(band.tMax)}°</div>
+    <div class="range-cap" style="left:${((n1+n2)/2).toFixed(1)}%">normal ${fTn(band.tMin)}°–${fTn(band.tMax)}°</div>
   </div>`;
 }
 function dryCard(w){
@@ -727,9 +728,11 @@ function dailyRainReadout(i, store){
   const idx=i==null?d.todayIdx:i;
   const parts=precipParts(d.precip[idx]||0);
   const label=idx===d.todayIdx?'Today':idx<d.todayIdx?'Observed':'Forecast';
-  const words=rainDayWords(d.precip[idx]||0, d.means?.[idx], idx===d.todayIdx?d.p90:null, d.dates[idx]);
+  const words=rainDayWords(d.precip[idx]||0, d.means?.[idx], d.p90s?.[idx]??(idx===d.todayIdx?d.p90:null), d.dates[idx]);
   const chance=idx>=d.todayIdx && d.probs[idx]!=null?`${d.probs[idx]}% chance · `: '';
-  return readoutHtml('daily-rain', parts.num, parts.unit, ctx(label, `· ${chance}${words}`), store);
+  const hours=d.hours?.[idx];
+  const onOff=hours>=1 && (d.precip[idx]||0)>=0.1?` · rain on and off for about ${Math.round(hours)} h`:'';
+  return readoutHtml('daily-rain', parts.num, parts.unit, ctx(label, `· ${chance}${words}${onOff}`), store);
 }
 function ytdReadout(){
   if(!ytdData) return readoutHtml('rain','—','',ctx('Year to date','· loading'));
@@ -755,7 +758,7 @@ function climateReadout(){
   if(act?.tMax!=null && act?.tMin!=null){
     const dep=(act.tMax+act.tMin)/2-(norm.tMax+norm.tMin)/2;
     const d=degFrom(dep);
-    const rain=act.rain!=null&&norm.rain!=null?` · ${precipReadout(act.rain)} of ${precipReadout(norm.rain)}`:'';
+    const rain=act.rain!=null&&norm.rain!=null?` · ${precipParts(act.rain).num} of ${precipReadout(norm.rain)}`:'';
     rest=`· ${d.near?'near':d.text+' than'} the ${Math.round(nT(norm.tMax))}° / ${Math.round(nT(norm.tMin))}° normal${rain}`;
   }
   const label=act?.days?`${MONTHS[parts.month]} so far`:`${MONTHS[parts.month]} normal`;
@@ -880,13 +883,17 @@ function openSettings(){
 }
 function closeSettings(){ document.getElementById('settings-modal')?.classList.add('hidden'); }
 function openDetail(key){
-  const mod=document.querySelector(`.chart-mod[data-chart-key="${key}"]`);
-  const svg=mod?.querySelector('svg')?.outerHTML||'';
-  const read=mod?.querySelector('.mod-read')?.innerText||'';
+  const mod=document.querySelector(`#content .chart-mod[data-chart-key="${key}"]`);
+  const svg=mod?.querySelector('svg[data-chart]')?.outerHTML||'';
+  const readEl=mod?.querySelector('.mod-read');
+  const read=readEl?.innerText||'';
   const card=document.getElementById('detail-card');
   const years=climatologyData?`${climatologyData.yearStart}–${climatologyData.yearEnd}`:(hourlyHistData?`${hourlyHistData.yearStart}–${hourlyHistData.yearEnd}`:'');
   card.innerHTML=`<div class="modal-head"><h2 id="detail-title">${escapeHtml(mod?.querySelector('h3')?.textContent||'Chart')}</h2><button type="button" class="text-btn" data-close="detail">Done</button></div>
-    <div class="detail-plot">${svg}</div>
+    <div class="chart-mod" data-chart-key="${escapeHtml(key)}">
+      ${readEl?readEl.outerHTML:'<div class="mod-read"></div>'}
+      <div class="detail-plot">${svg}</div>
+    </div>
     <div class="detail-stats">${detailStats(key)}</div>
     <p class="how"><strong>How this is worked out.</strong> ${escapeHtml(HOW[key]||'')}${years?` Years ${escapeHtml(years)}.` :''}</p>
     <button type="button" class="btn" data-copy="${escapeHtml(read)}">Copy summary</button>`;
@@ -897,10 +904,18 @@ function detailStats(key){
   if(key==='hourly'&&_hourlyData){
     const i=_hourlyData.nowIdx??0;
     const now=_hourlyData.temps[i], usual=_hourlyData.histLine[i];
-    const diffs=_hourlyData.temps.map((v,n)=>v!=null&&_hourlyData.histLine[n]!=null?v-_hourlyData.histLine[n]:null).filter(v=>v!=null);
-    const cold=Math.min(..._hourlyData.temps.filter(v=>v!=null));
-    const warm=Math.max(..._hourlyData.temps.filter(v=>v!=null));
-    return cell('Now', now==null?'—':`${Math.round(now)}°`)+cell('Usual for the hour', usual==null?'—':`${Math.round(usual)}°`)+cell('Difference', now==null||usual==null?'—':degFrom(imp?(now-usual)*5/9:now-usual).text)+cell('In this window', `${Math.round(cold)}° to ${Math.round(warm)}°`);
+    let cold=Infinity, warm=-Infinity, coldI=-1, warmI=-1;
+    _hourlyData.temps.forEach((v,n)=>{
+      if(v==null) return;
+      if(v<cold){ cold=v; coldI=n; }
+      if(v>warm){ warm=v; warmI=n; }
+    });
+    const at=i=>{
+      const t=_hourlyData.times?.[i];
+      return t?` at ${hourClock(+t.slice(11,13))}`:'';
+    };
+    const span=coldI<0?'—':`${Math.round(cold)}°${at(coldI)} to ${Math.round(warm)}°${at(warmI)}`;
+    return cell('Now', now==null?'—':`${Math.round(now)}°`)+cell('Usual for the hour', usual==null?'—':`${Math.round(usual)}°`)+cell('Difference', now==null||usual==null?'—':degFrom(imp?(now-usual)*5/9:now-usual).text)+cell('In this window', span);
   }
   if(key==='temp'&&_tempData){
     const i=_tempData.todayIdx??0;
@@ -1151,14 +1166,14 @@ function loadSaved(i){
 }
 
 function applyReadout(key, num, unit, ctxHtml){
-  const root=document.querySelector(`.chart-mod[data-chart-key="${key}"] .mod-read`);
-  if(!root) return;
-  const numEl=root.querySelector('.mod-num');
-  const unitEl=root.querySelector('.mod-unit');
-  const ctxEl=root.querySelector('.mod-ctx');
-  if(numEl) numEl.textContent=num;
-  if(unitEl) unitEl.textContent=unit;
-  if(ctxEl) ctxEl.innerHTML=ctxHtml;
+  document.querySelectorAll(`.chart-mod[data-chart-key="${key}"] .mod-read`).forEach(root=>{
+    const numEl=root.querySelector('.mod-num');
+    const unitEl=root.querySelector('.mod-unit');
+    const ctxEl=root.querySelector('.mod-ctx');
+    if(numEl) numEl.textContent=num;
+    if(unitEl) unitEl.textContent=unit;
+    if(ctxEl) ctxEl.innerHTML=ctxHtml;
+  });
 }
 window.restoreChartReadout=function(){
   Object.entries(readoutBase).forEach(([key,v])=>applyReadout(key, v.num, v.unit, v.ctx));
@@ -1220,7 +1235,7 @@ document.addEventListener('click', async (e)=>{
   }
   const seg=e.target.closest('[data-seg]');
   if(seg){ e.preventDefault(); scrollToPanel(seg.dataset.seg); return; }
-  const unit=e.target.closest('[data-unit]');
+  const unit=e.target.closest('#settings-card [data-unit]');
   if(unit){
     imp=unit.dataset.unit==='imp';
     savePrefs({imp});
@@ -1228,7 +1243,7 @@ document.addEventListener('click', async (e)=>{
     paintSettings();
     return;
   }
-  const theme=e.target.closest('[data-theme]');
+  const theme=e.target.closest('#settings-card [data-theme]');
   if(theme){
     if(theme.dataset.theme==='auto'){
       delete document.documentElement.dataset.theme;

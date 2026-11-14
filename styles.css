@@ -528,10 +528,7 @@ body{
 /* ─── UX review layout ─── */
 html,body{margin:0}
 body{background:var(--bg)}
-.sky{
-  position:fixed;left:0;right:0;top:0;height:100vh;z-index:0;pointer-events:none;
-  background:linear-gradient(180deg,var(--sky-top,#165ea8) 0%,var(--sky-mid,#2a74b8) 42%,var(--sky-mid,#2a74b8) 100%);
-}
+.sky{display:none}
 #app{position:relative;z-index:1}
 body.has-weather #app{max-width:none;padding:0 0 48px}
 body.has-weather .hdr-wrap{display:none}
@@ -572,8 +569,14 @@ html[data-sky="storm-night"]{--sky-top:#140e22;--sky-mid:#2a2044;--on-sky:#f4f7f
 .segs button:focus-visible,.icon-btn:focus-visible,.loc-pill:focus-visible,.mod-expand:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 body.has-weather .hero{
-  background:transparent;box-shadow:none;border-radius:0;overflow:visible;color:var(--on-sky,#fff);
+  position:relative;isolation:isolate;
+  background:linear-gradient(180deg,var(--sky-top,#165ea8) 0%,var(--sky-mid,#2a74b8) 62%,var(--sky-mid,#2a74b8) 100%);
+  box-shadow:none;border-radius:0;overflow:visible;color:var(--on-sky,#fff);
   padding:max(28px,env(safe-area-inset-top)) 20px 56px;margin:0;
+}
+body.has-weather .hero::before{
+  content:"";position:absolute;z-index:-1;top:-180px;bottom:0;left:50%;width:100vw;
+  transform:translateX(-50%);background:inherit;pointer-events:none;
 }
 body.has-weather .hero-temp,
 body.has-weather .hero-unit,
@@ -606,17 +609,17 @@ body.has-weather .range-cap{color:var(--on-sky-dim,rgba(255,255,255,.86))}
 .voice-h{display:block;font-size:1.18rem;font-weight:650;line-height:1.3}
 .voice-d{display:block;margin-top:4px;font-size:.9rem;color:var(--on-sky-dim,rgba(255,255,255,.82));line-height:1.35;min-height:1.2em}
 .voice-reserve{min-height:44px}
-.range{position:relative;min-height:62px;margin-top:18px}
-.range-slot{min-height:62px}
-.range-track{position:relative;height:28px;margin:26px 8px 0}
+.range{position:relative;min-height:92px;margin-top:18px}
+.range-slot{min-height:92px}
+.range-track{position:relative;height:28px;margin:4px 8px 0}
 .range-normal{position:absolute;top:6px;height:16px;border-radius:99px;background:rgba(255,255,255,.2)}
 .range-today{position:absolute;top:11px;height:6px;border-radius:99px;background:#fff}
 .range-now{
   position:absolute;top:7px;width:13px;height:13px;border-radius:50%;background:#fff;
   transform:translateX(-50%);box-shadow:0 0 0 2.5px rgba(12,24,40,.45);
 }
-.range-lo,.range-hi{position:absolute;top:50px;font-size:13px;font-weight:700;transform:translateX(-50%);white-space:nowrap}
-.range-cap{position:absolute;top:0;left:4px;transform:none;font-size:12px;color:var(--on-sky-dim,rgba(255,255,255,.86));white-space:nowrap}
+.range-lo,.range-hi{position:absolute;top:40px;font-size:13px;font-weight:700;transform:translateX(-50%);white-space:nowrap}
+.range-cap{position:absolute;top:62px;transform:translateX(-50%);font-size:12px;color:var(--on-sky-dim,rgba(255,255,255,.86));white-space:nowrap}
 .hero-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:28px}
 .hero-stat{display:flex;flex-direction:column;gap:2px;min-width:0}
 .stat-k{font-size:12px;color:var(--on-sky-dim,rgba(255,255,255,.82))}
@@ -736,6 +739,7 @@ body.has-weather .range-cap{color:var(--on-sky-dim,rgba(255,255,255,.86))}
 }
 .search-result.focused,.search-result:hover{background:var(--card-hover)}
 .detail-plot{background:var(--bg);border-radius:12px;padding:8px}
+.detail-plot .wc-svg{width:100%;height:auto;min-height:240px}
 .detail-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
 .detail-stats div{background:var(--accent-soft);border-radius:12px;padding:10px}
 .detail-stats span{display:block;color:var(--muted);font-size:.75rem}

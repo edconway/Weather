@@ -593,7 +593,8 @@ function makeHourlyRainChart(){
   const pastLabel=relNow>1?`<text x="${(pL+4).toFixed(1)}" y="${(pT+12).toFixed(1)}" font-size="11" font-weight="650" fill="${c.muted}" text-anchor="start">PAST 24 H · OBSERVED</text>`:'';
   const cells=prob.map((p,i)=>{
     if(i<relNow||p==null) return '';
-    const op=(0.06+0.94*(Math.max(0,Math.min(100,p))/100)).toFixed(3);
+    const floor=_chartDark()?0.09:0.06;
+    const op=(floor+(1-floor)*(Math.max(0,Math.min(100,p))/100)).toFixed(3);
     return `<rect x="${(pL+i*slotW).toFixed(1)}" y="${pT}" width="${slotW.toFixed(1)}" height="16" fill="${c.rain}" opacity="${op}"/>`;
   }).join('');
   const chanceLabels=(()=>{
@@ -667,7 +668,8 @@ function makeDailyRainChart(){
   const byDate={};
   norms.forEach(r=>{ if(r?.date) byDate[r.date]=r; });
   const means=daily.time.map(t=>byDate[t]?.histMeanMm??null);
-  const p90=byDate[daily.time[todayIdx]]?.p90Mm??null;
+  const p90s=daily.time.map(t=>byDate[t]?.p90Mm??null);
+  const p90=p90s[todayIdx];
   const yMax=Math.max(...precip, ...means.filter(v=>v!=null), p90||0, 1)*1.25;
   const {W,H,pL,pR,pT,pB}=_dims(200,48,16,22,36);
   const cW=W-pL-pR, cH=H-pT-pB;
@@ -709,7 +711,7 @@ function makeDailyRainChart(){
     const dayLbl=showDay?(isToday?'Today':fDay(dateStr)):'';
     return bar+base+tick+valLbl+(dayLbl?`<text x="${xCx(i).toFixed(1)}" y="${H-8}" class="ca" font-weight="${isToday?700:400}" text-anchor="middle">${dayLbl}</text>`:'');
   }).join('');
-  _dailyRainData={dates:daily.time,precip,probs,means,pL,slotW,n,todayIdx,p90};
+  _dailyRainData={dates:daily.time,precip,probs,means,pL,slotW,n,todayIdx,p90,p90s,hours:daily.precipitation_hours||[]};
   return `<svg viewBox="0 0 ${W} ${H}" class="wc-svg" data-chart="daily-rain" tabindex="0" role="img" aria-label="14-day rainfall. Ticks mark the usual amount. The dotted line is a 1-in-10 wet day.">
     ${ticks.join('')}${p90Line}${todayMark}
     <line id="ttg-daily-rain" x1="${pL}" y1="${pT}" x2="${pL}" y2="${(pT+cH).toFixed(1)}" stroke="${c.muted}" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>
