@@ -18,17 +18,19 @@ import os
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROJECT_DIR = os.path.join(ROOT, "WeatherScope.xcodeproj")
 
-# Set this to build for a real iPhone/Apple Watch:
+# Material World Limited. WeatherKit is enabled for the iPhone App ID on this
+# team (Capabilities and App Services). Override with WEATHERSCOPE_TEAM_ID.
+# An empty value falls back to ad-hoc simulator signing:
 #
-#     WEATHERSCOPE_TEAM_ID=ABCDE12345 python3 ios/tools/generate_project.py
+#     WEATHERSCOPE_TEAM_ID= python3 ios/tools/generate_project.py
 #
-# With a team, targets use automatic signing and Xcode registers the bundle IDs
-# and the App Group for you. Without one they fall back to ad-hoc signing, which
-# is simulator-only but needs no account — and still applies the App Group
-# entitlement, which `CODE_SIGNING_ALLOWED = NO` would not.
-TEAM_ID = os.environ.get("WEATHERSCOPE_TEAM_ID", "").strip()
+# With a team, targets use automatic signing. Without one they fall back to
+# ad-hoc signing, which is simulator-only but needs no account — and still
+# applies the App Group entitlement, which `CODE_SIGNING_ALLOWED = NO` would not.
+TEAM_ID = os.environ.get("WEATHERSCOPE_TEAM_ID", "8UMB36YLV4").strip()
 
-BUNDLE_APP = "com.edconway.weatherworld"
+# iPhone bundle. Do not point WeatherKit at com.edconway.weatherworld.
+BUNDLE_APP = "uk.co.materialworld.weatherworld"
 BUNDLE_WATCH = "com.edconway.weatherworld.watchkitapp"
 BUNDLE_WATCH_WIDGETS = "com.edconway.weatherworld.watchkitapp.widgets"
 BUNDLE_IOS_WIDGETS = "com.edconway.weatherworld.widgets"
@@ -160,6 +162,29 @@ TARGETS = [APP, WATCH, WATCH_WIDGETS, IOS_WIDGETS]
 APP.embeds.append("WeatherWidgets")
 BY_NAME = {t.name: t for t in TARGETS}
 
+# On-device WeatherKit. The watch and the widgets do not link it and do not
+# carry the entitlement.
+SYSTEM_FRAMEWORKS = {
+    "WeatherApp": ["WeatherKit"],
+}
+
+
+def framework_names():
+    names = []
+    for group in SYSTEM_FRAMEWORKS.values():
+        for name in group:
+            if name not in names:
+                names.append(name)
+    return names
+
+
+def framework_ref(name):
+    return uid("framework", name)
+
+
+def framework_build(target, name):
+    return uid("frameworkbuild", target, name)
+
 SUPPORT_FILES = sorted(
     [f"{t.name}-Info.plist" for t in TARGETS] +
     [f"{t.name}.entitlements" for t in TARGETS]
@@ -265,6 +290,10 @@ def build():
             w(f"\t\t{bf} /* {child.product_name} in Embed */ = {{isa = PBXBuildFile; "
               f"fileRef = {child.product_ref} /* {child.product_name} */; "
               "settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };")
+    for target_name, names in SYSTEM_FRAMEWORKS.items():
+        for name in names:
+            w(f"\t\t{framework_build(target_name, name)} /* {name}.framework in Frameworks */ = "
+              f"{{isa = PBXBuildFile; fileRef = {framework_ref(name)} /* {name}.framework */; }};")
     w("/* End PBXBuildFile section */")
 
     # ── PBXContainerItemProxy ───────────────────────────────────────────────
@@ -320,6 +349,10 @@ def build():
         w(f'\t\t{t.product_ref} /* {t.product_name} */ = {{isa = PBXFileReference; '
           f'explicitFileType = "{ext}"; includeInIndex = 0; '
           f'path = "{t.product_name}"; sourceTree = BUILT_PRODUCTS_DIR; }};')
+    for name in framework_names():
+        w(f'\t\t{framework_ref(name)} /* {name}.framework */ = {{isa = PBXFileReference; '
+          f'lastKnownFileType = wrapper.framework; name = "{name}.framework"; '
+          f'path = "System/Library/Frameworks/{name}.framework"; sourceTree = SDKROOT; }};')
     w("/* End PBXFileReference section */")
 
     # ── PBXFileSystemSynchronizedRootGroup ──────────────────────────────────
@@ -340,6 +373,8 @@ def build():
         w("\t\t\tbuildActionMask = 2147483647;")
         w("\t\t\tfiles = (")
         w(f"\t\t\t\t{t.package_build_file} /* WeatherCore in Frameworks */,")
+        for name in SYSTEM_FRAMEWORKS.get(t.name, []):
+            w(f"\t\t\t\t{framework_build(t.name, name)} /* {name}.framework in Frameworks */,")
         w("\t\t\t);")
         w("\t\t\trunOnlyForDeploymentPostprocessing = 0;")
         w("\t\t};")
@@ -355,6 +390,7 @@ def build():
     w(f"\t\t\t\t{uid('group', 'support')} /* Support */,")
     w(f"\t\t\t\t{uid('group', 'packages')} /* Packages */,")
     w(f"\t\t\t\t{uid('group', 'products')} /* Products */,")
+    w(f"\t\t\t\t{uid('group', 'frameworks')} /* Frameworks */,")
     w("\t\t\t);")
     w("\t\t\tsourceTree = \"<group>\";")
     w("\t\t};")
@@ -376,6 +412,16 @@ def build():
         w(f"\t\t\t\t{uid('supportfile', name)} /* {name} */,")
     w("\t\t\t);")
     w("\t\t\tpath = Support;")
+    w("\t\t\tsourceTree = \"<group>\";")
+    w("\t\t};")
+
+    w(f"\t\t{uid('group', 'frameworks')} /* Frameworks */ = {{")
+    w("\t\t\tisa = PBXGroup;")
+    w("\t\t\tchildren = (")
+    for name in framework_names():
+        w(f"\t\t\t\t{framework_ref(name)} /* {name}.framework */,")
+    w("\t\t\t);")
+    w("\t\t\tname = Frameworks;")
     w("\t\t\tsourceTree = \"<group>\";")
     w("\t\t};")
 

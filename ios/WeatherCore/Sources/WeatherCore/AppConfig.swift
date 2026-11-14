@@ -2,6 +2,10 @@ import Foundation
 
 /// Identifiers shared by every target. Change these in one place if the app is renamed.
 public enum AppConfig {
+    /// iPhone bundle. WeatherKit is enabled for this App ID on `developmentTeamID`.
+    public static let iOSBundleID = "uk.co.materialworld.weatherworld"
+    public static let developmentTeamID = "8UMB36YLV4"
+
     public static let appGroup = "group.com.edconway.weatherworld"
     public static let backgroundRefreshTaskID = "com.edconway.weatherworld.refresh"
     public static let deepLinkScheme = "weatherworld"

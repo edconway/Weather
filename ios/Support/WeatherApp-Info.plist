@@ -20,7 +20,7 @@
 		</dict>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Used to show weather and historical context for where you are. Never leaves your device except as coordinates sent to the weather API.</string>
+	<string>Used to show weather and historical context for where you are. Coordinates are sent to Open-Meteo for the forecast and history, and to Apple Weather on this iPhone for minute-by-minute rain.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>

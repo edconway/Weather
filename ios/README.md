@@ -4,10 +4,11 @@ Native SwiftUI port of the web app in the repo root, built to `IOS_APP_PLAN.md`.
 The web app (`app.js`, `charts.js`, `search.js`) remains the reference
 implementation for all weather maths.
 
-Shipping name: **Weather World** (bundle `com.edconway.weatherworld`). Renamed
-from the working name "WeatherScope" on 2026-08-06 — see `FOLLOWUP_PLAN.md`
-Task C for the rename procedure if it needs repeating. Internal target/type
-names (`WeatherApp`, `WeatherScopeApp.swift`, the `.xcodeproj` filename, the
+Shipping name: **Weather World** (iPhone bundle `uk.co.materialworld.weatherworld`,
+team `8UMB36YLV4`). Minute-by-minute rain and alerts on the iPhone use on-device
+WeatherKit (`WeatherService`). Forecast, history, and normals stay on Open-Meteo.
+The watch and the widgets do not link WeatherKit. Internal target/type names
+(`WeatherApp`, `WeatherScopeApp.swift`, the `.xcodeproj` filename, the
 `WeatherScope.app` bundle filename) were deliberately left alone; they are not
 user-visible. App icon: candidate A (trend line, solid→dashed, with a
 sun/cloud glyph) from the four rendered options — see `ios/tools/icon_gen.swift`
@@ -63,12 +64,16 @@ python3 ios/tools/generate_project.py
 
 ## Signing
 
-Targets are set to manual ad-hoc signing (`CODE_SIGN_IDENTITY = "-"`) so the App
-Group entitlement is applied on the simulator. Without it,
-`containerURL(forSecurityApplicationGroupIdentifier:)` returns `nil` and the
-app↔widget cache sharing silently does not exist. For device builds set
-`DEVELOPMENT_TEAM` and switch `CODE_SIGN_STYLE` back to `Automatic` in
-`generate_project.py`.
+`generate_project.py` signs every target with team `8UMB36YLV4` (automatic
+signing). The iPhone App ID is `uk.co.materialworld.weatherworld`, which has
+WeatherKit turned on under both Capabilities and App Services. The WeatherKit
+entitlement is only in `Support/WeatherApp.entitlements`. WeatherKit is linked
+on the WeatherApp target only.
+
+The shared App Group is still `group.com.edconway.weatherworld`. That identifier
+has to be enabled on the Material World App ID or the app and widgets cannot
+share a cache. Set `WEATHERSCOPE_TEAM_ID=` (empty) before regenerating only if
+you need ad-hoc simulator signing without an account.
 
 ## Deviations from the plan
 
