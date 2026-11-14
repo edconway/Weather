@@ -19,6 +19,8 @@
 			</array>
 		</dict>
 	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Used to show weather and historical context for where you are. Coordinates are sent to Open-Meteo for the forecast and history, and to Apple Weather on this iPhone for minute-by-minute rain.</string>
 	<key>UIBackgroundModes</key>

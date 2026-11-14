@@ -6,7 +6,7 @@ public enum AppConfig {
     public static let iOSBundleID = "uk.co.materialworld.weatherworld"
     public static let developmentTeamID = "8UMB36YLV4"
 
-    public static let appGroup = "group.com.edconway.weatherworld"
+    public static let appGroup = "group.materialworld.weatherworld"
     public static let backgroundRefreshTaskID = "com.edconway.weatherworld.refresh"
     public static let deepLinkScheme = "weatherworld"
     public static let todayDeepLink = URL(string: "weatherworld://today")!

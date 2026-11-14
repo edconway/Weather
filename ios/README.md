@@ -70,10 +70,12 @@ WeatherKit turned on under both Capabilities and App Services. The WeatherKit
 entitlement is only in `Support/WeatherApp.entitlements`. WeatherKit is linked
 on the WeatherApp target only.
 
-The shared App Group is still `group.com.edconway.weatherworld`. That identifier
-has to be enabled on the Material World App ID or the app and widgets cannot
-share a cache. Set `WEATHERSCOPE_TEAM_ID=` (empty) before regenerating only if
-you need ad-hoc simulator signing without an account.
+The shared App Group is `group.materialworld.weatherworld`. The watch and
+widget bundle IDs are `uk.co.materialworld.weatherworld.watchkitapp`,
+`uk.co.materialworld.weatherworld.widgets`, and
+`uk.co.materialworld.weatherworld.watchkitapp.widgets`. Set
+`WEATHERSCOPE_TEAM_ID=` (empty) before regenerating only if you need ad-hoc
+simulator signing without an account.
 
 ## Deviations from the plan
 

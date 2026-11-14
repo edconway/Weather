@@ -31,9 +31,9 @@ TEAM_ID = os.environ.get("WEATHERSCOPE_TEAM_ID", "8UMB36YLV4").strip()
 
 # iPhone bundle. Do not point WeatherKit at com.edconway.weatherworld.
 BUNDLE_APP = "uk.co.materialworld.weatherworld"
-BUNDLE_WATCH = "com.edconway.weatherworld.watchkitapp"
-BUNDLE_WATCH_WIDGETS = "com.edconway.weatherworld.watchkitapp.widgets"
-BUNDLE_IOS_WIDGETS = "com.edconway.weatherworld.widgets"
+BUNDLE_WATCH = "uk.co.materialworld.weatherworld.watchkitapp"
+BUNDLE_WATCH_WIDGETS = "uk.co.materialworld.weatherworld.watchkitapp.widgets"
+BUNDLE_IOS_WIDGETS = "uk.co.materialworld.weatherworld.widgets"
 
 IOS_MIN = "17.0"
 WATCH_MIN = "10.0"
