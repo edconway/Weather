@@ -13,6 +13,7 @@ struct TemperatureRangeGauge: View {
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.gaugeIncreasedContrast) private var gaugeIncreasedContrast
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var width: CGFloat = 320
     @State private var grown = true
@@ -54,7 +55,7 @@ struct TemperatureRangeGauge: View {
             .accessibilityLabel(TemperatureRangeLayout.voiceOver(data, unit: unit))
     }
 
-    private var strongContrast: Bool { contrast == .increased }
+    private var strongContrast: Bool { contrast == .increased || gaugeIncreasedContrast }
 
     private var caveat: Font {
         Font.custom("Caveat", size: 22, relativeTo: .callout)
@@ -245,6 +246,19 @@ struct GaugeChevron: Shape {
     }
 }
 
+/// Preview-only switch. `colorSchemeContrast` is read-only, so the gallery
+/// cannot write it. The gauge still honours the system value.
+private struct GaugeIncreasedContrastKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var gaugeIncreasedContrast: Bool {
+        get { self[GaugeIncreasedContrastKey.self] }
+        set { self[GaugeIncreasedContrastKey.self] = newValue }
+    }
+}
+
 private struct GaugeWidthKey: PreferenceKey {
     static var defaultValue: CGFloat = 320
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
@@ -298,7 +312,7 @@ struct TemperatureRangeGallery: View {
                     todayLow: 7, todayHigh: 10, current: 8, averageLow: 5, averageHigh: 12))
                 card("Increase contrast", background: darkened, data: .init(
                     todayLow: 7, todayHigh: 10, current: 8, averageLow: 5, averageHigh: 12))
-                .environment(\.colorSchemeContrast, .increased)
+                .environment(\.gaugeIncreasedContrast, true)
                 card("Reduce motion", background: darkened, data: .init(
                     todayLow: 7, todayHigh: 10, current: 8, averageLow: 5, averageHigh: 12))
                 .environment(\.accessibilityReduceMotion, true)
