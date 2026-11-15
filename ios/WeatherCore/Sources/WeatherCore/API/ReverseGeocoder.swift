@@ -30,6 +30,21 @@ public actor ReverseGeocoder {
         return Self.coordinateName(latitude: latitude, longitude: longitude)
     }
 
+    /// Neighbourhood or street for the WeatherKit point, from the same
+    /// CLGeocoder lookup. Coordinates when that lookup has nothing finer.
+    public func preciseLabel(latitude: Double, longitude: Double) async -> String {
+        if let placemark = await applePlacemark(latitude: latitude, longitude: longitude) {
+            return PrecisePlaceLabel.format(
+                neighbourhood: placemark.subLocality,
+                streetNumber: placemark.subThoroughfare,
+                street: placemark.thoroughfare,
+                city: placemark.locality,
+                latitude: latitude,
+                longitude: longitude)
+        }
+        return PrecisePlaceLabel.coordinates(latitude: latitude, longitude: longitude)
+    }
+
     static func coordinateName(latitude: Double, longitude: Double) -> String {
         String(format: "%.2f, %.2f", latitude, longitude)
     }
@@ -37,10 +52,16 @@ public actor ReverseGeocoder {
     // MARK: - CLGeocoder
 
     private func appleName(latitude: Double, longitude: Double) async -> String? {
+        guard let placemark = await applePlacemark(latitude: latitude, longitude: longitude) else {
+            return nil
+        }
+        return Self.compose(placemark: placemark)
+    }
+
+    private func applePlacemark(latitude: Double, longitude: Double) async -> CLPlacemark? {
         let location = CLLocation(latitude: latitude, longitude: longitude)
         let placemarks = try? await CLGeocoder().reverseGeocodeLocation(location)
-        guard let placemark = placemarks?.first else { return nil }
-        return Self.compose(placemark: placemark)
+        return placemarks?.first
     }
 
     /// `city, region` with the same field priority as the web app's Nominatim

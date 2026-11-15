@@ -6,6 +6,8 @@ import WeatherCore
 /// so an hourly Open-Meteo estimate is never drawn as a minute curve.
 struct NextHourCard: View {
     let minutes: [AppleMinutePoint]
+    /// Neighbourhood, street, or coordinates of the point these minutes cover.
+    let placeLabel: String
     let attribution: AppleWeatherAttribution?
     let formatter: UnitFormatter
     let timeZone: TimeZone
@@ -30,6 +32,11 @@ struct NextHourCard: View {
                 Text("Apple Weather · minute by minute")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+            }
+            if !placeLabel.isEmpty {
+                Label(placeLabel, systemImage: "location.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .labelStyle(.titleAndIcon)
             }
             Text(summary.headline)
                 .font(emphasize ? .title2.weight(.semibold) : .title3.weight(.semibold))
@@ -86,7 +93,12 @@ struct NextHourCard: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(summary.headline). \(summary.detail). Apple Weather, minute by minute.")
+        .accessibilityLabel(accessibilitySentence)
+    }
+
+    private var accessibilitySentence: String {
+        let place = placeLabel.isEmpty ? "" : "\(placeLabel). "
+        return "\(place)\(summary.headline). \(summary.detail). Apple Weather, minute by minute."
     }
 
     private var yTop: Double {

@@ -234,6 +234,9 @@ struct TodayScreen: View {
         if !minutes.isEmpty {
             NextHourCard(
                 minutes: minutes,
+                placeLabel: store.applePointLabel ?? store.location.map {
+                    PrecisePlaceLabel.coordinates(latitude: $0.latitude, longitude: $0.longitude)
+                } ?? "",
                 attribution: store.appleWeather?.attribution,
                 formatter: store.formatter,
                 timeZone: store.locationTimeZone,
