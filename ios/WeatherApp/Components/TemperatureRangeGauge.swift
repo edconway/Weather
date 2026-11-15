@@ -15,6 +15,7 @@ struct TemperatureRangeGauge: View {
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.gaugeIncreasedContrast) private var gaugeIncreasedContrast
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.gaugePreviewReduceMotion) private var gaugePreviewReduceMotion
     @State private var width: CGFloat = 320
     @State private var grown = true
     @State private var inkTrim: CGFloat = 1
@@ -56,6 +57,8 @@ struct TemperatureRangeGauge: View {
     }
 
     private var strongContrast: Bool { contrast == .increased || gaugeIncreasedContrast }
+
+    private var suppressesMotion: Bool { reduceMotion || gaugePreviewReduceMotion }
 
     private var caveat: Font {
         Font.custom("Caveat", size: 22, relativeTo: .callout)
@@ -112,7 +115,7 @@ struct TemperatureRangeGauge: View {
     }
 
     private var animatesDot: Bool {
-        style != .widget && !reduceMotion
+        style != .widget && !suppressesMotion
     }
 
     private func gradient(_ placement: GaugePlacement) -> [Gradient.Stop] {
@@ -124,7 +127,7 @@ struct TemperatureRangeGauge: View {
     }
 
     private func playIntro() {
-        let skip = reduceMotion || style == .widget || UserDefaults.standard.bool(forKey: playedKey)
+        let skip = suppressesMotion || style == .widget || UserDefaults.standard.bool(forKey: playedKey)
         if skip {
             grown = true
             inkTrim = 1
@@ -259,6 +262,19 @@ extension EnvironmentValues {
     }
 }
 
+/// Preview-only switch. `accessibilityReduceMotion` is read-only, so the gallery
+/// cannot write it. The gauge still honours the system value.
+private struct GaugePreviewReduceMotionKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var gaugePreviewReduceMotion: Bool {
+        get { self[GaugePreviewReduceMotionKey.self] }
+        set { self[GaugePreviewReduceMotionKey.self] = newValue }
+    }
+}
+
 private struct GaugeWidthKey: PreferenceKey {
     static var defaultValue: CGFloat = 320
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
@@ -315,7 +331,7 @@ struct TemperatureRangeGallery: View {
                 .environment(\.gaugeIncreasedContrast, true)
                 card("Reduce motion", background: darkened, data: .init(
                     todayLow: 7, todayHigh: 10, current: 8, averageLow: 5, averageHigh: 12))
-                .environment(\.accessibilityReduceMotion, true)
+                .environment(\.gaugePreviewReduceMotion, true)
             }
             .padding(16)
         }
