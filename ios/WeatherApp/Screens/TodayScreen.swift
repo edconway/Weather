@@ -78,6 +78,7 @@ struct TodayScreen: View {
                                     locationID: store.location?.cacheKey ?? "",
                                     day: conditions.todayString),
                                 temperatureUnit: store.imperial ? .fahrenheit : .celsius,
+                                sun: TodaySun.today(forecast: forecast, dayIndex: conditions.todayIndex),
                                 outlook: outlook(forecast: forecast, conditions: conditions),
                                 topInset: topInset,
                                 formatter: store.formatter,

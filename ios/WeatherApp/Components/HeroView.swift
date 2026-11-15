@@ -10,6 +10,7 @@ struct HeroView: View {
     let gauge: TemperatureRangeData?
     let gaugeSeed: TemperatureGaugeSeed
     let temperatureUnit: UnitTemperature
+    let sun: TodaySun?
     let outlook: ScreenPresentation.RainOutlook
     let topInset: CGFloat
     let formatter: UnitFormatter
@@ -151,12 +152,36 @@ struct HeroView: View {
     }
 
     private var stats: some View {
-        HStack(alignment: .top, spacing: 8) {
-            stat("Rain", outlook.heroValue)
-            stat("Wind", formatter.wind(conditions.windSpeed))
-            stat(conditions.isDay ? "UV" : "UV peak", formatter.uvIndexCompact(conditions.uvIndex))
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 8) {
+                stat("Rain", outlook.heroValue)
+                stat("Wind", formatter.wind(conditions.windSpeed))
+                stat(conditions.isDay ? "UV" : "UV peak", formatter.uvIndexCompact(conditions.uvIndex))
+            }
+            if let sun {
+                HStack(alignment: .top, spacing: 8) {
+                    sunStat("Sunrise", sun.sunrise, symbol: SunEvent.Kind.sunrise.symbolName)
+                    sunStat("Sunset", sun.sunset, symbol: SunEvent.Kind.sunset.symbolName)
+                }
+            }
         }
         .padding(.top, 28)
+    }
+
+    private func sunStat(_ label: String, _ time: String, symbol: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Label(label, systemImage: symbol)
+                .font(.caption)
+                .foregroundStyle(atmosphere.secondaryForeground)
+                .labelStyle(.titleAndIcon)
+            Text(time)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label): \(time)")
     }
 
     private func stat(_ label: String, _ value: String) -> some View {

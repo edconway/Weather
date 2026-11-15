@@ -186,4 +186,22 @@ final class SunEventTests: XCTestCase {
                            "21:00 entry is past sunset")
         }
     }
+
+    func testTodaySunKeepsTheLocationClock() {
+        let response = forecast(
+            timezone: "Pacific/Auckland", offset: 43_200,
+            times: ["2026-08-05"],
+            sunrise: ["2026-08-05T07:12"],
+            sunset: ["2026-08-05T17:48"])
+        let sun = TodaySun.today(forecast: response, dayIndex: 0)
+        XCTAssertEqual(sun?.sunrise.contains("12"), true)
+        XCTAssertEqual(sun?.sunset.contains("48"), true)
+        XCTAssertTrue(sun?.sunrise.contains("7") == true)
+    }
+
+    func testTodaySunIsAbsentWhenBothTimesAreMissing() {
+        let response = forecast(
+            times: ["2026-08-05"], sunrise: [nil], sunset: [nil])
+        XCTAssertNil(TodaySun.today(forecast: response, dayIndex: 0))
+    }
 }

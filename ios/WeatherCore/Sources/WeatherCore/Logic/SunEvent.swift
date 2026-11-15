@@ -62,3 +62,26 @@ public struct SunEvent: Sendable, Equatable, Codable {
         return date.formatted(style)
     }
 }
+
+/// Today's sunrise and sunset for the status page, already formatted in the
+/// place's timezone. Missing sides stay visible as "—" so a polar day still
+/// has both labels. Nil only when the forecast has neither time.
+public struct TodaySun: Equatable, Sendable {
+    public let sunrise: String
+    public let sunset: String
+
+    public static func today(forecast: ForecastResponse, dayIndex: Int) -> TodaySun? {
+        let zone = forecast.locationTimeZone
+        let sunrise = forecast.daily.sunrise.value(at: dayIndex)
+        let sunset = forecast.daily.sunset.value(at: dayIndex)
+        guard sunrise != nil || sunset != nil else { return nil }
+        return TodaySun(
+            sunrise: clock(sunrise, kind: .sunrise, timeZone: zone),
+            sunset: clock(sunset, kind: .sunset, timeZone: zone))
+    }
+
+    private static func clock(_ time: String?, kind: SunEvent.Kind, timeZone: TimeZone) -> String {
+        guard let time else { return "—" }
+        return SunEvent(kind: kind, timeString: time).formattedTime(timeZone: timeZone)
+    }
+}
