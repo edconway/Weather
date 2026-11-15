@@ -73,8 +73,11 @@ struct TodayScreen: View {
                                 showsGPS: store.activeSource == .geo,
                                 conditions: conditions,
                                 voice: voice(forecast: forecast, conditions: conditions),
-                                range: ScreenPresentation.todayRange(
-                                    conditions: conditions, normal: store.tempBand?.today),
+                                gauge: gaugeData(conditions),
+                                gaugeSeed: TemperatureGaugeSeed(
+                                    locationID: store.location?.cacheKey ?? "",
+                                    day: conditions.todayString),
+                                temperatureUnit: store.imperial ? .fahrenheit : .celsius,
                                 outlook: outlook(forecast: forecast, conditions: conditions),
                                 topInset: topInset,
                                 formatter: store.formatter,
@@ -158,6 +161,16 @@ struct TodayScreen: View {
             forecast: forecast, conditions: conditions,
             hourlyNormals: store.hourlyNormals, tempBand: store.tempBand,
             dailyRain: store.dailyRain, formatter: store.formatter)
+    }
+
+    private func gaugeData(_ conditions: CurrentConditions) -> TemperatureRangeData? {
+        guard let low = conditions.low, let high = conditions.high else { return nil }
+        return TemperatureRangeData(
+            todayLow: low,
+            todayHigh: high,
+            current: conditions.temperature,
+            averageLow: store.tempBand?.today?.tMin,
+            averageHigh: store.tempBand?.today?.tMax)
     }
 
     private func outlook(

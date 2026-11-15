@@ -7,7 +7,9 @@ struct HeroView: View {
     let showsGPS: Bool
     let conditions: CurrentConditions
     let voice: ScreenPresentation.HeroVoice?
-    let range: ScreenPresentation.TodayRange?
+    let gauge: TemperatureRangeData?
+    let gaugeSeed: TemperatureGaugeSeed
+    let temperatureUnit: UnitTemperature
     let outlook: ScreenPresentation.RainOutlook
     let topInset: CGFloat
     let formatter: UnitFormatter
@@ -25,7 +27,16 @@ struct HeroView: View {
             temperatureRow
             conditionLine
             voiceButton
-            TodayRangeBar(range: range, formatter: formatter, ink: atmosphere.foreground, dim: atmosphere.secondaryForeground)
+            if let gauge {
+                TemperatureRangeGauge(
+                    data: gauge,
+                    style: .hero,
+                    unit: temperatureUnit,
+                    weatherBackground: atmosphere.mid,
+                    ink: .chalk,
+                    seed: gaugeSeed)
+                    .padding(.top, 12)
+            }
             stats
         }
         .padding(.horizontal, 20)
@@ -164,64 +175,3 @@ struct HeroView: View {
     }
 }
 
-struct TodayRangeBar: View {
-    let range: ScreenPresentation.TodayRange?
-    let formatter: UnitFormatter
-    let ink: Color
-    let dim: Color
-
-    var body: some View {
-        Group {
-            if let range {
-                filled(range)
-            } else {
-                Color.clear
-            }
-        }
-        .frame(height: 92)
-        .padding(.top, 18)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(range.map { value in
-            "Today \(formatter.temperatureShort(value.low)) to \(formatter.temperatureShort(value.high)). "
-                + "Normal \(formatter.temperatureShort(value.normalLow)) to \(formatter.temperatureShort(value.normalHigh))."
-        } ?? "Normal range unavailable")
-    }
-
-    private func filled(_ range: ScreenPresentation.TodayRange) -> some View {
-        GeometryReader { geo in
-            let width = geo.size.width
-            ZStack(alignment: .topLeading) {
-                Capsule()
-                    .fill(Color.white.opacity(0.20))
-                    .frame(width: width * range.normalWidth, height: 16)
-                    .offset(x: width * range.normalStart, y: 6)
-                Capsule()
-                    .fill(Color.white)
-                    .frame(width: max(width * range.todayWidth, 4), height: 6)
-                    .offset(x: width * range.todayStart, y: 11)
-                if let now = range.nowFraction {
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: 13, height: 13)
-                        .overlay(Circle().stroke(Color.black.opacity(0.45), lineWidth: 2.5))
-                        .offset(x: width * now - 6.5, y: 7)
-                }
-                label(formatter.temperatureShort(range.low), at: range.lowLabelFraction, width: width, color: ink)
-                label(formatter.temperatureShort(range.high), at: range.highLabelFraction, width: width, color: ink)
-                Text("normal \(formatter.temperatureShort(range.normalLow))–\(formatter.temperatureShort(range.normalHigh))")
-                    .font(.caption)
-                    .foregroundStyle(dim)
-                    .fixedSize()
-                    .position(x: width * range.captionFraction, y: 74)
-            }
-        }
-    }
-
-    private func label(_ text: String, at fraction: Double, width: CGFloat, color: Color) -> some View {
-        Text(text)
-            .font(.footnote.weight(.bold))
-            .foregroundStyle(color)
-            .fixedSize()
-            .position(x: width * fraction, y: 48)
-    }
-}
