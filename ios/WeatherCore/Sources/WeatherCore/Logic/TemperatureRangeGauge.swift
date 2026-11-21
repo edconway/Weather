@@ -47,7 +47,7 @@ public struct TemperatureRangeGauge: View {
         }
     }
 
-    var body: some View {
+    public var body: some View {
         let placement = TemperatureRangeLayout.placement(
             data: data,
             style: style,
