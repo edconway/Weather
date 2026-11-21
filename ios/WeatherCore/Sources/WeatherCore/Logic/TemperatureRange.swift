@@ -244,6 +244,19 @@ public enum TemperatureRangeLayout {
         return min(inset + width, max(inset, raw))
     }
 
+    /// Inverse of `x(temperature:)`, clamped to the track. Used to colour a
+    /// slice of the bar by the temperatures it actually covers.
+    public static func temperature(
+        atX x: Double,
+        domain: TemperatureScaleDomain,
+        inset: Double,
+        usableWidth: Double
+    ) -> Double {
+        let width = max(usableWidth, 0.001)
+        let fraction = min(1, max(0, (x - inset) / width))
+        return domain.lower + fraction * domain.span
+    }
+
     public static func roundedDegrees(_ celsius: Double, unit: UnitTemperature) -> Int {
         let measurement = Measurement(value: celsius, unit: UnitTemperature.celsius).converted(to: unit)
         // swift-corelibs-foundation does not ship MeasurementFormatter. Apple builds

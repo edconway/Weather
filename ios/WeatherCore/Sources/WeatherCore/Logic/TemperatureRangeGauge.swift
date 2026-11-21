@@ -95,14 +95,13 @@ public struct TemperatureRangeGauge: View {
                 .frame(width: placement.usableWidth, height: style.trackHeight)
                 .offset(x: placement.inset, y: placement.trackTop)
 
-            LinearGradient(stops: gradient(placement), startPoint: .leading, endPoint: .trailing)
-                .frame(width: placement.usableWidth, height: style.trackHeight)
-                .offset(x: placement.inset, y: placement.trackTop)
-                .mask(alignment: .topLeading) {
-                    Capsule()
-                        .frame(width: max(shown, 0), height: style.trackHeight)
-                        .offset(x: shownStart - placement.inset)
-                }
+            Capsule()
+                .fill(LinearGradient(
+                    stops: barGradient(placement, from: shownStart, width: shown),
+                    startPoint: .leading,
+                    endPoint: .trailing))
+                .frame(width: max(shown, 0), height: style.trackHeight)
+                .offset(x: shownStart, y: placement.trackTop)
 
             if let dot = placement.dot {
                 dotMark
@@ -137,8 +136,22 @@ public struct TemperatureRangeGauge: View {
         style != .widget && !suppressesMotion
     }
 
-    private func gradient(_ placement: GaugePlacement) -> [Gradient.Stop] {
-        TemperatureColorScale.gradientStops(domain: placement.domain).map { stop in
+    /// The capsule is painted with the temperatures under it, not with a
+    /// gradient stretched from the cold end of the track to the hot end.
+    private func barGradient(
+        _ placement: GaugePlacement, from start: Double, width: Double
+    ) -> [Gradient.Stop] {
+        let startTemperature = TemperatureRangeLayout.temperature(
+            atX: Double(start),
+            domain: placement.domain,
+            inset: placement.inset,
+            usableWidth: placement.usableWidth)
+        let endTemperature = TemperatureRangeLayout.temperature(
+            atX: Double(start + width),
+            domain: placement.domain,
+            inset: placement.inset,
+            usableWidth: placement.usableWidth)
+        return TemperatureColorScale.stops(from: startTemperature, to: endTemperature).map { stop in
             Gradient.Stop(
                 color: Color(red: stop.color.red, green: stop.color.green, blue: stop.color.blue),
                 location: stop.location)

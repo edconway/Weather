@@ -1,47 +1,35 @@
 import SwiftUI
+import WeatherCore
 
-/// Layout for a resizable iPhone, including iPhone Duo.
+/// The hinge, when this SDK can see it.
 ///
-/// This SDK has no Duo idiom and no inner-display pose. The outer display is a
-/// compact width, like any other iPhone. The inner display is a regular width.
-/// A split is used only when that regular width can actually hold two columns.
-enum StatusCanvas {
-    /// Narrowest pair of columns that still leaves the status and the charts readable.
-    static let splitMinimum: CGFloat = 600
-    static let statusMaximum: CGFloat = 420
-    static let chartPairMinimum: CGFloat = 640
-
-    static func prefersSplit(horizontal: UserInterfaceSizeClass?, width: CGFloat) -> Bool {
-        horizontal == .regular && width >= splitMinimum
-    }
-
-    static func statusWidth(in width: CGFloat) -> CGFloat {
-        min(statusMaximum, max(300, width * 0.4))
+/// iPhone Duo (November 2026) describes the fold as a division reserved region
+/// and the cameras as occlusion regions. `GeometryProxy` in this SDK has
+/// neither `reservedRegions` nor a Duo idiom. The page therefore cannot tell
+/// a book or a tent from a flat display, and it cannot see the inner camera
+/// turn on. Cover and the open inner display both use the one-column layout,
+/// inset by the safe area so a side toolbar or Split View does not cover it.
+enum DuoFold {
+    static func active(in proxy: GeometryProxy) -> DuoDivision? {
+        _ = proxy.size
+        return nil
     }
 }
 
-private struct CanvasWidthKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+struct DuoMetrics: Equatable {
+    var size: CGSize = .zero
+    var fold: DuoDivision?
+}
+
+struct DuoMetricsKey: PreferenceKey {
+    static var defaultValue = DuoMetrics()
+    static func reduce(value: inout DuoMetrics, nextValue: () -> DuoMetrics) {
         value = nextValue()
     }
 }
 
-/// Reports the width actually offered to this view, including after a fold.
-struct CanvasWidthReader: View {
-    @Binding var width: CGFloat
-
-    var body: some View {
-        GeometryReader { geo in
-            Color.clear.preference(key: CanvasWidthKey.self, value: geo.size.width)
-        }
-        .onPreferenceChange(CanvasWidthKey.self) { width = $0 }
-    }
-}
-
 extension View {
-    /// Centers sheet content on a regular-width canvas so a form does not stretch
-    /// across the unfolded display.
+    /// Keeps a sheet from stretching across the unfolded inner display.
     func readableWhenRegular() -> some View {
         modifier(ReadableWhenRegular())
     }
@@ -52,7 +40,7 @@ private struct ReadableWhenRegular: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .frame(maxWidth: horizontalSizeClass == .regular ? 640 : .infinity)
+            .frame(maxWidth: horizontalSizeClass == .regular ? 680 : .infinity)
             .frame(maxWidth: .infinity)
     }
 }

@@ -84,6 +84,25 @@ final class TemperatureRangeTests: XCTestCase {
         XCTAssertGreaterThan(hotDay.last!.color.red, hotDay.last!.color.blue)
     }
 
+    func testBarColourFollowsAbsoluteTemperature() {
+        let mild = TemperatureColorScale.stops(from: 7, to: 10)
+        XCTAssertGreaterThan(mild[0].color.blue, mild[0].color.red)
+        XCTAssertGreaterThan(mild.last!.color.blue, mild.last!.color.red)
+
+        let hot = TemperatureColorScale.stops(from: 28, to: 34)
+        XCTAssertGreaterThan(hot[0].color.red, hot[0].color.blue)
+        XCTAssertEqual(hot.last!.color.red, TemperatureColorScale.color(celsius: 30).red, accuracy: 0.001)
+
+        let freezing = TemperatureColorScale.stops(from: -20, to: -10)
+        XCTAssertEqual(freezing[0].color.blue, TemperatureRGB(hex: 0x2F8CFF).blue, accuracy: 0.001)
+        XCTAssertEqual(freezing.last!.color.red, TemperatureRGB(hex: 0x2F8CFF).red, accuracy: 0.001)
+
+        let full = TemperatureColorScale.stops(from: -10, to: 30)
+        XCTAssertEqual(full[0].color.red, TemperatureRGB(hex: 0x2F8CFF).red, accuracy: 0.001)
+        XCTAssertEqual(full.last!.color.red, TemperatureRGB(hex: 0xFF5A4E).red, accuracy: 0.001)
+        XCTAssertTrue(full.contains { abs($0.location - (24.0 / 40.0)) < 0.001 })
+    }
+
     func testVoiceOverReadsColderWarmerAndInLine() {
         XCTAssertEqual(
             TemperatureRangeLayout.voiceOver(TemperatureRangeData(

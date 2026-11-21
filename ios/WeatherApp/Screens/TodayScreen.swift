@@ -4,7 +4,6 @@ import WeatherCore
 /// The single scrolling screen (§8.2): atmosphere hero, native sections, charts.
 struct TodayScreen: View {
     @Bindable var store: WeatherStore
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var showingSearch = false
     @State private var showingSettings = false
@@ -17,8 +16,9 @@ struct TodayScreen: View {
     @State private var selectedPanel: PanelID = .temperature
     @State private var segmentLock: PanelID?
     @State private var wetBulbExpanded = false
-    /// Width of the scene, updated when the window resizes or the phone folds.
-    @State private var canvasWidth: CGFloat = 0
+    /// The scene after safe areas. Used only to place content around a hinge.
+    @State private var canvas = CGSize.zero
+    @State private var fold: DuoDivision?
 
     var body: some View {
         NavigationStack {
@@ -68,16 +68,27 @@ struct TodayScreen: View {
         }
     }
 
+    private var arrangement: DuoArrangement {
+        DuoArrangement.arrangement(
+            containerWidth: Double(canvas.width),
+            containerHeight: Double(canvas.height),
+            division: fold)
+    }
+
     private var loadedScroll: some View {
         ScrollViewReader { proxy in
-            Group {
-                if StatusCanvas.prefersSplit(horizontal: horizontalSizeClass, width: canvasWidth) {
-                    splitCanvas(proxy: proxy)
-                } else {
-                    compactCanvas(proxy: proxy)
+            arranged(arrangement, proxy: proxy)
+            .background {
+                GeometryReader { geo in
+                    Color.clear.preference(
+                        key: DuoMetricsKey.self,
+                        value: DuoMetrics(size: geo.size, fold: DuoFold.active(in: geo)))
                 }
             }
-            .background { CanvasWidthReader(width: $canvasWidth) }
+            .onPreferenceChange(DuoMetricsKey.self) { metrics in
+                canvas = metrics.size
+                fold = metrics.fold
+            }
             .background { WindowTopInset(top: $topInset) }
             .onChange(of: store.pendingPanelJump) { _, panel in
                 guard let panel else { return }
@@ -90,13 +101,26 @@ struct TodayScreen: View {
         }
     }
 
-    /// Cover display, and any regular window that is still too narrow to split.
-    private func compactCanvas(proxy: ScrollViewProxy) -> some View {
+    @ViewBuilder
+    private func arranged(_ arrangement: DuoArrangement, proxy: ScrollViewProxy) -> some View {
+        switch arrangement {
+        case .column:
+            columnCanvas(proxy: proxy)
+        case .book(let leading, let gap, let trailing):
+            bookCanvas(proxy: proxy, leading: leading, gap: gap, trailing: trailing)
+        case .tent(let top, let gap, let bottom):
+            tentCanvas(proxy: proxy, top: top, gap: gap, bottom: bottom)
+        }
+    }
+
+    /// Cover, Split View, and a fully open inner display. One scroll, so the
+    /// status stays above the charts. Safe areas keep it off a side toolbar.
+    private func columnCanvas(proxy: ScrollViewProxy) -> some View {
         ZStack(alignment: .top) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     hero(proxy: proxy)
-                    sheet(proxy: proxy, tucked: true, sideBySide: false)
+                    sheet(proxy: proxy, tucked: true)
                 }
             }
             .coordinateSpace(name: "today")
@@ -135,43 +159,64 @@ struct TodayScreen: View {
         }
     }
 
-    /// Unfolded regular width: status stays in one column, charts scroll in the other.
-    private func splitCanvas(proxy: ScrollViewProxy) -> some View {
-        let statusWidth = StatusCanvas.statusWidth(in: canvasWidth)
-        let detailWidth = max(0, canvasWidth - statusWidth)
-        return HStack(alignment: .top, spacing: 0) {
-            GeometryReader { column in
-                ScrollView {
-                    hero(proxy: proxy)
-                        .frame(minHeight: column.size.height, alignment: .top)
-                }
-                .ignoresSafeArea(edges: .top)
-            }
-            .frame(width: statusWidth)
-            .frame(maxHeight: .infinity)
-
-            Divider()
-
+    /// Book pose. The hinge runs down the display, so the status stays on one
+    /// side of it and the charts stay on the other.
+    private func bookCanvas(
+        proxy: ScrollViewProxy, leading: Double, gap: Double, trailing: Double
+    ) -> some View {
+        HStack(alignment: .top, spacing: 0) {
             ScrollView {
-                sheet(
-                    proxy: proxy,
-                    tucked: false,
-                    sideBySide: detailWidth >= StatusCanvas.chartPairMinimum)
+                hero(proxy: proxy)
             }
-            .frame(maxHeight: .infinity)
-            .coordinateSpace(name: "today")
-            .background(Color(.systemBackground))
-            .refreshable { await store.refresh() }
-            .onPreferenceChange(SectionTopsPreference.self) { tops in
-                guard segmentLock == nil else { return }
-                var current = PanelID.temperature
-                for panel in [PanelID.temperature, .wetBulb, .rain, .climate] {
-                    if let top = tops[panel], top <= 80 { current = panel }
-                }
-                if selectedPanel != current { selectedPanel = current }
-            }
+            .ignoresSafeArea(edges: .top)
+            .frame(width: CGFloat(leading))
+
+            Color.clear.frame(width: CGFloat(gap))
+                .accessibilityHidden(true)
+
+            chartScroll(proxy: proxy)
+                .frame(width: CGFloat(trailing))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// Tent pose. The hinge runs across the display. The temperature stays in
+    /// the top half, where it can be read at a distance, and the charts stay
+    /// in the bottom half, where they can be touched.
+    private func tentCanvas(
+        proxy: ScrollViewProxy, top: Double, gap: Double, bottom: Double
+    ) -> some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                hero(proxy: proxy)
+            }
+            .ignoresSafeArea(edges: .top)
+            .frame(height: CGFloat(top))
+
+            Color.clear.frame(height: CGFloat(gap))
+                .accessibilityHidden(true)
+
+            chartScroll(proxy: proxy)
+                .frame(height: CGFloat(bottom))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func chartScroll(proxy: ScrollViewProxy) -> some View {
+        ScrollView {
+            sheet(proxy: proxy, tucked: false)
+        }
+        .coordinateSpace(name: "today")
+        .background(Color(.systemBackground))
+        .refreshable { await store.refresh() }
+        .onPreferenceChange(SectionTopsPreference.self) { tops in
+            guard segmentLock == nil else { return }
+            var current = PanelID.temperature
+            for panel in [PanelID.temperature, .wetBulb, .rain, .climate] {
+                if let top = tops[panel], top <= 80 { current = panel }
+            }
+            if selectedPanel != current { selectedPanel = current }
+        }
     }
 
     @ViewBuilder
@@ -250,7 +295,7 @@ struct TodayScreen: View {
         }
     }
 
-    private func sheet(proxy: ScrollViewProxy, tucked: Bool, sideBySide: Bool) -> some View {
+    private func sheet(proxy: ScrollViewProxy, tucked: Bool) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             if let banner = store.banner {
                 BannerView(message: banner) { store.dismissBanner() }
@@ -271,7 +316,7 @@ struct TodayScreen: View {
                 }
             }
 
-            panels(sideBySide: sideBySide)
+            panels()
 
             footer
         }
@@ -361,7 +406,7 @@ struct TodayScreen: View {
     // MARK: - Panels
 
     @ViewBuilder
-    private func panels(sideBySide: Bool) -> some View {
+    private func panels() -> some View {
         let timeZone = store.locationTimeZone
 
         WeatherSection(
@@ -369,7 +414,7 @@ struct TodayScreen: View {
             title: "Temperature",
             caption: "Actual air temp, high & low"
         ) {
-            chartPair(sideBySide: sideBySide) {
+            chartPair {
                 HourlyTempChart(
                     points: store.hourlyPoints, series: .temperature,
                     formatter: store.formatter, timeZone: timeZone,
@@ -408,7 +453,7 @@ struct TodayScreen: View {
                         .font(.subheadline.weight(.semibold))
                         .buttonStyle(.plain)
                 }
-                chartPair(sideBySide: sideBySide) {
+                chartPair {
                     HourlyTempChart(
                         points: store.hourlyPoints, series: .wetBulb,
                         formatter: store.formatter, timeZone: timeZone,
@@ -436,7 +481,7 @@ struct TodayScreen: View {
                         forecast: forecast, conditions: conditions, dailyRain: store.dailyRain),
                     formatter: store.formatter)
             }
-            chartPair(sideBySide: sideBySide) {
+            chartPair {
                 HourlyRainChart(
                     points: store.hourlyPoints,
                     formatter: store.formatter, timeZone: timeZone,
@@ -485,23 +530,13 @@ struct TodayScreen: View {
         .onAppear { store.ensureClimatology() }
     }
 
-    @ViewBuilder
+    /// Two charts sit next to each other only when this column can hold both.
+    /// A cover, or one side of a fold, stacks them. This is not a second page column.
     private func chartPair<First: View, Second: View>(
-        sideBySide: Bool,
         @ViewBuilder first: () -> First,
         @ViewBuilder second: () -> Second
     ) -> some View {
-        if sideBySide {
-            HStack(alignment: .top, spacing: 16) {
-                first().frame(maxWidth: .infinity, alignment: .leading)
-                second().frame(maxWidth: .infinity, alignment: .leading)
-            }
-        } else {
-            VStack(alignment: .leading, spacing: 16) {
-                first()
-                second()
-            }
-        }
+        ChartPair(first: first(), second: second())
     }
 
     private func sectionTop(_ panel: PanelID) -> some View {
@@ -539,5 +574,44 @@ struct TodayScreen: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 8)
+    }
+}
+
+private struct ChartPairWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+/// Lays two charts side by side once the column is wide enough for a pair of
+/// 280-point charts. Narrower columns stack them.
+private struct ChartPair<First: View, Second: View>: View {
+    var first: First
+    var second: Second
+    @State private var width: CGFloat = 0
+
+    private var sideBySide: Bool { width >= 280 * 2 + 16 }
+
+    var body: some View {
+        Group {
+            if sideBySide {
+                HStack(alignment: .top, spacing: 16) {
+                    first.frame(maxWidth: .infinity, alignment: .leading)
+                    second.frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 16) {
+                    first
+                    second
+                }
+            }
+        }
+        .background {
+            GeometryReader { geo in
+                Color.clear.preference(key: ChartPairWidthKey.self, value: geo.size.width)
+            }
+        }
+        .onPreferenceChange(ChartPairWidthKey.self) { width = $0 }
     }
 }

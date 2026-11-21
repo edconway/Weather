@@ -45,7 +45,10 @@ struct HeroView: View {
         .padding(.bottom, 48)
         .frame(maxWidth: .infinity, alignment: .leading)
         .foregroundStyle(atmosphere.foreground)
-        .background { AtmosphereBackground(colors: atmosphere) }
+        .background {
+            AtmosphereBackground(colors: atmosphere)
+                .ignoresSafeArea(edges: [.horizontal, .top])
+        }
     }
 
     private var chrome: some View {
