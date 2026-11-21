@@ -1,15 +1,30 @@
 import SwiftUI
-import WeatherCore
 
 /// Today's low–high as a colour bar, with the historic average as a dashed
 /// bracket and the current temperature as a dot and a looping arrow.
-struct TemperatureRangeGauge: View {
-    var data: TemperatureRangeData
-    var style: TemperatureGaugeStyle = .hero
-    var unit: UnitTemperature = .celsius
-    var weatherBackground: Color
-    var ink: Ink = .chalk
-    var seed: TemperatureGaugeSeed = TemperatureGaugeSeed(locationID: "", day: "")
+public struct TemperatureRangeGauge: View {
+    public var data: TemperatureRangeData
+    public var style: TemperatureGaugeStyle
+    public var unit: UnitTemperature
+    public var weatherBackground: Color
+    public var ink: Ink
+    public var seed: TemperatureGaugeSeed
+
+    public init(
+        data: TemperatureRangeData,
+        style: TemperatureGaugeStyle = .hero,
+        unit: UnitTemperature = .celsius,
+        weatherBackground: Color,
+        ink: Ink = .chalk,
+        seed: TemperatureGaugeSeed = TemperatureGaugeSeed(locationID: "", day: "")
+    ) {
+        self.data = data
+        self.style = style
+        self.unit = unit
+        self.weatherBackground = weatherBackground
+        self.ink = ink
+        self.seed = seed
+    }
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.colorSchemeContrast) private var contrast
@@ -20,7 +35,7 @@ struct TemperatureRangeGauge: View {
     @State private var grown = true
     @State private var inkTrim: CGFloat = 1
 
-    enum Ink: Equatable {
+    public enum Ink: Equatable {
         case chalk
         case highlighter
 

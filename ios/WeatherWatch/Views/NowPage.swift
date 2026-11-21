@@ -40,13 +40,24 @@ struct NowPage: View {
                     .font(.caption)
                     .lineLimit(1)
 
-                HStack(spacing: 6) {
-                    Text("↑\(store.formatter.temperature(conditions.high))")
-                        .foregroundStyle(.orange)
-                    Text("↓\(store.formatter.temperature(conditions.low))")
-                        .foregroundStyle(.blue)
+                if let gauge = store.todayGauge {
+                    TemperatureRangeGauge(
+                        data: gauge,
+                        style: .widget,
+                        unit: store.imperial ? .fahrenheit : .celsius,
+                        weatherBackground: Color(red: 0.05, green: 0.12, blue: 0.28),
+                        seed: TemperatureGaugeSeed(
+                            locationID: store.location?.cacheKey ?? "",
+                            day: conditions.todayString))
+                } else {
+                    HStack(spacing: 6) {
+                        Text("↑\(store.formatter.temperature(conditions.high))")
+                            .foregroundStyle(.orange)
+                        Text("↓\(store.formatter.temperature(conditions.low))")
+                            .foregroundStyle(.blue)
+                    }
+                    .font(.caption2)
                 }
-                .font(.caption2)
 
                 if conditions.feelsLike != nil {
                     Text("Feels \(store.formatter.temperature(conditions.feelsLike))")
