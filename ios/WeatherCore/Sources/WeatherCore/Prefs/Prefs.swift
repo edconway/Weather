@@ -10,7 +10,7 @@ public struct Prefs: @unchecked Sendable {
         public var id: String { rawValue }
         public var title: String {
             switch self {
-            case .system: return "System"
+            case .system: return "Auto"
             case .light: return "Light"
             case .dark: return "Dark"
             }

@@ -6,9 +6,13 @@ import WeatherCore
 /// so an hourly Open-Meteo estimate is never drawn as a minute curve.
 struct NextHourCard: View {
     let minutes: [AppleMinutePoint]
+    /// Neighbourhood, street, or coordinates of the point these minutes cover.
+    let placeLabel: String
     let attribution: AppleWeatherAttribution?
     let formatter: UnitFormatter
     let timeZone: TimeZone
+    /// True when Apple's minutes include rain, so the card reads ahead of the hourly estimate.
+    var emphasize: Bool = false
 
     private var summary: (headline: String, detail: String) {
         AppleWeatherStatus.summary(minutes: minutes, timeZone: timeZone, formatter: formatter)
@@ -29,8 +33,13 @@ struct NextHourCard: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+            if !placeLabel.isEmpty {
+                Label(placeLabel, systemImage: "location.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .labelStyle(.titleAndIcon)
+            }
             Text(summary.headline)
-                .font(.title3.weight(.semibold))
+                .font(emphasize ? .title2.weight(.semibold) : .title3.weight(.semibold))
             Text(summary.detail)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -74,9 +83,22 @@ struct NextHourCard: View {
             }
         }
         .padding(14)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(
+            emphasize ? Palette.rainSeries.opacity(0.12) : Color(.secondarySystemBackground),
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            if emphasize {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(Palette.rainSeries.opacity(0.45), lineWidth: 1)
+            }
+        }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(summary.headline). \(summary.detail). Apple Weather, minute by minute.")
+        .accessibilityLabel(accessibilitySentence)
+    }
+
+    private var accessibilitySentence: String {
+        let place = placeLabel.isEmpty ? "" : "\(placeLabel). "
+        return "\(place)\(summary.headline). \(summary.detail). Apple Weather, minute by minute."
     }
 
     private var yTop: Double {

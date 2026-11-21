@@ -72,6 +72,20 @@ final class WatchStore {
 
     var hasContext: Bool { applicablePayload?.tempBand != nil }
 
+    /// Today's range for the watch gauge. Temperatures already on the watch:
+    /// the forecast's low, high, and current reading, plus the phone-synced
+    /// normal when it is for this place. The watch does not call WeatherKit.
+    var todayGauge: TemperatureRangeData? {
+        guard let conditions, let low = conditions.low, let high = conditions.high else { return nil }
+        let normal = applicablePayload?.tempBand?.today
+        return TemperatureRangeData(
+            todayLow: low,
+            todayHigh: high,
+            current: conditions.temperature,
+            averageLow: normal?.tMin,
+            averageHigh: normal?.tMax)
+    }
+
     /// The single highest-priority badge (§9.1). Prefers phone-synced climate
     /// normals; falls back to a recent-days comparison so the watch still
     /// speaks without the iPhone.
