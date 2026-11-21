@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Today's low–high as a colour bar, with the historic average as a dashed
-/// bracket and the current temperature as a dot and a looping arrow.
+/// Today's low–high as a colour bar, with the historic average in a felt-tip
+/// bracket and the current temperature marked by a curved arrow.
 public struct TemperatureRangeGauge: View {
     public var data: TemperatureRangeData
     public var style: TemperatureGaugeStyle
@@ -75,14 +75,18 @@ public struct TemperatureRangeGauge: View {
 
     private var suppressesMotion: Bool { reduceMotion || gaugePreviewReduceMotion }
 
-    private var caveat: Font {
-        Font.custom("Caveat", size: 22, relativeTo: .callout)
+    private func markerFont(width: Double) -> Font {
+        Font.custom(
+            "Permanent Marker",
+            size: TemperatureRangeLayout.markerFontSize(for: width),
+            relativeTo: .callout)
     }
 
     private func canvas(_ placement: GaugePlacement) -> some View {
         let trackOpacity = strongContrast ? 0.30 : 0.16
-        let dash: [CGFloat] = strongContrast ? [] : [6, 5]
-        let stroke = strongContrast ? 3.0 : 2.2
+        let markerStroke = style.drawsHandwriting
+        let dash: [CGFloat] = markerStroke || strongContrast ? [] : [6, 5]
+        let stroke: CGFloat = markerStroke ? (strongContrast ? 6 : 5) : (strongContrast ? 3 : 2.2)
         let shown = grown ? (placement.barEnd - placement.barStart) : 0
         let shownStart = (placement.barStart + placement.barEnd) / 2 - shown / 2
         return ZStack(alignment: .topLeading) {
@@ -109,7 +113,7 @@ public struct TemperatureRangeGauge: View {
             GaugeAnnotations(
                 placement: placement,
                 ink: ink.color,
-                caveat: caveat,
+                hand: style.drawsHandwriting ? markerFont(width: Double(width)) : .body,
                 dash: dash,
                 stroke: stroke,
                 trim: inkTrim)
@@ -164,11 +168,11 @@ public struct TemperatureRangeGauge: View {
     }
 }
 
-/// Handwritten historic label, bracket, and the current-temperature arrow.
+/// Felt-tip historic label, bracket, and the curved current-temperature arrow.
 struct GaugeAnnotations: View {
     let placement: GaugePlacement
     let ink: Color
-    let caveat: Font
+    let hand: Font
     let dash: [CGFloat]
     let stroke: CGFloat
     let trim: CGFloat
@@ -218,10 +222,9 @@ struct GaugeAnnotations: View {
 
     private func handwritten(_ text: String, in rect: GaugeRect) -> some View {
         Text(text)
-            .font(caveat)
+            .font(hand)
             .foregroundStyle(ink)
             .fixedSize()
-            .rotationEffect(.degrees(placement.labelRotationDegrees))
             .position(x: rect.midX, y: rect.midY)
     }
 

@@ -84,7 +84,7 @@ public enum TemperatureGaugeStyle: Equatable, Sendable {
         }
     }
 
-    /// Handwritten bracket, historic label, and the looping arrow.
+    /// Handwritten bracket, historic label, and the curved arrow.
     public var drawsHandwriting: Bool {
         switch self {
         case .hero: return true
@@ -345,9 +345,10 @@ public enum TemperatureRangeLayout {
         var bracketHighX: Double?
         var bracketNarrow = false
         var historicText: String?
+        let markerSize = markerFontSize(for: width)
         if handwriting, hasAverage, let averageLow = data.averageLow, let averageHigh = data.averageHigh {
-            historicText = "historic average \(degreeLabel(averageLow, unit: unit))–\(degreeLabel(averageHigh, unit: unit))"
-            let labelWidth = textWidth(historicText ?? "", fontSize: 22, handwriting: true)
+            historicText = "HISTORIC AVERAGE \(degreeLabel(averageLow, unit: unit))–\(degreeLabel(averageHigh, unit: unit))"
+            let labelWidth = textWidth(historicText ?? "", fontSize: markerSize, handwriting: true)
             let center = slidCenter(
                 (map(averageLow) + map(averageHigh)) / 2,
                 labelWidth: labelWidth,
@@ -396,7 +397,7 @@ public enum TemperatureRangeLayout {
         var nowText: String?
         var arrow: GaugeArrowGeometry?
         if handwriting, allowArrow, data.current != nil, let dot {
-            let nowWidth = textWidth("temperature now", fontSize: 22, handwriting: true)
+            let nowWidth = textWidth("TEMPERATURE NOW", fontSize: markerSize, handwriting: true)
             let nowRect = nowLabelRect(dotX: dot.x, y: y + 4, width: nowWidth, bounds: width)
             let obstacles = [lowLabel, highLabel, combinedLabel].compactMap { $0 }
             if let built = makeArrow(
@@ -406,7 +407,7 @@ public enum TemperatureRangeLayout {
                 obstacles: obstacles,
                 bounds: width) {
                 arrow = built
-                nowText = "temperature now"
+                nowText = "TEMPERATURE NOW"
                 y += 4 + 34
             }
         }
@@ -473,17 +474,26 @@ public enum TemperatureRangeLayout {
         return (start, end)
     }
 
+    /// Large enough to read as a marker, small enough that "TEMPERATURE NOW"
+    /// still leaves a sweep up to a centred dot.
+    static func markerFontSize(for width: Double) -> Double {
+        let room = max(48, width / 2 - 32 - 4)
+        // "TEMPERATURE NOW": 14 letters at 0.70em and one 0.36em space.
+        let emPerPoint = 14 * 0.70 + 0.36
+        return min(18, max(14, room / emPerPoint))
+    }
+
     static func textWidth(_ text: String, fontSize: Double, handwriting: Bool) -> Double {
         var width = 0.0
         for character in text {
             if character.isNumber {
-                width += handwriting ? fontSize * 0.50 : fontSize * 0.62
+                width += handwriting ? fontSize * 0.58 : fontSize * 0.62
             } else if character == " " {
-                width += fontSize * 0.28
+                width += handwriting ? fontSize * 0.36 : fontSize * 0.28
             } else if "°–-−".contains(character) {
-                width += fontSize * 0.42
+                width += handwriting ? fontSize * 0.50 : fontSize * 0.42
             } else {
-                width += handwriting ? fontSize * 0.48 : fontSize * 0.56
+                width += handwriting ? fontSize * 0.70 : fontSize * 0.56
             }
         }
         return width
@@ -499,18 +509,17 @@ public enum TemperatureRangeLayout {
         return GaugeRect(x: x, y: y, width: width, height: 24)
     }
 
+    /// Pins the label to the outer edge of the side that leaves the longer
+    /// sweep from its inner edge up to the dot.
     private static func nowLabelRect(dotX: Double, y: Double, width: Double, bounds: Double) -> GaugeRect {
-        var leading = dotX + 55
-        if leading + width > bounds - 4 {
-            leading = dotX - 55 - width
-        }
-        if leading < 4 {
-            leading = 4
-        }
-        if leading + width > bounds - 4 {
-            leading = max(4, bounds - 4 - width)
-        }
-        return GaugeRect(x: leading, y: y, width: min(width, max(1, bounds - 8)), height: 34)
+        let margin = 4.0
+        let fitted = min(width, max(1, bounds - margin * 2))
+        let rightX = bounds - margin - fitted
+        let leftX = margin
+        let rightSweep = rightX - dotX
+        let leftSweep = dotX - (leftX + fitted)
+        let x = rightSweep >= leftSweep ? rightX : leftX
+        return GaugeRect(x: x, y: y, width: fitted, height: 34)
     }
 
     private static func bracketCurves(
@@ -567,33 +576,40 @@ public enum TemperatureRangeLayout {
         bounds: Double
     ) -> GaugeArrowGeometry? {
         let tip = GaugePoint(x: dot.x, y: dot.y + outerRadius + 2)
-        let start = GaugePoint(x: min(max(dot.x, label.x), label.maxX), y: label.y)
+        let labelOnRight = label.midX >= dot.x
+        // Leave from the inner edge of the words, level with the lettering.
+        let startX = min(max(labelOnRight ? label.x : label.maxX, 0), bounds)
+        let start = GaugePoint(x: startX, y: label.midY)
         let blocked = obstacles.map { $0.inset(by: 2) }
-        let corridor = freeCorridor(around: dot.x, obstacles: blocked, bounds: bounds)
-        guard let swing = swingOffset(dotX: dot.x, corridor: corridor) else { return nil }
-        let bowX = min(bounds - 8, max(8, dot.x + swing))
-        let bow = GaugePoint(x: bowX, y: max(tip.y + 20, start.y - 10))
-        let first = GaugeCubic(
-            start: start,
-            c1: GaugePoint(x: start.x + (bowX - start.x) * 0.35, y: start.y - 2),
-            c2: GaugePoint(x: bow.x, y: start.y - 8),
-            end: bow)
-        let approach = GaugePoint(x: tip.x, y: tip.y + 12)
-        let second = GaugeCubic(
-            start: bow,
-            c1: GaugePoint(x: bow.x, y: tip.y + 18),
-            c2: approach,
-            end: tip)
-        let curves = [first, second]
-        let hits = curves.flatMap { $0.samples(count: 20) }.contains { sample in
-            blocked.contains { $0.contains(sample) }
+        let span = tip.x - start.x
+        let rise = max(start.y - tip.y, 8)
+        // Quarter-ellipse first. If that crosses a number, a slightly tighter
+        // hook that stays low until it is past the label. Both arrive vertically.
+        let attempts = [(lead: 0.45, lift: 0.55), (lead: 0.70, lift: 0.72)]
+        var chosen: GaugeCubic?
+        for attempt in attempts {
+            let curve = GaugeCubic(
+                start: start,
+                c1: GaugePoint(x: start.x + span * attempt.lead, y: start.y),
+                c2: GaugePoint(x: tip.x, y: tip.y + rise * attempt.lift),
+                end: tip)
+            let hits = curve.samples(count: 24).contains { sample in
+                blocked.contains { $0.contains(sample) }
+            }
+            if !hits {
+                chosen = curve
+                break
+            }
         }
-        if hits { return nil }
-        let rise = max(hypot(tip.x - approach.x, tip.y - approach.y), 0.001)
-        let tangent = GaugePoint(x: (tip.x - approach.x) / rise, y: (tip.y - approach.y) / rise)
+        guard let curve = chosen else { return nil }
+        let approach = curve.c2
+        let approachLength = max(hypot(tip.x - approach.x, tip.y - approach.y), 0.001)
+        let tangent = GaugePoint(
+            x: (tip.x - approach.x) / approachLength,
+            y: (tip.y - approach.y) / approachLength)
         let chevron = chevronPoints(tip: tip, tangent: tangent)
         return GaugeArrowGeometry(
-            curves: curves,
+            curves: [curve],
             tip: tip,
             finalTangent: tangent,
             chevronLeft: chevron.left,
@@ -601,42 +617,19 @@ public enum TemperatureRangeLayout {
             label: label)
     }
 
-    private static func freeCorridor(
-        around x: Double, obstacles: [GaugeRect], bounds: Double
-    ) -> (left: Double, right: Double) {
-        var left = 0.0
-        var right = bounds
-        for obstacle in obstacles where x >= obstacle.x && x <= obstacle.maxX {
-            return (left: bounds, right: 0)
-        }
-        for obstacle in obstacles {
-            if obstacle.maxX <= x { left = max(left, obstacle.maxX) }
-            if obstacle.x >= x { right = min(right, obstacle.x) }
-        }
-        return (left, right)
-    }
-
-    /// Negative swings left. Needs at least 10 points of clear air.
-    private static func swingOffset(dotX: Double, corridor: (left: Double, right: Double)) -> Double? {
-        let leftRoom = dotX - corridor.left
-        let rightRoom = corridor.right - dotX
-        if leftRoom >= 10 { return -min(18, leftRoom - 4) }
-        if rightRoom >= 10 { return min(18, rightRoom - 4) }
-        return nil
-    }
-
     private static func chevronPoints(
         tip: GaugePoint, tangent: GaugePoint
     ) -> (left: GaugePoint, right: GaugePoint) {
-        let angle = 35.0 * Double.pi / 180
-        // Trail back along the reverse tangent, then ±35°.
+        let angle = 42.0 * Double.pi / 180
+        // A broad open head. The arms trail back from the tip.
         let back = GaugePoint(x: -tangent.x, y: -tangent.y)
+        let length = 16.0
         func arm(_ turn: Double) -> GaugePoint {
             let c = cos(turn)
             let s = sin(turn)
             return GaugePoint(
-                x: tip.x + (back.x * c - back.y * s) * 10,
-                y: tip.y + (back.x * s + back.y * c) * 10)
+                x: tip.x + (back.x * c - back.y * s) * length,
+                y: tip.y + (back.x * s + back.y * c) * length)
         }
         return (arm(angle), arm(-angle))
     }
