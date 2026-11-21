@@ -4,6 +4,7 @@ import WeatherCore
 /// The single scrolling screen (§8.2): atmosphere hero, native sections, charts.
 struct TodayScreen: View {
     @Bindable var store: WeatherStore
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var showingSearch = false
     @State private var showingSettings = false
@@ -16,6 +17,8 @@ struct TodayScreen: View {
     @State private var selectedPanel: PanelID = .temperature
     @State private var segmentLock: PanelID?
     @State private var wetBulbExpanded = false
+    /// Width of the scene, updated when the window resizes or the phone folds.
+    @State private var canvasWidth: CGFloat = 0
 
     var body: some View {
         NavigationStack {
@@ -28,12 +31,15 @@ struct TodayScreen: View {
             SearchSheet { result in
                 Task { await store.selectSearchResult(result) }
             }
+            .readableWhenRegular()
         }
         .sheet(isPresented: $showingSettings) {
             SettingsSheet(store: store)
+                .readableWhenRegular()
         }
         .sheet(item: $detailKind) { kind in
             ChartDetailSheet(kind: kind, store: store)
+                .readableWhenRegular()
         }
         .task { await store.boot() }
     }
@@ -64,84 +70,137 @@ struct TodayScreen: View {
 
     private var loadedScroll: some View {
         ScrollViewReader { proxy in
-            ZStack(alignment: .top) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        if let conditions = store.conditions, let forecast = store.forecast {
-                            HeroView(
-                                placeName: placeName,
-                                showsGPS: store.activeSource == .geo,
-                                conditions: conditions,
-                                voice: voice(forecast: forecast, conditions: conditions),
-                                gauge: gaugeData(conditions),
-                                gaugeSeed: TemperatureGaugeSeed(
-                                    locationID: store.location?.cacheKey ?? "",
-                                    day: conditions.todayString),
-                                temperatureUnit: store.imperial ? .fahrenheit : .celsius,
-                                sun: TodaySun.today(forecast: forecast, dayIndex: conditions.todayIndex),
-                                outlook: outlook(forecast: forecast, conditions: conditions),
-                                topInset: topInset,
-                                formatter: store.formatter,
-                                onSearch: { showingSearch = true },
-                                onSettings: { showingSettings = true },
-                                onVoice: { jump($0, proxy: proxy) }
-                            )
-                            .background {
-                                GeometryReader { geo in
-                                    Color.clear.preference(
-                                        key: HeroBottomPreference.self,
-                                        value: geo.frame(in: .named("today")).maxY)
-                                }
-                            }
-                        }
-
-                        sheet(proxy: proxy)
-                    }
-                }
-                .coordinateSpace(name: "today")
-                .ignoresSafeArea(edges: .top)
-                .refreshable { await store.refresh() }
-                .onPreferenceChange(HeroBottomPreference.self) { bottom in
-                    pinProgress = min(1, max(0, (118 - bottom) / 24))
-                }
-                .onPreferenceChange(SectionTopsPreference.self) { tops in
-                    guard segmentLock == nil else { return }
-                    let bar: CGFloat = pinProgress > 0.55 ? 120 : 24
-                    var current = PanelID.temperature
-                    for panel in [PanelID.temperature, .wetBulb, .rain, .climate] {
-                        if let top = tops[panel], top - bar <= 56 { current = panel }
-                    }
-                    if selectedPanel != current { selectedPanel = current }
-                }
-                .onChange(of: store.pendingPanelJump) { _, panel in
-                    guard let panel else { return }
-                    jump(panel, proxy: proxy)
-                    store.pendingPanelJump = nil
-                }
-                .onChange(of: store.location?.cacheKey) { _, _ in
-                    wetBulbExpanded = false
-                }
-
-                if let conditions = store.conditions, pinProgress > 0.02 {
-                    PinnedHeader(
-                        placeName: placeName,
-                        showsGPS: store.activeSource == .geo,
-                        nowLine: nowLine(conditions),
-                        updated: ScreenPresentation.updatedPhrase(
-                            fetchedAt: store.forecastUpdatedAt,
-                            now: Date(),
-                            timeZone: store.locationTimeZone).text,
-                        selected: selectedPanel,
-                        onPlace: { showingSearch = true },
-                        onSelect: { jump($0, proxy: proxy) }
-                    )
-                    .opacity(pinProgress)
-                    .allowsHitTesting(pinProgress > 0.55)
-                    .accessibilityHidden(pinProgress < 0.55)
+            Group {
+                if StatusCanvas.prefersSplit(horizontal: horizontalSizeClass, width: canvasWidth) {
+                    splitCanvas(proxy: proxy)
+                } else {
+                    compactCanvas(proxy: proxy)
                 }
             }
+            .background { CanvasWidthReader(width: $canvasWidth) }
+            .background { WindowTopInset(top: $topInset) }
+            .onChange(of: store.pendingPanelJump) { _, panel in
+                guard let panel else { return }
+                jump(panel, proxy: proxy)
+                store.pendingPanelJump = nil
+            }
+            .onChange(of: store.location?.cacheKey) { _, _ in
+                wetBulbExpanded = false
+            }
+        }
+    }
+
+    /// Cover display, and any regular window that is still too narrow to split.
+    private func compactCanvas(proxy: ScrollViewProxy) -> some View {
+        ZStack(alignment: .top) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    hero(proxy: proxy)
+                    sheet(proxy: proxy, tucked: true, sideBySide: false)
+                }
+            }
+            .coordinateSpace(name: "today")
+            .ignoresSafeArea(edges: .top)
+            .refreshable { await store.refresh() }
+            .onPreferenceChange(HeroBottomPreference.self) { bottom in
+                pinProgress = min(1, max(0, (118 - bottom) / 24))
+            }
+            .onPreferenceChange(SectionTopsPreference.self) { tops in
+                guard segmentLock == nil else { return }
+                let bar: CGFloat = pinProgress > 0.55 ? 120 : 24
+                var current = PanelID.temperature
+                for panel in [PanelID.temperature, .wetBulb, .rain, .climate] {
+                    if let top = tops[panel], top - bar <= 56 { current = panel }
+                }
+                if selectedPanel != current { selectedPanel = current }
+            }
+
+            if let conditions = store.conditions, pinProgress > 0.02 {
+                PinnedHeader(
+                    placeName: placeName,
+                    showsGPS: store.activeSource == .geo,
+                    nowLine: nowLine(conditions),
+                    updated: ScreenPresentation.updatedPhrase(
+                        fetchedAt: store.forecastUpdatedAt,
+                        now: Date(),
+                        timeZone: store.locationTimeZone).text,
+                    selected: selectedPanel,
+                    onPlace: { showingSearch = true },
+                    onSelect: { jump($0, proxy: proxy) }
+                )
+                .opacity(pinProgress)
+                .allowsHitTesting(pinProgress > 0.55)
+                .accessibilityHidden(pinProgress < 0.55)
+            }
+        }
+    }
+
+    /// Unfolded regular width: status stays in one column, charts scroll in the other.
+    private func splitCanvas(proxy: ScrollViewProxy) -> some View {
+        let statusWidth = StatusCanvas.statusWidth(in: canvasWidth)
+        let detailWidth = max(0, canvasWidth - statusWidth)
+        return HStack(alignment: .top, spacing: 0) {
+            GeometryReader { column in
+                ScrollView {
+                    hero(proxy: proxy)
+                        .frame(minHeight: column.size.height, alignment: .top)
+                }
+                .ignoresSafeArea(edges: .top)
+            }
+            .frame(width: statusWidth)
+            .frame(maxHeight: .infinity)
+
+            Divider()
+
+            ScrollView {
+                sheet(
+                    proxy: proxy,
+                    tucked: false,
+                    sideBySide: detailWidth >= StatusCanvas.chartPairMinimum)
+            }
+            .frame(maxHeight: .infinity)
+            .coordinateSpace(name: "today")
+            .background(Color(.systemBackground))
+            .refreshable { await store.refresh() }
+            .onPreferenceChange(SectionTopsPreference.self) { tops in
+                guard segmentLock == nil else { return }
+                var current = PanelID.temperature
+                for panel in [PanelID.temperature, .wetBulb, .rain, .climate] {
+                    if let top = tops[panel], top <= 80 { current = panel }
+                }
+                if selectedPanel != current { selectedPanel = current }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private func hero(proxy: ScrollViewProxy) -> some View {
+        if let conditions = store.conditions, let forecast = store.forecast {
+            HeroView(
+                placeName: placeName,
+                showsGPS: store.activeSource == .geo,
+                conditions: conditions,
+                voice: voice(forecast: forecast, conditions: conditions),
+                gauge: gaugeData(conditions),
+                gaugeSeed: TemperatureGaugeSeed(
+                    locationID: store.location?.cacheKey ?? "",
+                    day: conditions.todayString),
+                temperatureUnit: store.imperial ? .fahrenheit : .celsius,
+                sun: TodaySun.today(forecast: forecast, dayIndex: conditions.todayIndex),
+                outlook: outlook(forecast: forecast, conditions: conditions),
+                topInset: topInset,
+                formatter: store.formatter,
+                onSearch: { showingSearch = true },
+                onSettings: { showingSettings = true },
+                onVoice: { jump($0, proxy: proxy) }
+            )
             .background {
-                WindowTopInset(top: $topInset)
+                GeometryReader { geo in
+                    Color.clear.preference(
+                        key: HeroBottomPreference.self,
+                        value: geo.frame(in: .named("today")).maxY)
+                }
             }
         }
     }
@@ -191,7 +250,7 @@ struct TodayScreen: View {
         }
     }
 
-    private func sheet(proxy: ScrollViewProxy) -> some View {
+    private func sheet(proxy: ScrollViewProxy, tucked: Bool, sideBySide: Bool) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             if let banner = store.banner {
                 BannerView(message: banner) { store.dismissBanner() }
@@ -212,7 +271,7 @@ struct TodayScreen: View {
                 }
             }
 
-            panels
+            panels(sideBySide: sideBySide)
 
             footer
         }
@@ -222,9 +281,13 @@ struct TodayScreen: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.systemBackground))
         .clipShape(UnevenRoundedRectangle(
-            cornerRadii: RectangleCornerRadii(topLeading: 26, bottomLeading: 0, bottomTrailing: 0, topTrailing: 26),
+            cornerRadii: RectangleCornerRadii(
+                topLeading: tucked ? 26 : 0,
+                bottomLeading: 0,
+                bottomTrailing: 0,
+                topTrailing: tucked ? 26 : 0),
             style: .continuous))
-        .padding(.top, -26)
+        .padding(.top, tucked ? -26 : 0)
     }
 
     @ViewBuilder
@@ -298,7 +361,7 @@ struct TodayScreen: View {
     // MARK: - Panels
 
     @ViewBuilder
-    private var panels: some View {
+    private func panels(sideBySide: Bool) -> some View {
         let timeZone = store.locationTimeZone
 
         WeatherSection(
@@ -306,16 +369,19 @@ struct TodayScreen: View {
             title: "Temperature",
             caption: "Actual air temp, high & low"
         ) {
-            HourlyTempChart(
-                points: store.hourlyPoints, series: .temperature,
-                formatter: store.formatter, timeZone: timeZone,
-                detailText: Subtitles.hourlyTemp(store),
-                onOpenDetail: { detailKind = .hourlyTemp })
-            DailyTempChart(
-                points: store.dailyPoints, series: .temperature,
-                formatter: store.formatter, timeZone: timeZone,
-                detailText: Subtitles.dailyTemp(store),
-                onOpenDetail: { detailKind = .dailyTemp })
+            chartPair(sideBySide: sideBySide) {
+                HourlyTempChart(
+                    points: store.hourlyPoints, series: .temperature,
+                    formatter: store.formatter, timeZone: timeZone,
+                    detailText: Subtitles.hourlyTemp(store),
+                    onOpenDetail: { detailKind = .hourlyTemp })
+            } second: {
+                DailyTempChart(
+                    points: store.dailyPoints, series: .temperature,
+                    formatter: store.formatter, timeZone: timeZone,
+                    detailText: Subtitles.dailyTemp(store),
+                    onOpenDetail: { detailKind = .dailyTemp })
+            }
         }
         .background { sectionTop(.temperature) }
         .onAppear {
@@ -342,16 +408,19 @@ struct TodayScreen: View {
                         .font(.subheadline.weight(.semibold))
                         .buttonStyle(.plain)
                 }
-                HourlyTempChart(
-                    points: store.hourlyPoints, series: .wetBulb,
-                    formatter: store.formatter, timeZone: timeZone,
-                    detailText: Subtitles.hourlyWetBulb(store),
-                    onOpenDetail: { detailKind = .hourlyWetBulb })
-                DailyTempChart(
-                    points: store.dailyPoints, series: .wetBulb,
-                    formatter: store.formatter, timeZone: timeZone,
-                    detailText: Subtitles.dailyWetBulb(store),
-                    onOpenDetail: { detailKind = .dailyWetBulb })
+                chartPair(sideBySide: sideBySide) {
+                    HourlyTempChart(
+                        points: store.hourlyPoints, series: .wetBulb,
+                        formatter: store.formatter, timeZone: timeZone,
+                        detailText: Subtitles.hourlyWetBulb(store),
+                        onOpenDetail: { detailKind = .hourlyWetBulb })
+                } second: {
+                    DailyTempChart(
+                        points: store.dailyPoints, series: .wetBulb,
+                        formatter: store.formatter, timeZone: timeZone,
+                        detailText: Subtitles.dailyWetBulb(store),
+                        onOpenDetail: { detailKind = .dailyWetBulb })
+                }
             }
         }
         .background { sectionTop(.wetBulb) }
@@ -367,16 +436,19 @@ struct TodayScreen: View {
                         forecast: forecast, conditions: conditions, dailyRain: store.dailyRain),
                     formatter: store.formatter)
             }
-            HourlyRainChart(
-                points: store.hourlyPoints,
-                formatter: store.formatter, timeZone: timeZone,
-                detailText: Subtitles.hourlyRain(store),
-                onOpenDetail: { detailKind = .hourlyRain })
-            DailyRainChart(
-                points: store.dailyPoints,
-                formatter: store.formatter, timeZone: timeZone,
-                detailText: Subtitles.dailyRain(store),
-                onOpenDetail: { detailKind = .dailyRain })
+            chartPair(sideBySide: sideBySide) {
+                HourlyRainChart(
+                    points: store.hourlyPoints,
+                    formatter: store.formatter, timeZone: timeZone,
+                    detailText: Subtitles.hourlyRain(store),
+                    onOpenDetail: { detailKind = .hourlyRain })
+            } second: {
+                DailyRainChart(
+                    points: store.dailyPoints,
+                    formatter: store.formatter, timeZone: timeZone,
+                    detailText: Subtitles.dailyRain(store),
+                    onOpenDetail: { detailKind = .dailyRain })
+            }
             if let series = store.ytdSeries {
                 YTDRainChart(
                     series: series, formatter: store.formatter,
@@ -411,6 +483,25 @@ struct TodayScreen: View {
         }
         .background { sectionTop(.climate) }
         .onAppear { store.ensureClimatology() }
+    }
+
+    @ViewBuilder
+    private func chartPair<First: View, Second: View>(
+        sideBySide: Bool,
+        @ViewBuilder first: () -> First,
+        @ViewBuilder second: () -> Second
+    ) -> some View {
+        if sideBySide {
+            HStack(alignment: .top, spacing: 16) {
+                first().frame(maxWidth: .infinity, alignment: .leading)
+                second().frame(maxWidth: .infinity, alignment: .leading)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 16) {
+                first()
+                second()
+            }
+        }
     }
 
     private func sectionTop(_ panel: PanelID) -> some View {
