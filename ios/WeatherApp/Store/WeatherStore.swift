@@ -39,6 +39,8 @@ final class WeatherStore {
 
     /// Minute rain and alerts from on-device WeatherKit. Nil until the first reply.
     private(set) var appleWeather: AppleWeatherSnapshot?
+    /// Neighbourhood, street, or coordinates for the point sent to WeatherKit.
+    private(set) var applePointLabel: String?
     private(set) var forecastIsStale = false
     private(set) var forecastUpdatedAt: Date?
 
@@ -299,12 +301,19 @@ final class WeatherStore {
     }
 
     private func loadAppleWeather(for target: WeatherLocation, bypassHoldOff: Bool) async {
-        let snapshot = await appleClient.fetch(
+        applePointLabel = PrecisePlaceLabel.coordinates(
+            latitude: target.latitude, longitude: target.longitude)
+        async let snapshot = appleClient.fetch(
             latitude: target.latitude,
             longitude: target.longitude,
             bypassHoldOff: bypassHoldOff)
+        async let label = geocoder.preciseLabel(
+            latitude: target.latitude, longitude: target.longitude)
+        let fetched = await snapshot
+        let precise = await label
         guard !Task.isCancelled, currentKey == target.cacheKey else { return }
-        appleWeather = snapshot
+        appleWeather = fetched
+        applePointLabel = precise
     }
 
     private func loadHourlyNormals(for target: WeatherLocation) async {
@@ -435,6 +444,7 @@ final class WeatherStore {
         ytdRequested = false
         climatologyRequested = false
         appleWeather = nil
+        applePointLabel = nil
         banner = nil
     }
 }

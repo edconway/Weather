@@ -46,58 +46,42 @@ enum Atmosphere {
 
     static func colors(code: Int?, isDay: Bool) -> Colors {
         let family = family(for: code)
-        if !isDay {
-            return Colors(
-                top: Color(red: 0.05, green: 0.08, blue: 0.18),
-                mid: Color(red: 0.10, green: 0.14, blue: 0.28),
-                bottom: Color(red: 0.16, green: 0.18, blue: 0.30),
-                foreground: .white,
-                secondaryForeground: Color.white.opacity(0.78))
+        let sky = skyColors(family: family, isDay: isDay)
+        return Colors(
+            top: sky.top,
+            mid: sky.mid,
+            bottom: sky.mid,
+            foreground: .white,
+            secondaryForeground: Color.white.opacity(0.84))
+    }
+
+    /// Day and night skies from the website hero. Type stays light on both.
+    private static func skyColors(family: Family, isDay: Bool) -> (top: Color, mid: Color) {
+        if isDay {
+            switch family {
+            case .clear: return (hex(0x165EA8), hex(0x2C78BC))
+            case .cloudy: return (hex(0x3D5168), hex(0x5D738C))
+            case .fog: return (hex(0x4A5563), hex(0x6D7886))
+            case .rain: return (hex(0x1D4D6E), hex(0x3D7396))
+            case .snow: return (hex(0x3C5C78), hex(0x6E8EAA))
+            case .storm: return (hex(0x2A2444), hex(0x51486E))
+            }
         }
         switch family {
-        case .clear:
-            return Colors(
-                top: Color(red: 0.35, green: 0.62, blue: 0.95),
-                mid: Color(red: 0.55, green: 0.78, blue: 0.98),
-                bottom: Color(red: 0.82, green: 0.90, blue: 0.98),
-                foreground: Color(red: 0.08, green: 0.14, blue: 0.28),
-                secondaryForeground: Color(red: 0.18, green: 0.28, blue: 0.42).opacity(0.85))
-        case .cloudy:
-            return Colors(
-                top: Color(red: 0.55, green: 0.64, blue: 0.76),
-                mid: Color(red: 0.70, green: 0.76, blue: 0.84),
-                bottom: Color(red: 0.88, green: 0.90, blue: 0.93),
-                foreground: Color(red: 0.12, green: 0.16, blue: 0.24),
-                secondaryForeground: Color(red: 0.28, green: 0.32, blue: 0.40).opacity(0.85))
-        case .rain:
-            return Colors(
-                top: Color(red: 0.28, green: 0.38, blue: 0.52),
-                mid: Color(red: 0.42, green: 0.52, blue: 0.64),
-                bottom: Color(red: 0.62, green: 0.70, blue: 0.78),
-                foreground: .white,
-                secondaryForeground: Color.white.opacity(0.82))
-        case .snow:
-            return Colors(
-                top: Color(red: 0.62, green: 0.72, blue: 0.86),
-                mid: Color(red: 0.78, green: 0.84, blue: 0.92),
-                bottom: Color(red: 0.92, green: 0.94, blue: 0.97),
-                foreground: Color(red: 0.12, green: 0.18, blue: 0.30),
-                secondaryForeground: Color(red: 0.28, green: 0.34, blue: 0.44).opacity(0.85))
-        case .storm:
-            return Colors(
-                top: Color(red: 0.18, green: 0.20, blue: 0.32),
-                mid: Color(red: 0.30, green: 0.32, blue: 0.44),
-                bottom: Color(red: 0.48, green: 0.46, blue: 0.52),
-                foreground: .white,
-                secondaryForeground: Color.white.opacity(0.82))
-        case .fog:
-            return Colors(
-                top: Color(red: 0.58, green: 0.62, blue: 0.68),
-                mid: Color(red: 0.72, green: 0.74, blue: 0.78),
-                bottom: Color(red: 0.86, green: 0.87, blue: 0.88),
-                foreground: Color(red: 0.16, green: 0.18, blue: 0.22),
-                secondaryForeground: Color(red: 0.32, green: 0.34, blue: 0.38).opacity(0.85))
+        case .clear: return (hex(0x071428), hex(0x16325C))
+        case .cloudy: return (hex(0x121820), hex(0x243044))
+        case .fog: return (hex(0x1A1E24), hex(0x2C333C))
+        case .rain: return (hex(0x0C1A2E), hex(0x1A3350))
+        case .snow: return (hex(0x15202C), hex(0x2A3C50))
+        case .storm: return (hex(0x140E22), hex(0x2A2044))
         }
+    }
+
+    private static func hex(_ value: UInt32) -> Color {
+        Color(
+            red: Double((value >> 16) & 0xFF) / 255,
+            green: Double((value >> 8) & 0xFF) / 255,
+            blue: Double(value & 0xFF) / 255)
     }
 
     private enum Family {
