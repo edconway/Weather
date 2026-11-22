@@ -19,6 +19,11 @@ struct TodayScreen: View {
     /// The scene after safe areas. Used only to place content around a hinge.
     @State private var canvas = CGSize.zero
     @State private var fold: DuoDivision?
+    @State private var hingeSeparates = false
+    @State private var occlusion = DuoPadding.zero
+    /// The fold reports no regions on its first layout passes. This counts a
+    /// few more reads so the hinge arrives without waiting for another resize.
+    @State private var regionProbe = 0
 
     var body: some View {
         NavigationStack {
@@ -72,7 +77,8 @@ struct TodayScreen: View {
         DuoArrangement.arrangement(
             containerWidth: Double(canvas.width),
             containerHeight: Double(canvas.height),
-            division: fold)
+            division: fold,
+            hingeSeparates: hingeSeparates)
     }
 
     private var loadedScroll: some View {
@@ -80,14 +86,26 @@ struct TodayScreen: View {
             arranged(arrangement, proxy: proxy)
             .background {
                 GeometryReader { geo in
+                    let _ = regionProbe
                     Color.clear.preference(
                         key: DuoMetricsKey.self,
-                        value: DuoMetrics(size: geo.size, fold: DuoFold.active(in: geo)))
+                        value: metrics(in: geo))
+                }
+            }
+            .task {
+                // The first layout passes report no regions, and a fold from
+                // flat to book can change the hinge without changing the size.
+                // Reading again while this page is up picks up both.
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(250))
+                    regionProbe += 1
                 }
             }
             .onPreferenceChange(DuoMetricsKey.self) { metrics in
                 canvas = metrics.size
                 fold = metrics.fold
+                hingeSeparates = metrics.hingeSeparates
+                occlusion = metrics.occlusion
             }
             .background { WindowTopInset(top: $topInset) }
             .onChange(of: store.pendingPanelJump) { _, panel in
@@ -113,8 +131,21 @@ struct TodayScreen: View {
         }
     }
 
-    /// Cover, Split View, and a fully open inner display. One scroll, so the
-    /// status stays above the charts. Safe areas keep it off a side toolbar.
+    private func metrics(in geo: GeometryProxy) -> DuoMetrics {
+        let reading = DuoFold.reading(in: geo)
+        let padding = DuoOcclusionLayout.padding(
+            frames: reading.occlusions,
+            containerWidth: Double(geo.size.width),
+            containerHeight: Double(geo.size.height))
+        return DuoMetrics(
+            size: geo.size,
+            fold: reading.division,
+            hingeSeparates: reading.hingeSeparates,
+            occlusion: padding)
+    }
+
+    /// Cover, and any window the system does not divide. One scroll, so the
+    /// status stays above the charts.
     private func columnCanvas(proxy: ScrollViewProxy) -> some View {
         ZStack(alignment: .top) {
             ScrollView {
@@ -125,6 +156,7 @@ struct TodayScreen: View {
             }
             .coordinateSpace(name: "today")
             .ignoresSafeArea(edges: .top)
+            .duoPadding(occlusion)
             .refreshable { await store.refresh() }
             .onPreferenceChange(HeroBottomPreference.self) { bottom in
                 pinProgress = min(1, max(0, (118 - bottom) / 24))
@@ -152,6 +184,7 @@ struct TodayScreen: View {
                     onPlace: { showingSearch = true },
                     onSelect: { jump($0, proxy: proxy) }
                 )
+                .duoPadding(occlusion)
                 .opacity(pinProgress)
                 .allowsHitTesting(pinProgress > 0.55)
                 .accessibilityHidden(pinProgress < 0.55)
@@ -169,12 +202,18 @@ struct TodayScreen: View {
                 hero(proxy: proxy)
             }
             .ignoresSafeArea(edges: .top)
+            .padding(.leading, CGFloat(occlusion.leading))
+            .padding(.top, CGFloat(occlusion.top))
+            .padding(.bottom, CGFloat(occlusion.bottom))
             .frame(width: CGFloat(leading))
 
             Color.clear.frame(width: CGFloat(gap))
                 .accessibilityHidden(true)
 
             chartScroll(proxy: proxy)
+                .padding(.trailing, CGFloat(occlusion.trailing))
+                .padding(.top, CGFloat(occlusion.top))
+                .padding(.bottom, CGFloat(occlusion.bottom))
                 .frame(width: CGFloat(trailing))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -191,12 +230,18 @@ struct TodayScreen: View {
                 hero(proxy: proxy)
             }
             .ignoresSafeArea(edges: .top)
+            .padding(.top, CGFloat(occlusion.top))
+            .padding(.leading, CGFloat(occlusion.leading))
+            .padding(.trailing, CGFloat(occlusion.trailing))
             .frame(height: CGFloat(top))
 
             Color.clear.frame(height: CGFloat(gap))
                 .accessibilityHidden(true)
 
             chartScroll(proxy: proxy)
+                .padding(.bottom, CGFloat(occlusion.bottom))
+                .padding(.leading, CGFloat(occlusion.leading))
+                .padding(.trailing, CGFloat(occlusion.trailing))
                 .frame(height: CGFloat(bottom))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
