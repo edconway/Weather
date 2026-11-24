@@ -491,6 +491,77 @@ public enum TemperatureRangeLayout {
         return min(22, max(16, room / emPerPoint))
     }
 
+    static func textWidth(_ text: String, fontSize: Double, handwriting: Bool) -> Double {
+        var width = 0.0
+        for character in text {
+            if character.isNumber {
+                width += handwriting ? fontSize * 0.58 : fontSize * 0.62
+            } else if character == " " {
+                width += handwriting ? fontSize * 0.36 : fontSize * 0.28
+            } else if "°–-−".contains(character) {
+                width += handwriting ? fontSize * 0.50 : fontSize * 0.42
+            } else {
+                width += handwriting ? fontSize * 0.70 : fontSize * 0.56
+            }
+        }
+        return width
+    }
+
+    static func slidCenter(_ center: Double, labelWidth: Double, bounds: Double) -> Double {
+        let half = labelWidth / 2
+        return min(max(center, half), max(half, bounds - half))
+    }
+
+    private static func labelRect(centerX: Double, y: Double, width: Double, bounds: Double) -> GaugeRect {
+        let x = min(max(0, centerX - width / 2), max(0, bounds - width))
+        return GaugeRect(x: x, y: y, width: width, height: 24)
+    }
+
+    private static func bracketCurves(
+        lowX: Double?, highX: Double?, top: Double, legEnd: Double, narrow: Bool, seed: TemperatureGaugeSeed
+    ) -> [GaugeCubic] {
+        guard let lowX, let highX else { return [] }
+        let left = min(lowX, highX)
+        let right = max(lowX, highX)
+        if narrow {
+            let x = (left + right) / 2
+            return [GaugeCubic(
+                start: GaugePoint(x: x, y: legEnd - 10),
+                c1: GaugePoint(x: x, y: legEnd - 7),
+                c2: GaugePoint(x: x, y: legEnd - 3),
+                end: GaugePoint(x: x, y: legEnd))]
+        }
+        let wobble = wobble(seed: seed)
+        return [
+            verticalLeg(x: left, top: top, bottom: legEnd, dx1: wobble[0], dx2: wobble[1]),
+            horizontalRun(left: left, right: right, y: top, dy1: wobble[2], dy2: wobble[3]),
+            verticalLeg(x: right, top: top, bottom: legEnd, dx1: wobble[4], dx2: wobble[5])
+        ]
+    }
+
+    private static func verticalLeg(
+        x: Double, top: Double, bottom: Double, dx1: Double, dx2: Double
+    ) -> GaugeCubic {
+        let y1 = top + (bottom - top) * 0.35
+        let y2 = top + (bottom - top) * 0.7
+        return GaugeCubic(
+            start: GaugePoint(x: x, y: top),
+            c1: GaugePoint(x: x + dx1, y: y1),
+            c2: GaugePoint(x: x + dx2, y: y2),
+            end: GaugePoint(x: x, y: bottom))
+    }
+
+    private static func horizontalRun(
+        left: Double, right: Double, y: Double, dy1: Double, dy2: Double
+    ) -> GaugeCubic {
+        let x1 = left + (right - left) * 0.33
+        let x2 = left + (right - left) * 0.66
+        return GaugeCubic(
+            start: GaugePoint(x: left, y: y),
+            c1: GaugePoint(x: x1, y: y + dy1),
+            c2: GaugePoint(x: x2, y: y + dy2),
+            end: GaugePoint(x: right, y: y))
+    }
 
     private static func spoken(_ celsius: Double, unit: UnitTemperature) -> String {
         let number = roundedDegrees(celsius, unit: unit)
