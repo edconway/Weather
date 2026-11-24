@@ -91,7 +91,7 @@ public struct TemperatureRangeGauge: View {
         let markerStroke = style.drawsHandwriting
         let dash: [CGFloat] = markerStroke || strongContrast ? [] : [6, 5]
         let stroke: CGFloat = markerStroke
-            ? (strongContrast ? 4.5 : (style.compactNotes ? 2.6 : 4))
+            ? (strongContrast ? (style.compactNotes ? 1.75 : 2.2) : (style.compactNotes ? 1.25 : 1.6))
             : (strongContrast ? 3 : 2.2)
         let shown = grown ? (placement.barEnd - placement.barStart) : 0
         let shownStart = (placement.barStart + placement.barEnd) / 2 - shown / 2

@@ -432,7 +432,7 @@ public enum TemperatureRangeLayout {
                 label: nowRect,
                 obstacles: obstacles,
                 bounds: width,
-                chevronLength: compact ? 9 : 16) {
+                chevronLength: compact ? 4 : 6) {
                 arrow = built
                 nowText = phrase
                 y += (compact ? 2 : 4) + nowHeight
@@ -608,53 +608,60 @@ public enum TemperatureRangeLayout {
         bounds: Double,
         chevronLength: Double
     ) -> GaugeArrowGeometry? {
-        let tip = GaugePoint(x: dot.x, y: dot.y + outerRadius + 2)
         let labelOnRight = label.midX >= dot.x
+        let side: Double = labelOnRight ? 1 : -1
         // Leave from the inner edge of the words, level with the lettering.
         let startX = min(max(labelOnRight ? label.x : label.maxX, 0), bounds)
         let start = GaugePoint(x: startX, y: label.midY)
         let blocked = obstacles.map { $0.inset(by: 2) }
-        let span = tip.x - start.x
-        let rise = max(start.y - tip.y, 8)
-        // Quarter-ellipse first. If that crosses a number, a slightly tighter
-        // hook that stays low until it is past the label. Both arrive vertically.
-        let attempts = [(lead: 0.45, lift: 0.55), (lead: 0.70, lift: 0.72)]
-        var chosen: GaugeCubic?
-        for attempt in attempts {
-            let curve = GaugeCubic(
-                start: start,
-                c1: GaugePoint(x: start.x + span * attempt.lead, y: start.y),
-                c2: GaugePoint(x: tip.x, y: tip.y + rise * attempt.lift),
-                end: tip)
-            let hits = curve.samples(count: 24).contains { sample in
+        let under = GaugePoint(x: dot.x, y: dot.y + outerRadius + 2)
+        let span = under.x - start.x
+        let rise = max(start.y - under.y, 10)
+        // One bow, already turning as it leaves the words. A longer lead stays
+        // lower for longer when a degree label is in the way. The tip sits on
+        // the ring along the arrival, so the pen points at the dot.
+        let leads = [0.34, 0.52, 0.70]
+        for lead in leads {
+            let c1 = GaugePoint(
+                x: start.x + span * lead,
+                y: start.y - rise * 0.18)
+            let c2Draft = GaugePoint(
+                x: under.x + side * min(abs(span) * 0.22, 18),
+                y: under.y + rise * 0.42)
+            let approach = GaugePoint(x: under.x - c2Draft.x, y: under.y - c2Draft.y)
+            let approachLength = max(hypot(approach.x, approach.y), 0.001)
+            let tangent = GaugePoint(
+                x: approach.x / approachLength,
+                y: approach.y / approachLength)
+            let tip = GaugePoint(
+                x: dot.x - tangent.x * (outerRadius + 2),
+                y: dot.y - tangent.y * (outerRadius + 2))
+            let c2 = GaugePoint(
+                x: tip.x - tangent.x * approachLength,
+                y: tip.y - tangent.y * approachLength)
+            let curve = GaugeCubic(start: start, c1: c1, c2: c2, end: tip)
+            let hits = curve.samples(count: 28).contains { sample in
                 blocked.contains { $0.contains(sample) }
             }
             if !hits {
-                chosen = curve
-                break
+                let chevron = chevronPoints(tip: tip, tangent: tangent, length: chevronLength)
+                return GaugeArrowGeometry(
+                    curves: [curve],
+                    tip: tip,
+                    finalTangent: tangent,
+                    chevronLeft: chevron.left,
+                    chevronRight: chevron.right,
+                    label: label)
             }
         }
-        guard let curve = chosen else { return nil }
-        let approach = curve.c2
-        let approachLength = max(hypot(tip.x - approach.x, tip.y - approach.y), 0.001)
-        let tangent = GaugePoint(
-            x: (tip.x - approach.x) / approachLength,
-            y: (tip.y - approach.y) / approachLength)
-        let chevron = chevronPoints(tip: tip, tangent: tangent, length: chevronLength)
-        return GaugeArrowGeometry(
-            curves: [curve],
-            tip: tip,
-            finalTangent: tangent,
-            chevronLeft: chevron.left,
-            chevronRight: chevron.right,
-            label: label)
+        return nil
     }
 
     private static func chevronPoints(
         tip: GaugePoint, tangent: GaugePoint, length: Double
     ) -> (left: GaugePoint, right: GaugePoint) {
-        let angle = 42.0 * Double.pi / 180
-        // A broad open head. The arms trail back from the tip.
+        let angle = 26.0 * Double.pi / 180
+        // A small nib. The arms trail back along the curve.
         let back = GaugePoint(x: -tangent.x, y: -tangent.y)
         func arm(_ turn: Double) -> GaugePoint {
             let c = cos(turn)
