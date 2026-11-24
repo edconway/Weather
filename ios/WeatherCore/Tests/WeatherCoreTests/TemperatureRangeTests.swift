@@ -160,12 +160,21 @@ final class TemperatureRangeTests: XCTestCase {
         let toward = hypot(towardX, towardY)
         let dotProduct = (arrow.finalTangent.x * towardX + arrow.finalTangent.y * towardY) / toward
         XCTAssertGreaterThan(dotProduct, 0.95)
+        let attached = TemperatureRangeLayout.cursiveAttachment(
+            label: arrow.label,
+            fontSize: TemperatureRangeLayout.markerFontSize(for: 320),
+            rotationDegrees: placed.labelRotationDegrees)
+        XCTAssertEqual(arrow.curves[0].start.x, attached.x, accuracy: 0.01)
+        XCTAssertEqual(arrow.curves[0].start.y, attached.y, accuracy: 0.01)
         let bar = GaugeRect(
             x: placed.inset, y: placed.trackTop, width: placed.usableWidth, height: 9)
-        let blocked = [placed.lowLabel, placed.highLabel, placed.combinedLabel, arrow.label, bar].compactMap { $0 }
+        let letters = TemperatureRangeLayout.cursiveBody(
+            label: arrow.label, fontSize: TemperatureRangeLayout.markerFontSize(for: 320))
+        let blocked = [placed.lowLabel, placed.highLabel, placed.combinedLabel, bar].compactMap { $0 }
         let samples = arrow.curves.flatMap { $0.samples(count: 24) }
         for sample in samples {
             XCTAssertFalse(blocked.contains { $0.contains(sample) })
+            XCTAssertFalse(letters.contains(sample))
             XCTAssertGreaterThanOrEqual(hypot(sample.x - dot.x, sample.y - dot.y), outer - 0.2)
         }
     }
@@ -181,10 +190,16 @@ final class TemperatureRangeTests: XCTestCase {
         let toward = hypot(towardX, towardY)
         let dotProduct = (arrow.finalTangent.x * towardX + arrow.finalTangent.y * towardY) / toward
         XCTAssertGreaterThan(dotProduct, 0.95)
+        let size = TemperatureRangeLayout.markerFontSize(for: 170, compact: true)
+        let attached = TemperatureRangeLayout.cursiveAttachment(
+            label: arrow.label, fontSize: size, rotationDegrees: placed.labelRotationDegrees)
+        XCTAssertEqual(arrow.curves[0].start.x, attached.x, accuracy: 0.01)
+        XCTAssertEqual(arrow.curves[0].start.y, attached.y, accuracy: 0.01)
+        let letters = TemperatureRangeLayout.cursiveBody(label: arrow.label, fontSize: size)
         let bar = GaugeRect(
             x: placed.inset, y: placed.trackTop, width: placed.usableWidth, height: 6)
         for sample in arrow.curves.flatMap({ $0.samples(count: 24) }) {
-            XCTAssertFalse(arrow.label.contains(sample))
+            XCTAssertFalse(letters.contains(sample))
             XCTAssertFalse(bar.contains(sample))
         }
     }

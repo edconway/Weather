@@ -440,6 +440,8 @@ public enum TemperatureRangeLayout {
                 dot: dot,
                 outerRadius: outer,
                 label: nowRect,
+                fontSize: markerSize,
+                rotationDegrees: labelRotation(seed: seed),
                 laneY: laneY,
                 obstacles: obstacles,
                 bar: barRect,
@@ -523,6 +525,35 @@ public enum TemperatureRangeLayout {
         // "temperature now": 14 letters at 0.62em and one 0.34em space.
         let emPerPoint = 14 * 0.62 + 0.34
         return min(22, max(16, room / emPerPoint))
+    }
+
+    /// The ink at the end of “temperature now” in Cedarville Cursive.
+    /// The layout box is wider than the letters, so the curve uses this point
+    /// and not the edge of the box. Advances measured from the bundled font.
+    static func cursiveAttachment(
+        label: GaugeRect, fontSize: Double, rotationDegrees: Double
+    ) -> GaugePoint {
+        let advance = 7035.0 / 1024.0 * fontSize
+        let inkRight = 7089.0 / 1024.0 * fontSize
+        let dx = inkRight - advance / 2
+        let theta = rotationDegrees * Double.pi / 180
+        return GaugePoint(
+            x: label.midX + dx * cos(theta),
+            y: label.midY + dx * sin(theta))
+    }
+
+    /// The letters of “temperature now”, short of the last stroke, so the
+    /// curve can leave the end of the word without crossing the rest.
+    static func cursiveBody(label: GaugeRect, fontSize: Double) -> GaugeRect {
+        let advance = 7035.0 / 1024.0 * fontSize
+        let origin = label.midX - advance / 2
+        let inkLeft = -178.0 / 1024.0 * fontSize
+        let inkRight = 7089.0 / 1024.0 * fontSize
+        return GaugeRect(
+            x: origin + inkLeft,
+            y: label.midY - 0.25 * fontSize,
+            width: max(1, inkRight - inkLeft - 4),
+            height: 0.85 * fontSize)
     }
 
     static func textWidth(_ text: String, fontSize: Double, handwriting: Bool) -> Double {
@@ -616,6 +647,8 @@ public enum TemperatureRangeLayout {
         dot: GaugePoint,
         outerRadius: Double,
         label: GaugeRect,
+        fontSize: Double,
+        rotationDegrees: Double,
         laneY: Double,
         obstacles: [GaugeRect],
         bar: GaugeRect,
@@ -624,16 +657,33 @@ public enum TemperatureRangeLayout {
     ) -> GaugeArrowGeometry? {
         let labelOnRight = label.midX >= dot.x
         let preferred: Double = labelOnRight ? 1 : -1
-        let startX = min(max(labelOnRight ? label.x - 3 : label.maxX + 3, 2), bounds - 2)
-        let start = GaugePoint(x: startX, y: laneY)
+        let attached = cursiveAttachment(
+            label: label, fontSize: fontSize, rotationDegrees: rotationDegrees)
+        let letters = cursiveBody(label: label, fontSize: fontSize)
+        // Leave the last letter and rise into the clear lane, so the stroke
+        // begins on the word and does not cross the rest of the letters.
+        var prefix: [GaugeCubic] = []
+        var start = attached
+        let liftY = min(laneY, attached.y - 4)
+        if liftY < attached.y - 1 {
+            let lift = GaugePoint(x: attached.x, y: liftY)
+            prefix = [GaugeCubic(
+                start: attached,
+                c1: GaugePoint(x: attached.x, y: attached.y + (liftY - attached.y) * 0.45),
+                c2: GaugePoint(x: attached.x, y: liftY + (attached.y - liftY) * 0.2),
+                end: lift)]
+            start = lift
+        }
         let reach = outerRadius + 2.5
 
         func blocked(_ points: [GaugePoint], tip: GaugePoint) -> Bool {
             if points.dropLast().contains(where: { hypot($0.x - dot.x, $0.y - dot.y) < outerRadius - 0.2 }) {
                 return true
             }
-            let paddedWords = obstacles + [label]
-            if points.contains(where: { point in paddedWords.contains { $0.inset(by: 1.5).contains(point) } }) {
+            if points.contains(where: { letters.contains($0) }) {
+                return true
+            }
+            if points.contains(where: { point in obstacles.contains { $0.inset(by: 1.5).contains(point) } }) {
                 return true
             }
             if points.contains(where: { bar.inset(by: 1.2).contains($0) }) {
@@ -662,7 +712,7 @@ public enum TemperatureRangeLayout {
         func finish(_ curves: [GaugeCubic], tip: GaugePoint, tangent: GaugePoint) -> GaugeArrowGeometry {
             let head = chevronPoints(tip: tip, tangent: tangent, length: chevronLength)
             return GaugeArrowGeometry(
-                curves: curves,
+                curves: prefix + curves,
                 tip: tip,
                 finalTangent: tangent,
                 chevronLeft: head.left,
@@ -680,12 +730,9 @@ public enum TemperatureRangeLayout {
             let c2 = GaugePoint(
                 x: aim.tip.x - aim.tangent.x * approach,
                 y: aim.tip.y - aim.tangent.y * approach)
-            var c1 = GaugePoint(
+            let c1 = GaugePoint(
                 x: start.x + (c2.x - start.x) * lead,
                 y: start.y - rise * 0.06)
-            if abs(aim.tip.x - start.x) < 28 {
-                c1.x += preferred * 12 * (1 - lead)
-            }
             let curve = GaugeCubic(start: start, c1: c1, c2: c2, end: aim.tip)
             let points = curve.samples(count: 36)
             guard !blocked(points, tip: aim.tip) else { return nil }
