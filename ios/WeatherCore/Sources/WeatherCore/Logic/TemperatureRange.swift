@@ -84,7 +84,7 @@ public enum TemperatureGaugeStyle: Equatable, Sendable {
         }
     }
 
-    /// Handwritten bracket, historic label, and the curved arrow.
+    /// Handwritten bracket and historic label.
     /// The watch Now page uses `.widget` and keeps the notes. A list row does not.
     public var drawsHandwriting: Bool {
         switch self {
@@ -166,20 +166,6 @@ public struct GaugeCubic: Equatable, Sendable {
     }
 }
 
-public struct GaugeArrowGeometry: Equatable, Sendable {
-    public var curves: [GaugeCubic]
-    public var tip: GaugePoint
-    /// Unit vector at the tip, pointing at the dot.
-    public var finalTangent: GaugePoint
-    public var chevronLeft: GaugePoint
-    public var chevronRight: GaugePoint
-    public var label: GaugeRect
-
-    public var samples: [GaugePoint] {
-        curves.flatMap { $0.samples() }
-    }
-}
-
 public struct GaugePlacement: Equatable, Sendable {
     public var domain: TemperatureScaleDomain
     public var inset: Double
@@ -200,7 +186,7 @@ public struct GaugePlacement: Equatable, Sendable {
     public var lowLabel: GaugeRect?
     public var highLabel: GaugeRect?
     public var combinedLabel: GaugeRect?
-    public var arrow: GaugeArrowGeometry?
+    public var nowLabel: GaugeRect?
     public var height: Double
     public var labelRotationDegrees: Double
     public var lowText: String
@@ -331,8 +317,7 @@ public enum TemperatureRangeLayout {
         unit: UnitTemperature,
         width: Double,
         seed: TemperatureGaugeSeed,
-        stackedLabels: Bool,
-        allowArrow: Bool = true
+        stackedLabels: Bool
     ) -> GaugePlacement {
         let data = data.normalized()
         let domain = domain(for: data)
@@ -419,38 +404,18 @@ public enum TemperatureRangeLayout {
 
         let dot: GaugePoint? = data.current.map { GaugePoint(x: map($0), y: barCenterY) }
         var nowText: String?
-        var arrow: GaugeArrowGeometry?
-        if handwriting, allowArrow, data.current != nil, let dot {
+        var nowLabel: GaugeRect?
+        if handwriting, data.current != nil {
             let phrase = "temperature now"
             let nowWidth = textWidth(phrase, fontSize: markerSize, handwriting: true)
-            let outer = style.dotDiameter / 2 + ringWidth
-            // The curve lives in a lane under the numbers, or under the ring on
-            // the watch, so it can rise to the dot without crossing the words.
-            var laneTop = y
-            if !style.drawsValueLabels {
-                laneTop = max(laneTop, dot.y + outer + 4)
-            }
-            let laneHeight = compact ? 26.0 : 12.0
-            let laneY = laneTop + laneHeight - 6
-            let nowRect = nowLabelRect(
-                dotX: dot.x, y: laneTop + laneHeight, width: nowWidth, bounds: width, height: nowHeight)
-            let obstacles = [lowLabel, highLabel, combinedLabel].compactMap { $0 }
-            let barRect = GaugeRect(x: inset, y: trackTop, width: usable, height: style.trackHeight)
-            if let built = makeArrow(
-                dot: dot,
-                outerRadius: outer,
-                label: nowRect,
-                fontSize: markerSize,
-                rotationDegrees: labelRotation(seed: seed),
-                laneY: laneY,
-                obstacles: obstacles,
-                bar: barRect,
-                bounds: width,
-                chevronLength: compact ? 5 : 8) {
-                arrow = built
-                nowText = phrase
-                y = laneTop + laneHeight + nowHeight
-            }
+            let fitted = min(nowWidth, max(1, width - 8))
+            let center = slidCenter(width / 2, labelWidth: fitted, bounds: width)
+            let ringBottom = (dot?.y ?? barCenterY) + style.dotDiameter / 2 + ringWidth
+            let gap = compact ? 4.0 : 6.0
+            let wordTop = max(y + gap, ringBottom + gap)
+            nowLabel = GaugeRect(x: center - fitted / 2, y: wordTop, width: fitted, height: nowHeight)
+            nowText = phrase
+            y = wordTop + nowHeight
         }
 
         let curves = bracketCurves(
@@ -481,13 +446,13 @@ public enum TemperatureRangeLayout {
             lowLabel: lowLabel,
             highLabel: highLabel,
             combinedLabel: combinedLabel,
-            arrow: arrow,
+            nowLabel: nowLabel,
             height: max(y, barRow),
             labelRotationDegrees: labelRotation(seed: seed),
             lowText: lowText,
             highText: highText,
             historicText: historicText,
-            nowText: arrow == nil ? nil : nowText)
+            nowText: nowText)
     }
 
     // MARK: - Pieces
@@ -515,8 +480,7 @@ public enum TemperatureRangeLayout {
         return (start, end)
     }
 
-    /// Cursive, large enough to read, small enough that "temperature now"
-    /// still leaves a sweep up to the dot. The watch uses the compact size.
+    /// Cursive, large enough to read. The watch uses the compact size.
     static func markerFontSize(for width: Double, compact: Bool = false) -> Double {
         if compact {
             return min(13, max(11, width / 14))
@@ -527,324 +491,6 @@ public enum TemperatureRangeLayout {
         return min(22, max(16, room / emPerPoint))
     }
 
-    /// The ink at the end of “temperature now” in Cedarville Cursive.
-    /// The layout box is wider than the letters, so the curve uses this point
-    /// and not the edge of the box. Advances measured from the bundled font.
-    static func cursiveAttachment(
-        label: GaugeRect, fontSize: Double, rotationDegrees: Double
-    ) -> GaugePoint {
-        let advance = 7035.0 / 1024.0 * fontSize
-        let inkRight = 7089.0 / 1024.0 * fontSize
-        let dx = inkRight - advance / 2
-        let theta = rotationDegrees * Double.pi / 180
-        return GaugePoint(
-            x: label.midX + dx * cos(theta),
-            y: label.midY + dx * sin(theta))
-    }
-
-    /// The letters of “temperature now”, short of the last stroke, so the
-    /// curve can leave the end of the word without crossing the rest.
-    static func cursiveBody(label: GaugeRect, fontSize: Double) -> GaugeRect {
-        let advance = 7035.0 / 1024.0 * fontSize
-        let origin = label.midX - advance / 2
-        let inkLeft = -178.0 / 1024.0 * fontSize
-        let inkRight = 7089.0 / 1024.0 * fontSize
-        return GaugeRect(
-            x: origin + inkLeft,
-            y: label.midY - 0.25 * fontSize,
-            width: max(1, inkRight - inkLeft - 4),
-            height: 0.85 * fontSize)
-    }
-
-    static func textWidth(_ text: String, fontSize: Double, handwriting: Bool) -> Double {
-        var width = 0.0
-        for character in text {
-            if character.isNumber {
-                width += handwriting ? fontSize * 0.58 : fontSize * 0.62
-            } else if character == " " {
-                width += handwriting ? fontSize * 0.36 : fontSize * 0.28
-            } else if "°–-−".contains(character) {
-                width += handwriting ? fontSize * 0.50 : fontSize * 0.42
-            } else {
-                width += handwriting ? fontSize * 0.70 : fontSize * 0.56
-            }
-        }
-        return width
-    }
-
-    static func slidCenter(_ center: Double, labelWidth: Double, bounds: Double) -> Double {
-        let half = labelWidth / 2
-        return min(max(center, half), max(half, bounds - half))
-    }
-
-    private static func labelRect(centerX: Double, y: Double, width: Double, bounds: Double) -> GaugeRect {
-        let x = min(max(0, centerX - width / 2), max(0, bounds - width))
-        return GaugeRect(x: x, y: y, width: width, height: 24)
-    }
-
-    /// Pins the label to the outer edge of the side that leaves the longer
-    /// sweep from its inner edge up to the dot.
-    private static func nowLabelRect(
-        dotX: Double, y: Double, width: Double, bounds: Double, height: Double
-    ) -> GaugeRect {
-        let margin = 4.0
-        let fitted = min(width, max(1, bounds - margin * 2))
-        let rightX = bounds - margin - fitted
-        let leftX = margin
-        let rightSweep = rightX - dotX
-        let leftSweep = dotX - (leftX + fitted)
-        let x = rightSweep >= leftSweep ? rightX : leftX
-        return GaugeRect(x: x, y: y, width: fitted, height: height)
-    }
-
-    private static func bracketCurves(
-        lowX: Double?, highX: Double?, top: Double, legEnd: Double, narrow: Bool, seed: TemperatureGaugeSeed
-    ) -> [GaugeCubic] {
-        guard let lowX, let highX else { return [] }
-        let left = min(lowX, highX)
-        let right = max(lowX, highX)
-        if narrow {
-            let x = (left + right) / 2
-            return [GaugeCubic(
-                start: GaugePoint(x: x, y: legEnd - 10),
-                c1: GaugePoint(x: x, y: legEnd - 7),
-                c2: GaugePoint(x: x, y: legEnd - 3),
-                end: GaugePoint(x: x, y: legEnd))]
-        }
-        let wobble = wobble(seed: seed)
-        return [
-            verticalLeg(x: left, top: top, bottom: legEnd, dx1: wobble[0], dx2: wobble[1]),
-            horizontalRun(left: left, right: right, y: top, dy1: wobble[2], dy2: wobble[3]),
-            verticalLeg(x: right, top: top, bottom: legEnd, dx1: wobble[4], dx2: wobble[5])
-        ]
-    }
-
-    private static func verticalLeg(
-        x: Double, top: Double, bottom: Double, dx1: Double, dx2: Double
-    ) -> GaugeCubic {
-        let y1 = top + (bottom - top) * 0.35
-        let y2 = top + (bottom - top) * 0.7
-        return GaugeCubic(
-            start: GaugePoint(x: x, y: top),
-            c1: GaugePoint(x: x + dx1, y: y1),
-            c2: GaugePoint(x: x + dx2, y: y2),
-            end: GaugePoint(x: x, y: bottom))
-    }
-
-    private static func horizontalRun(
-        left: Double, right: Double, y: Double, dy1: Double, dy2: Double
-    ) -> GaugeCubic {
-        let x1 = left + (right - left) * 0.33
-        let x2 = left + (right - left) * 0.66
-        return GaugeCubic(
-            start: GaugePoint(x: left, y: y),
-            c1: GaugePoint(x: x1, y: y + dy1),
-            c2: GaugePoint(x: x2, y: y + dy2),
-            end: GaugePoint(x: right, y: y))
-    }
-
-    private static func makeArrow(
-        dot: GaugePoint,
-        outerRadius: Double,
-        label: GaugeRect,
-        fontSize: Double,
-        rotationDegrees: Double,
-        laneY: Double,
-        obstacles: [GaugeRect],
-        bar: GaugeRect,
-        bounds: Double,
-        chevronLength: Double
-    ) -> GaugeArrowGeometry? {
-        let labelOnRight = label.midX >= dot.x
-        let preferred: Double = labelOnRight ? 1 : -1
-        let attached = cursiveAttachment(
-            label: label, fontSize: fontSize, rotationDegrees: rotationDegrees)
-        let letters = cursiveBody(label: label, fontSize: fontSize)
-        // Leave the last letter and rise into the clear lane, so the stroke
-        // begins on the word and does not cross the rest of the letters.
-        var prefix: [GaugeCubic] = []
-        var start = attached
-        let liftY = min(laneY, attached.y - 4)
-        if liftY < attached.y - 1 {
-            let lift = GaugePoint(x: attached.x, y: liftY)
-            prefix = [GaugeCubic(
-                start: attached,
-                c1: GaugePoint(x: attached.x, y: attached.y + (liftY - attached.y) * 0.45),
-                c2: GaugePoint(x: attached.x, y: liftY + (attached.y - liftY) * 0.2),
-                end: lift)]
-            start = lift
-        }
-        let reach = outerRadius + 2.5
-
-        func blocked(_ points: [GaugePoint], tip: GaugePoint) -> Bool {
-            if points.dropLast().contains(where: { hypot($0.x - dot.x, $0.y - dot.y) < outerRadius - 0.2 }) {
-                return true
-            }
-            if points.contains(where: { letters.contains($0) }) {
-                return true
-            }
-            if points.contains(where: { point in obstacles.contains { $0.inset(by: 1.5).contains(point) } }) {
-                return true
-            }
-            if points.contains(where: { bar.inset(by: 1.2).contains($0) }) {
-                return true
-            }
-            if points.contains(where: { $0.x < -2 || $0.x > bounds + 2 }) {
-                return true
-            }
-            // Stay at or below the tip so the stroke cannot climb into the bar.
-            if points.contains(where: { $0.y < tip.y - 0.5 }) {
-                return true
-            }
-            return false
-        }
-
-        func aimed(_ theta: Double, _ side: Double) -> (tip: GaugePoint, tangent: GaugePoint) {
-            let tip = GaugePoint(
-                x: dot.x + sin(theta) * reach * side,
-                y: dot.y + cos(theta) * reach)
-            let towardX = dot.x - tip.x
-            let towardY = dot.y - tip.y
-            let norm = max(hypot(towardX, towardY), 0.001)
-            return (tip, GaugePoint(x: towardX / norm, y: towardY / norm))
-        }
-
-        func finish(_ curves: [GaugeCubic], tip: GaugePoint, tangent: GaugePoint) -> GaugeArrowGeometry {
-            let head = chevronPoints(tip: tip, tangent: tangent, length: chevronLength)
-            return GaugeArrowGeometry(
-                curves: prefix + curves,
-                tip: tip,
-                finalTangent: tangent,
-                chevronLeft: head.left,
-                chevronRight: head.right,
-                label: label)
-        }
-
-        // One sweep from the words. It stays low, then turns up along a ray
-        // that ends on the ring and points at the centre of the dot.
-        func sweep(_ theta: Double, _ side: Double, lead: Double) -> GaugeArrowGeometry? {
-            let aim = aimed(theta, side)
-            let rise = start.y - aim.tip.y
-            guard rise >= 8 else { return nil }
-            let approach = max(10, min(rise * 0.42, 22))
-            let c2 = GaugePoint(
-                x: aim.tip.x - aim.tangent.x * approach,
-                y: aim.tip.y - aim.tangent.y * approach)
-            let c1 = GaugePoint(
-                x: start.x + (c2.x - start.x) * lead,
-                y: start.y - rise * 0.06)
-            let curve = GaugeCubic(start: start, c1: c1, c2: c2, end: aim.tip)
-            let points = curve.samples(count: 36)
-            guard !blocked(points, tip: aim.tip) else { return nil }
-            return finish([curve], tip: aim.tip, tangent: aim.tangent)
-        }
-
-        let angles = [0.0, 20.0, 34.0, 48.0, 60.0]
-        for degrees in angles {
-            let theta = degrees * Double.pi / 180
-            let sides: [Double] = degrees == 0 ? [1] : [preferred, -preferred]
-            for side in sides {
-                for lead in [0.42, 0.62, 0.82] {
-                    if let arrow = sweep(theta, side, lead: lead) {
-                        return arrow
-                    }
-                }
-            }
-        }
-
-        // The sweep crossed a number. Run under the numbers, climb outside
-        // them, and turn into the dot.
-        func elbow(riseX: Double, degrees: Double, side: Double) -> GaugeArrowGeometry? {
-            guard riseX > 4, riseX < bounds - 4 else { return nil }
-            let theta = degrees * Double.pi / 180
-            let aim = aimed(theta, side)
-            let rise = laneY - aim.tip.y
-            guard rise >= 8 else { return nil }
-            let came: Double = start.x <= riseX ? -1 : 1
-            for radius in [34.0, 22, 14, 8] {
-                let cornerX = riseX + came * radius
-                guard cornerX > 4, cornerX < bounds - 4 else { continue }
-                if (cornerX - start.x) * came > 0, abs(start.x - riseX) > 4 { continue }
-                let span = cornerX - start.x
-                let corner = GaugePoint(x: cornerX, y: laneY)
-                let lane = GaugeCubic(
-                    start: start,
-                    c1: GaugePoint(x: start.x + span * 0.5, y: laneY),
-                    c2: GaugePoint(x: cornerX - came * min(10, abs(span) * 0.3), y: laneY),
-                    end: corner)
-                let approach = max(8, min(radius * 0.7, rise * 0.4))
-                let climb = GaugeCubic(
-                    start: corner,
-                    c1: GaugePoint(x: cornerX + (aim.tip.x - cornerX) * 0.55, y: laneY),
-                    c2: GaugePoint(
-                        x: aim.tip.x - aim.tangent.x * approach,
-                        y: aim.tip.y - aim.tangent.y * approach),
-                    end: aim.tip)
-                let points = lane.samples(count: 24) + climb.samples(count: 24)
-                if !blocked(points, tip: aim.tip) {
-                    return finish([lane, climb], tip: aim.tip, tangent: aim.tangent)
-                }
-            }
-            let approach = max(8, min(14, rise * 0.28))
-            let span = riseX - start.x
-            let lane = GaugeCubic(
-                start: start,
-                c1: GaugePoint(x: start.x + span * 0.45, y: laneY),
-                c2: GaugePoint(x: riseX - came * 6, y: laneY),
-                end: GaugePoint(x: riseX, y: laneY))
-            let climb = GaugeCubic(
-                start: GaugePoint(x: riseX, y: laneY),
-                c1: GaugePoint(x: riseX, y: laneY - rise * 0.78),
-                c2: GaugePoint(
-                    x: aim.tip.x - aim.tangent.x * approach,
-                    y: aim.tip.y - aim.tangent.y * approach),
-                end: aim.tip)
-            let points = lane.samples(count: 24) + climb.samples(count: 24)
-            guard !blocked(points, tip: aim.tip) else { return nil }
-            return finish([lane, climb], tip: aim.tip, tangent: aim.tangent)
-        }
-
-        var edges = [dot.x]
-        for rect in obstacles {
-            for margin in [8.0, 18, 30, 46] {
-                edges.append(rect.x - margin)
-                edges.append(rect.maxX + margin)
-            }
-        }
-        edges.sort { lhs, rhs in
-            let leftPreferred = (lhs - dot.x) * preferred >= -1
-            let rightPreferred = (rhs - dot.x) * preferred >= -1
-            if leftPreferred != rightPreferred { return leftPreferred }
-            return abs(lhs - dot.x) < abs(rhs - dot.x)
-        }
-        for riseX in edges {
-            for degrees in [0.0, 28, 46, 60] {
-                let sides: [Double] = degrees == 0 ? [1] : [preferred, -preferred]
-                for side in sides {
-                    if let arrow = elbow(riseX: riseX, degrees: degrees, side: side) {
-                        return arrow
-                    }
-                }
-            }
-        }
-        return nil
-    }
-
-    private static func chevronPoints(
-        tip: GaugePoint, tangent: GaugePoint, length: Double
-    ) -> (left: GaugePoint, right: GaugePoint) {
-        let angle = 32.0 * Double.pi / 180
-        // A small nib. The arms trail back along the curve.
-        let back = GaugePoint(x: -tangent.x, y: -tangent.y)
-        func arm(_ turn: Double) -> GaugePoint {
-            let c = cos(turn)
-            let s = sin(turn)
-            return GaugePoint(
-                x: tip.x + (back.x * c - back.y * s) * length,
-                y: tip.y + (back.x * s + back.y * c) * length)
-        }
-        return (arm(angle), arm(-angle))
-    }
 
     private static func spoken(_ celsius: Double, unit: UnitTemperature) -> String {
         let number = roundedDegrees(celsius, unit: unit)

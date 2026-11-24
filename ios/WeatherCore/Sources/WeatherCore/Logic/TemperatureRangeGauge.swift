@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// A spectrum coloured by degrees, today's range outlined on it, the historic
-/// average in a hand-drawn bracket, and the current temperature on a curve.
+/// average in a hand-drawn bracket, and “temperature now” in that temperature's colour.
 public struct TemperatureRangeGauge: View {
     public var data: TemperatureRangeData
     public var style: TemperatureGaugeStyle
@@ -54,8 +54,7 @@ public struct TemperatureRangeGauge: View {
             unit: unit,
             width: width,
             seed: seed,
-            stackedLabels: dynamicTypeSize.isAccessibilitySize,
-            allowArrow: style.drawsHandwriting && !dynamicTypeSize.isAccessibilitySize)
+            stackedLabels: dynamicTypeSize.isAccessibilitySize)
         canvas(placement)
             .frame(maxWidth: .infinity)
             .frame(height: placement.height)
@@ -127,6 +126,7 @@ public struct TemperatureRangeGauge: View {
                 trim: inkTrim,
                 lowColor: temperatureColor(data.todayLow),
                 highColor: temperatureColor(data.todayHigh),
+                nowColor: data.current.map(temperatureColor) ?? ink.color,
                 rotation: placement.labelRotationDegrees)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -181,7 +181,7 @@ public struct TemperatureRangeGauge: View {
     }
 }
 
-/// Cursive historic label, hand-drawn bracket, and the curved current-temperature arrow.
+/// Cursive historic label, hand-drawn bracket, and the current-temperature note.
 struct GaugeAnnotations: View {
     let placement: GaugePlacement
     let ink: Color
@@ -191,6 +191,7 @@ struct GaugeAnnotations: View {
     let trim: CGFloat
     let lowColor: Color
     let highColor: Color
+    let nowColor: Color
     let rotation: Double
 
     var body: some View {
@@ -205,18 +206,8 @@ struct GaugeAnnotations: View {
             if let label = placement.historicLabel, let text = placement.historicText {
                 handwritten(text, in: label)
             }
-            if let arrow = placement.arrow {
-                GaugeCurves(curves: arrow.curves)
-                    .trim(from: 0, to: trim)
-                    .stroke(
-                        ink,
-                        style: StrokeStyle(lineWidth: stroke, lineCap: .round, lineJoin: .round, dash: dash))
-                GaugeChevron(a: arrow.tip, b: arrow.chevronLeft, c: arrow.chevronRight)
-                    .stroke(ink, style: StrokeStyle(lineWidth: stroke, lineCap: .round, lineJoin: .round))
-                    .opacity(trim > 0.95 ? 1 : 0)
-                if let text = placement.nowText {
-                    handwritten(text, in: arrow.label)
-                }
+            if let label = placement.nowLabel, let text = placement.nowText {
+                handwritten(text, in: label, color: nowColor)
             }
             valueLabels
         }
@@ -236,10 +227,10 @@ struct GaugeAnnotations: View {
         }
     }
 
-    private func handwritten(_ text: String, in rect: GaugeRect) -> some View {
+    private func handwritten(_ text: String, in rect: GaugeRect, color: Color? = nil) -> some View {
         Text(text)
             .font(hand)
-            .foregroundStyle(ink)
+            .foregroundStyle(color ?? ink)
             .fixedSize()
             .rotationEffect(.degrees(rotation))
             .position(x: rect.midX, y: rect.midY)
@@ -266,20 +257,6 @@ struct GaugeCurves: Shape {
                 control1: CGPoint(x: curve.c1.x, y: curve.c1.y),
                 control2: CGPoint(x: curve.c2.x, y: curve.c2.y))
         }
-        return path
-    }
-}
-
-struct GaugeChevron: Shape {
-    var a: GaugePoint
-    var b: GaugePoint
-    var c: GaugePoint
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: b.x, y: b.y))
-        path.addLine(to: CGPoint(x: a.x, y: a.y))
-        path.addLine(to: CGPoint(x: c.x, y: c.y))
         return path
     }
 }
