@@ -423,19 +423,31 @@ public enum TemperatureRangeLayout {
         if handwriting, allowArrow, data.current != nil, let dot {
             let phrase = "temperature now"
             let nowWidth = textWidth(phrase, fontSize: markerSize, handwriting: true)
+            let outer = style.dotDiameter / 2 + ringWidth
+            // The curve lives in a lane under the numbers, or under the ring on
+            // the watch, so it can rise to the dot without crossing the words.
+            var laneTop = y
+            if !style.drawsValueLabels {
+                laneTop = max(laneTop, dot.y + outer + 4)
+            }
+            let laneHeight = compact ? 26.0 : 12.0
+            let laneY = laneTop + laneHeight - 6
             let nowRect = nowLabelRect(
-                dotX: dot.x, y: y + (compact ? 2 : 4), width: nowWidth, bounds: width, height: nowHeight)
+                dotX: dot.x, y: laneTop + laneHeight, width: nowWidth, bounds: width, height: nowHeight)
             let obstacles = [lowLabel, highLabel, combinedLabel].compactMap { $0 }
+            let barRect = GaugeRect(x: inset, y: trackTop, width: usable, height: style.trackHeight)
             if let built = makeArrow(
                 dot: dot,
-                outerRadius: style.dotDiameter / 2 + ringWidth,
+                outerRadius: outer,
                 label: nowRect,
+                laneY: laneY,
                 obstacles: obstacles,
+                bar: barRect,
                 bounds: width,
-                chevronLength: compact ? 4 : 6) {
+                chevronLength: compact ? 5 : 8) {
                 arrow = built
                 nowText = phrase
-                y += (compact ? 2 : 4) + nowHeight
+                y = laneTop + laneHeight + nowHeight
             }
         }
 
@@ -604,54 +616,168 @@ public enum TemperatureRangeLayout {
         dot: GaugePoint,
         outerRadius: Double,
         label: GaugeRect,
+        laneY: Double,
         obstacles: [GaugeRect],
+        bar: GaugeRect,
         bounds: Double,
         chevronLength: Double
     ) -> GaugeArrowGeometry? {
         let labelOnRight = label.midX >= dot.x
-        let side: Double = labelOnRight ? 1 : -1
-        // Leave from the inner edge of the words, level with the lettering.
-        let startX = min(max(labelOnRight ? label.x : label.maxX, 0), bounds)
-        let start = GaugePoint(x: startX, y: label.midY)
-        let blocked = obstacles.map { $0.inset(by: 2) }
-        let under = GaugePoint(x: dot.x, y: dot.y + outerRadius + 2)
-        let span = under.x - start.x
-        let rise = max(start.y - under.y, 10)
-        // One bow, already turning as it leaves the words. A longer lead stays
-        // lower for longer when a degree label is in the way. The tip sits on
-        // the ring along the arrival, so the pen points at the dot.
-        let leads = [0.34, 0.52, 0.70]
-        for lead in leads {
-            let c1 = GaugePoint(
-                x: start.x + span * lead,
-                y: start.y - rise * 0.18)
-            let c2Draft = GaugePoint(
-                x: under.x + side * min(abs(span) * 0.22, 18),
-                y: under.y + rise * 0.42)
-            let approach = GaugePoint(x: under.x - c2Draft.x, y: under.y - c2Draft.y)
-            let approachLength = max(hypot(approach.x, approach.y), 0.001)
-            let tangent = GaugePoint(
-                x: approach.x / approachLength,
-                y: approach.y / approachLength)
-            let tip = GaugePoint(
-                x: dot.x - tangent.x * (outerRadius + 2),
-                y: dot.y - tangent.y * (outerRadius + 2))
-            let c2 = GaugePoint(
-                x: tip.x - tangent.x * approachLength,
-                y: tip.y - tangent.y * approachLength)
-            let curve = GaugeCubic(start: start, c1: c1, c2: c2, end: tip)
-            let hits = curve.samples(count: 28).contains { sample in
-                blocked.contains { $0.contains(sample) }
+        let preferred: Double = labelOnRight ? 1 : -1
+        let startX = min(max(labelOnRight ? label.x - 3 : label.maxX + 3, 2), bounds - 2)
+        let start = GaugePoint(x: startX, y: laneY)
+        let reach = outerRadius + 2.5
+
+        func blocked(_ points: [GaugePoint], tip: GaugePoint) -> Bool {
+            if points.dropLast().contains(where: { hypot($0.x - dot.x, $0.y - dot.y) < outerRadius - 0.2 }) {
+                return true
             }
-            if !hits {
-                let chevron = chevronPoints(tip: tip, tangent: tangent, length: chevronLength)
-                return GaugeArrowGeometry(
-                    curves: [curve],
-                    tip: tip,
-                    finalTangent: tangent,
-                    chevronLeft: chevron.left,
-                    chevronRight: chevron.right,
-                    label: label)
+            let paddedWords = obstacles + [label]
+            if points.contains(where: { point in paddedWords.contains { $0.inset(by: 1.5).contains(point) } }) {
+                return true
+            }
+            if points.contains(where: { bar.inset(by: 1.2).contains($0) }) {
+                return true
+            }
+            if points.contains(where: { $0.x < -2 || $0.x > bounds + 2 }) {
+                return true
+            }
+            // Stay at or below the tip so the stroke cannot climb into the bar.
+            if points.contains(where: { $0.y < tip.y - 0.5 }) {
+                return true
+            }
+            return false
+        }
+
+        func aimed(_ theta: Double, _ side: Double) -> (tip: GaugePoint, tangent: GaugePoint) {
+            let tip = GaugePoint(
+                x: dot.x + sin(theta) * reach * side,
+                y: dot.y + cos(theta) * reach)
+            let towardX = dot.x - tip.x
+            let towardY = dot.y - tip.y
+            let norm = max(hypot(towardX, towardY), 0.001)
+            return (tip, GaugePoint(x: towardX / norm, y: towardY / norm))
+        }
+
+        func finish(_ curves: [GaugeCubic], tip: GaugePoint, tangent: GaugePoint) -> GaugeArrowGeometry {
+            let head = chevronPoints(tip: tip, tangent: tangent, length: chevronLength)
+            return GaugeArrowGeometry(
+                curves: curves,
+                tip: tip,
+                finalTangent: tangent,
+                chevronLeft: head.left,
+                chevronRight: head.right,
+                label: label)
+        }
+
+        // One sweep from the words. It stays low, then turns up along a ray
+        // that ends on the ring and points at the centre of the dot.
+        func sweep(_ theta: Double, _ side: Double, lead: Double) -> GaugeArrowGeometry? {
+            let aim = aimed(theta, side)
+            let rise = start.y - aim.tip.y
+            guard rise >= 8 else { return nil }
+            let approach = max(10, min(rise * 0.42, 22))
+            let c2 = GaugePoint(
+                x: aim.tip.x - aim.tangent.x * approach,
+                y: aim.tip.y - aim.tangent.y * approach)
+            var c1 = GaugePoint(
+                x: start.x + (c2.x - start.x) * lead,
+                y: start.y - rise * 0.06)
+            if abs(aim.tip.x - start.x) < 28 {
+                c1.x += preferred * 12 * (1 - lead)
+            }
+            let curve = GaugeCubic(start: start, c1: c1, c2: c2, end: aim.tip)
+            let points = curve.samples(count: 36)
+            guard !blocked(points, tip: aim.tip) else { return nil }
+            return finish([curve], tip: aim.tip, tangent: aim.tangent)
+        }
+
+        let angles = [0.0, 20.0, 34.0, 48.0, 60.0]
+        for degrees in angles {
+            let theta = degrees * Double.pi / 180
+            let sides: [Double] = degrees == 0 ? [1] : [preferred, -preferred]
+            for side in sides {
+                for lead in [0.42, 0.62, 0.82] {
+                    if let arrow = sweep(theta, side, lead: lead) {
+                        return arrow
+                    }
+                }
+            }
+        }
+
+        // The sweep crossed a number. Run under the numbers, climb outside
+        // them, and turn into the dot.
+        func elbow(riseX: Double, degrees: Double, side: Double) -> GaugeArrowGeometry? {
+            guard riseX > 4, riseX < bounds - 4 else { return nil }
+            let theta = degrees * Double.pi / 180
+            let aim = aimed(theta, side)
+            let rise = laneY - aim.tip.y
+            guard rise >= 8 else { return nil }
+            let came: Double = start.x <= riseX ? -1 : 1
+            for radius in [34.0, 22, 14, 8] {
+                let cornerX = riseX + came * radius
+                guard cornerX > 4, cornerX < bounds - 4 else { continue }
+                if (cornerX - start.x) * came > 0, abs(start.x - riseX) > 4 { continue }
+                let span = cornerX - start.x
+                let corner = GaugePoint(x: cornerX, y: laneY)
+                let lane = GaugeCubic(
+                    start: start,
+                    c1: GaugePoint(x: start.x + span * 0.5, y: laneY),
+                    c2: GaugePoint(x: cornerX - came * min(10, abs(span) * 0.3), y: laneY),
+                    end: corner)
+                let approach = max(8, min(radius * 0.7, rise * 0.4))
+                let climb = GaugeCubic(
+                    start: corner,
+                    c1: GaugePoint(x: cornerX + (aim.tip.x - cornerX) * 0.55, y: laneY),
+                    c2: GaugePoint(
+                        x: aim.tip.x - aim.tangent.x * approach,
+                        y: aim.tip.y - aim.tangent.y * approach),
+                    end: aim.tip)
+                let points = lane.samples(count: 24) + climb.samples(count: 24)
+                if !blocked(points, tip: aim.tip) {
+                    return finish([lane, climb], tip: aim.tip, tangent: aim.tangent)
+                }
+            }
+            let approach = max(8, min(14, rise * 0.28))
+            let span = riseX - start.x
+            let lane = GaugeCubic(
+                start: start,
+                c1: GaugePoint(x: start.x + span * 0.45, y: laneY),
+                c2: GaugePoint(x: riseX - came * 6, y: laneY),
+                end: GaugePoint(x: riseX, y: laneY))
+            let climb = GaugeCubic(
+                start: GaugePoint(x: riseX, y: laneY),
+                c1: GaugePoint(x: riseX, y: laneY - rise * 0.78),
+                c2: GaugePoint(
+                    x: aim.tip.x - aim.tangent.x * approach,
+                    y: aim.tip.y - aim.tangent.y * approach),
+                end: aim.tip)
+            let points = lane.samples(count: 24) + climb.samples(count: 24)
+            guard !blocked(points, tip: aim.tip) else { return nil }
+            return finish([lane, climb], tip: aim.tip, tangent: aim.tangent)
+        }
+
+        var edges = [dot.x]
+        for rect in obstacles {
+            for margin in [8.0, 18, 30, 46] {
+                edges.append(rect.x - margin)
+                edges.append(rect.maxX + margin)
+            }
+        }
+        edges.sort { lhs, rhs in
+            let leftPreferred = (lhs - dot.x) * preferred >= -1
+            let rightPreferred = (rhs - dot.x) * preferred >= -1
+            if leftPreferred != rightPreferred { return leftPreferred }
+            return abs(lhs - dot.x) < abs(rhs - dot.x)
+        }
+        for riseX in edges {
+            for degrees in [0.0, 28, 46, 60] {
+                let sides: [Double] = degrees == 0 ? [1] : [preferred, -preferred]
+                for side in sides {
+                    if let arrow = elbow(riseX: riseX, degrees: degrees, side: side) {
+                        return arrow
+                    }
+                }
             }
         }
         return nil
@@ -660,7 +786,7 @@ public enum TemperatureRangeLayout {
     private static func chevronPoints(
         tip: GaugePoint, tangent: GaugePoint, length: Double
     ) -> (left: GaugePoint, right: GaugePoint) {
-        let angle = 26.0 * Double.pi / 180
+        let angle = 32.0 * Double.pi / 180
         // A small nib. The arms trail back along the curve.
         let back = GaugePoint(x: -tangent.x, y: -tangent.y)
         func arm(_ turn: Double) -> GaugePoint {

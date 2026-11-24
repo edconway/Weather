@@ -160,9 +160,32 @@ final class TemperatureRangeTests: XCTestCase {
         let toward = hypot(towardX, towardY)
         let dotProduct = (arrow.finalTangent.x * towardX + arrow.finalTangent.y * towardY) / toward
         XCTAssertGreaterThan(dotProduct, 0.95)
-        let blocked = [placed.lowLabel, placed.highLabel].compactMap { $0 }
-        for sample in arrow.samples {
+        let bar = GaugeRect(
+            x: placed.inset, y: placed.trackTop, width: placed.usableWidth, height: 9)
+        let blocked = [placed.lowLabel, placed.highLabel, placed.combinedLabel, arrow.label, bar].compactMap { $0 }
+        let samples = arrow.curves.flatMap { $0.samples(count: 24) }
+        for sample in samples {
             XCTAssertFalse(blocked.contains { $0.contains(sample) })
+            XCTAssertGreaterThanOrEqual(hypot(sample.x - dot.x, sample.y - dot.y), outer - 0.2)
+        }
+    }
+
+    func testWatchArrowPointsAtTheDotAndMissesTheWords() throws {
+        let placed = TemperatureRangeLayout.placement(
+            data: TemperatureRangeData(todayLow: 9, todayHigh: 28, current: 28, averageLow: 4, averageHigh: 16),
+            style: .widget, unit: .celsius, width: 170, seed: seed, stackedLabels: false)
+        let arrow = try XCTUnwrap(placed.arrow)
+        let dot = try XCTUnwrap(placed.dot)
+        let towardX = dot.x - arrow.tip.x
+        let towardY = dot.y - arrow.tip.y
+        let toward = hypot(towardX, towardY)
+        let dotProduct = (arrow.finalTangent.x * towardX + arrow.finalTangent.y * towardY) / toward
+        XCTAssertGreaterThan(dotProduct, 0.95)
+        let bar = GaugeRect(
+            x: placed.inset, y: placed.trackTop, width: placed.usableWidth, height: 6)
+        for sample in arrow.curves.flatMap({ $0.samples(count: 24) }) {
+            XCTAssertFalse(arrow.label.contains(sample))
+            XCTAssertFalse(bar.contains(sample))
         }
     }
 

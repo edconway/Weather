@@ -55,7 +55,7 @@ public struct TemperatureRangeGauge: View {
             width: width,
             seed: seed,
             stackedLabels: dynamicTypeSize.isAccessibilitySize,
-            allowArrow: style == .hero && !dynamicTypeSize.isAccessibilitySize)
+            allowArrow: style.drawsHandwriting && !dynamicTypeSize.isAccessibilitySize)
         canvas(placement)
             .frame(maxWidth: .infinity)
             .frame(height: placement.height)
