@@ -15,6 +15,10 @@
 			</array>
 		</dict>
 	</array>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Fonts/Cedarville-Cursive.ttf</string>
+	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Used to show weather and historical context for where you are. Never leaves your device except as coordinates sent to the weather API.</string>
 	<key>WKApplication</key>

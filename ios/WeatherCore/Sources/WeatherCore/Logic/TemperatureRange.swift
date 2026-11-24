@@ -85,19 +85,22 @@ public enum TemperatureGaugeStyle: Equatable, Sendable {
     }
 
     /// Handwritten bracket, historic label, and the curved arrow.
+    /// The watch Now page uses `.widget` and keeps the notes. A list row does not.
     public var drawsHandwriting: Bool {
+        switch self {
+        case .hero, .widget: return true
+        case .row: return false
+        }
+    }
+
+    public var drawsValueLabels: Bool {
         switch self {
         case .hero: return true
         case .row, .widget: return false
         }
     }
 
-    public var drawsValueLabels: Bool {
-        switch self {
-        case .hero, .widget: return true
-        case .row: return false
-        }
-    }
+    var compactNotes: Bool { self == .widget }
 }
 
 public struct GaugePoint: Equatable, Sendable {
@@ -358,28 +361,36 @@ public enum TemperatureRangeLayout {
         var bracketHighX: Double?
         var bracketNarrow = false
         var historicText: String?
-        let markerSize = markerFontSize(for: width)
+        let compact = style.compactNotes
+        let markerSize = markerFontSize(for: width, compact: compact)
+        let noteHeight = compact ? 16.0 : 26.0
+        let bracketSpan = compact ? 14.0 : 24.0
+        let nowHeight = compact ? 18.0 : 30.0
         if handwriting, hasAverage, let averageLow = data.averageLow, let averageHigh = data.averageHigh {
-            historicText = "HISTORIC AVERAGE \(degreeLabel(averageLow, unit: unit))–\(degreeLabel(averageHigh, unit: unit))"
+            // The phone keeps the historic-average wording. The watch says
+            // "typical range" because the usual numbers are already on the line above.
+            historicText = compact
+                ? "typical range"
+                : "historic average \(degreeLabel(averageLow, unit: unit))–\(degreeLabel(averageHigh, unit: unit))"
             let labelWidth = textWidth(historicText ?? "", fontSize: markerSize, handwriting: true)
             let center = slidCenter(
                 (map(averageLow) + map(averageHigh)) / 2,
                 labelWidth: labelWidth,
                 bounds: width)
-            historicLabel = GaugeRect(x: center - labelWidth / 2, y: y, width: labelWidth, height: 28)
-            y += 28 + 6
+            historicLabel = GaugeRect(x: center - labelWidth / 2, y: y, width: labelWidth, height: noteHeight)
+            y += noteHeight + (compact ? 2 : 4)
             bracketTop = y
-            y += 28
+            y += bracketSpan
             bracketLowX = map(averageLow)
             bracketHighX = map(averageHigh)
-            bracketNarrow = abs((bracketHighX ?? 0) - (bracketLowX ?? 0)) < 40
+            bracketNarrow = abs((bracketHighX ?? 0) - (bracketLowX ?? 0)) < (compact ? 28 : 40)
         }
 
         let barCenterY = y + barRow / 2
         let trackTop = barCenterY - style.trackHeight / 2
         if hasAverage, handwriting {
-            bracketLegEnd = trackTop - 4
-            bracketTop = bracketLegEnd - 24
+            bracketLegEnd = trackTop - (compact ? 2 : 4)
+            bracketTop = bracketLegEnd - bracketSpan
         }
         y += barRow
 
@@ -410,18 +421,21 @@ public enum TemperatureRangeLayout {
         var nowText: String?
         var arrow: GaugeArrowGeometry?
         if handwriting, allowArrow, data.current != nil, let dot {
-            let nowWidth = textWidth("TEMPERATURE NOW", fontSize: markerSize, handwriting: true)
-            let nowRect = nowLabelRect(dotX: dot.x, y: y + 4, width: nowWidth, bounds: width)
+            let phrase = "temperature now"
+            let nowWidth = textWidth(phrase, fontSize: markerSize, handwriting: true)
+            let nowRect = nowLabelRect(
+                dotX: dot.x, y: y + (compact ? 2 : 4), width: nowWidth, bounds: width, height: nowHeight)
             let obstacles = [lowLabel, highLabel, combinedLabel].compactMap { $0 }
             if let built = makeArrow(
                 dot: dot,
                 outerRadius: style.dotDiameter / 2 + ringWidth,
                 label: nowRect,
                 obstacles: obstacles,
-                bounds: width) {
+                bounds: width,
+                chevronLength: compact ? 9 : 16) {
                 arrow = built
-                nowText = "TEMPERATURE NOW"
-                y += 4 + 34
+                nowText = phrase
+                y += (compact ? 2 : 4) + nowHeight
             }
         }
 
@@ -487,13 +501,16 @@ public enum TemperatureRangeLayout {
         return (start, end)
     }
 
-    /// Large enough to read as a marker, small enough that "TEMPERATURE NOW"
-    /// still leaves a sweep up to a centred dot.
-    static func markerFontSize(for width: Double) -> Double {
-        let room = max(48, width / 2 - 32 - 4)
-        // "TEMPERATURE NOW": 14 letters at 0.70em and one 0.36em space.
-        let emPerPoint = 14 * 0.70 + 0.36
-        return min(18, max(14, room / emPerPoint))
+    /// Cursive, large enough to read, small enough that "temperature now"
+    /// still leaves a sweep up to the dot. The watch uses the compact size.
+    static func markerFontSize(for width: Double, compact: Bool = false) -> Double {
+        if compact {
+            return min(13, max(11, width / 14))
+        }
+        let room = max(72, width / 2 - 16)
+        // "temperature now": 14 letters at 0.62em and one 0.34em space.
+        let emPerPoint = 14 * 0.62 + 0.34
+        return min(22, max(16, room / emPerPoint))
     }
 
     static func textWidth(_ text: String, fontSize: Double, handwriting: Bool) -> Double {
@@ -524,7 +541,9 @@ public enum TemperatureRangeLayout {
 
     /// Pins the label to the outer edge of the side that leaves the longer
     /// sweep from its inner edge up to the dot.
-    private static func nowLabelRect(dotX: Double, y: Double, width: Double, bounds: Double) -> GaugeRect {
+    private static func nowLabelRect(
+        dotX: Double, y: Double, width: Double, bounds: Double, height: Double
+    ) -> GaugeRect {
         let margin = 4.0
         let fitted = min(width, max(1, bounds - margin * 2))
         let rightX = bounds - margin - fitted
@@ -532,7 +551,7 @@ public enum TemperatureRangeLayout {
         let rightSweep = rightX - dotX
         let leftSweep = dotX - (leftX + fitted)
         let x = rightSweep >= leftSweep ? rightX : leftX
-        return GaugeRect(x: x, y: y, width: fitted, height: 34)
+        return GaugeRect(x: x, y: y, width: fitted, height: height)
     }
 
     private static func bracketCurves(
@@ -586,7 +605,8 @@ public enum TemperatureRangeLayout {
         outerRadius: Double,
         label: GaugeRect,
         obstacles: [GaugeRect],
-        bounds: Double
+        bounds: Double,
+        chevronLength: Double
     ) -> GaugeArrowGeometry? {
         let tip = GaugePoint(x: dot.x, y: dot.y + outerRadius + 2)
         let labelOnRight = label.midX >= dot.x
@@ -620,7 +640,7 @@ public enum TemperatureRangeLayout {
         let tangent = GaugePoint(
             x: (tip.x - approach.x) / approachLength,
             y: (tip.y - approach.y) / approachLength)
-        let chevron = chevronPoints(tip: tip, tangent: tangent)
+        let chevron = chevronPoints(tip: tip, tangent: tangent, length: chevronLength)
         return GaugeArrowGeometry(
             curves: [curve],
             tip: tip,
@@ -631,12 +651,11 @@ public enum TemperatureRangeLayout {
     }
 
     private static func chevronPoints(
-        tip: GaugePoint, tangent: GaugePoint
+        tip: GaugePoint, tangent: GaugePoint, length: Double
     ) -> (left: GaugePoint, right: GaugePoint) {
         let angle = 42.0 * Double.pi / 180
         // A broad open head. The arms trail back from the tip.
         let back = GaugePoint(x: -tangent.x, y: -tangent.y)
-        let length = 16.0
         func arm(_ turn: Double) -> GaugePoint {
             let c = cos(turn)
             let s = sin(turn)

@@ -22,6 +22,7 @@
 	<key>UIAppFonts</key>
 	<array>
 		<string>Fonts/Caveat.ttf</string>
+		<string>Fonts/Cedarville-Cursive.ttf</string>
 		<string>Fonts/PermanentMarker-Regular.ttf</string>
 	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>

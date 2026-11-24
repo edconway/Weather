@@ -191,6 +191,25 @@ final class TemperatureRangeTests: XCTestCase {
         XCTAssertLessThanOrEqual(dot, placed.inset + placed.usableWidth)
     }
 
+    func testNotesAreCursiveWording() {
+        let phone = TemperatureRangeLayout.placement(
+            data: TemperatureRangeData(todayLow: 9, todayHigh: 28, current: 28, averageLow: 4, averageHigh: 16),
+            style: .hero, unit: .celsius, width: 360, seed: seed, stackedLabels: false)
+        XCTAssertEqual(phone.historicText, "historic average 4°–16°")
+        XCTAssertEqual(phone.nowText, "temperature now")
+        XCTAssertNotNil(phone.arrow)
+        XCTAssertFalse(phone.bracketCurves.isEmpty)
+
+        let watch = TemperatureRangeLayout.placement(
+            data: TemperatureRangeData(todayLow: 9, todayHigh: 28, current: 28, averageLow: 4, averageHigh: 16),
+            style: .widget, unit: .celsius, width: 170, seed: seed, stackedLabels: false)
+        XCTAssertEqual(watch.historicText, "typical range")
+        XCTAssertEqual(watch.nowText, "temperature now")
+        XCTAssertNil(watch.lowLabel)
+        XCTAssertNotNil(watch.arrow)
+        XCTAssertFalse(watch.bracketCurves.isEmpty)
+    }
+
     func testRowStyleIsTheBarAndDotOnly() {
         let placed = TemperatureRangeLayout.placement(
             data: TemperatureRangeData(todayLow: 7, todayHigh: 10, current: 8, averageLow: 5, averageHigh: 12),

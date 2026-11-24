@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Today's low–high as a colour bar, with the historic average in a felt-tip
-/// bracket and the current temperature marked by a curved arrow.
+/// A spectrum coloured by degrees, today's range outlined on it, the historic
+/// average in a hand-drawn bracket, and the current temperature on a curve.
 public struct TemperatureRangeGauge: View {
     public var data: TemperatureRangeData
     public var style: TemperatureGaugeStyle
@@ -77,34 +77,43 @@ public struct TemperatureRangeGauge: View {
 
     private func markerFont(width: Double) -> Font {
         Font.custom(
-            "Permanent Marker",
-            size: TemperatureRangeLayout.markerFontSize(for: width),
-            relativeTo: .callout)
+            "Cedarville Cursive",
+            size: TemperatureRangeLayout.markerFontSize(for: width, compact: style.compactNotes),
+            relativeTo: style.compactNotes ? .caption : .title3)
+    }
+
+    private func temperatureColor(_ celsius: Double) -> Color {
+        let rgb = TemperatureColorScale.color(celsius: celsius)
+        return Color(red: rgb.red, green: rgb.green, blue: rgb.blue)
     }
 
     private func canvas(_ placement: GaugePlacement) -> some View {
-        let trackOpacity = strongContrast ? 0.30 : 0.16
         let markerStroke = style.drawsHandwriting
         let dash: [CGFloat] = markerStroke || strongContrast ? [] : [6, 5]
-        let stroke: CGFloat = markerStroke ? (strongContrast ? 6 : 5) : (strongContrast ? 3 : 2.2)
+        let stroke: CGFloat = markerStroke
+            ? (strongContrast ? 4.5 : (style.compactNotes ? 2.6 : 4))
+            : (strongContrast ? 3 : 2.2)
         let shown = grown ? (placement.barEnd - placement.barStart) : 0
         let shownStart = (placement.barStart + placement.barEnd) / 2 - shown / 2
+        let outlinePad = style.compactNotes ? 3.0 : 5.0
         return ZStack(alignment: .topLeading) {
             Capsule()
-                .fill(Color.white.opacity(trackOpacity))
+                .fill(LinearGradient(
+                    stops: domainGradient(placement),
+                    startPoint: .leading,
+                    endPoint: .trailing))
                 .frame(width: placement.usableWidth, height: style.trackHeight)
                 .offset(x: placement.inset, y: placement.trackTop)
 
             Capsule()
-                .fill(LinearGradient(
-                    stops: barGradient(placement, from: shownStart, width: shown),
-                    startPoint: .leading,
-                    endPoint: .trailing))
-                .frame(width: max(shown, 0), height: style.trackHeight)
-                .offset(x: shownStart, y: placement.trackTop)
+                .stroke(Color.white.opacity(strongContrast ? 1 : 0.94), lineWidth: style.compactNotes ? 1.6 : 2.2)
+                .frame(
+                    width: max(shown + outlinePad, style.trackHeight),
+                    height: style.trackHeight + outlinePad)
+                .offset(x: shownStart - outlinePad / 2, y: placement.trackTop - outlinePad / 2)
 
             if let dot = placement.dot {
-                dotMark
+                dotMark(ring: data.current.map(temperatureColor) ?? .white)
                     .position(x: dot.x, y: dot.y)
                     .animation(animatesDot ? .spring(duration: 0.45) : nil, value: dot.x)
             }
@@ -115,15 +124,18 @@ public struct TemperatureRangeGauge: View {
                 hand: style.drawsHandwriting ? markerFont(width: Double(width)) : .body,
                 dash: dash,
                 stroke: stroke,
-                trim: inkTrim)
+                trim: inkTrim,
+                lowColor: temperatureColor(data.todayLow),
+                highColor: temperatureColor(data.todayHigh),
+                rotation: placement.labelRotationDegrees)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    private var dotMark: some View {
+    private func dotMark(ring: Color) -> some View {
         ZStack {
             Circle()
-                .fill(weatherBackground)
+                .fill(ring)
                 .frame(width: style.dotDiameter + TemperatureRangeLayout.ringWidth * 2,
                        height: style.dotDiameter + TemperatureRangeLayout.ringWidth * 2)
             Circle()
@@ -136,25 +148,13 @@ public struct TemperatureRangeGauge: View {
         style != .widget && !suppressesMotion
     }
 
-    /// The capsule is painted with the temperatures under it, not with a
-    /// gradient stretched from the cold end of the track to the hot end.
-    private func barGradient(
-        _ placement: GaugePlacement, from start: Double, width: Double
-    ) -> [Gradient.Stop] {
-        let startTemperature = TemperatureRangeLayout.temperature(
-            atX: Double(start),
-            domain: placement.domain,
-            inset: placement.inset,
-            usableWidth: placement.usableWidth)
-        let endTemperature = TemperatureRangeLayout.temperature(
-            atX: Double(start + width),
-            domain: placement.domain,
-            inset: placement.inset,
-            usableWidth: placement.usableWidth)
-        return TemperatureColorScale.stops(from: startTemperature, to: endTemperature).map { stop in
+    /// The whole track is coloured by the degrees under it. A cold domain stays
+    /// blue. A hot domain stays red. A wide domain runs through yellow.
+    private func domainGradient(_ placement: GaugePlacement) -> [Gradient.Stop] {
+        TemperatureColorScale.gradientStops(domain: placement.domain).map { stop in
             Gradient.Stop(
                 color: Color(red: stop.color.red, green: stop.color.green, blue: stop.color.blue),
-                location: stop.location)
+                location: CGFloat(stop.location))
         }
     }
 
@@ -181,7 +181,7 @@ public struct TemperatureRangeGauge: View {
     }
 }
 
-/// Felt-tip historic label, bracket, and the curved current-temperature arrow.
+/// Cursive historic label, hand-drawn bracket, and the curved current-temperature arrow.
 struct GaugeAnnotations: View {
     let placement: GaugePlacement
     let ink: Color
@@ -189,6 +189,9 @@ struct GaugeAnnotations: View {
     let dash: [CGFloat]
     let stroke: CGFloat
     let trim: CGFloat
+    let lowColor: Color
+    let highColor: Color
+    let rotation: Double
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -222,13 +225,13 @@ struct GaugeAnnotations: View {
     @ViewBuilder
     private var valueLabels: some View {
         if let combined = placement.combinedLabel {
-            value("\(placement.lowText)–\(placement.highText)", in: combined)
+            value("\(placement.lowText)–\(placement.highText)", in: combined, color: lowColor)
         } else {
             if let low = placement.lowLabel {
-                value(placement.lowText, in: low)
+                value(placement.lowText, in: low, color: lowColor)
             }
             if let high = placement.highLabel {
-                value(placement.highText, in: high)
+                value(placement.highText, in: high, color: highColor)
             }
         }
     }
@@ -238,14 +241,15 @@ struct GaugeAnnotations: View {
             .font(hand)
             .foregroundStyle(ink)
             .fixedSize()
+            .rotationEffect(.degrees(rotation))
             .position(x: rect.midX, y: rect.midY)
     }
 
-    private func value(_ text: String, in rect: GaugeRect) -> some View {
+    private func value(_ text: String, in rect: GaugeRect, color: Color) -> some View {
         Text(text)
             .font(.body.weight(.semibold))
             .monospacedDigit()
-            .foregroundStyle(ink)
+            .foregroundStyle(color)
             .position(x: rect.midX, y: rect.midY)
     }
 }
