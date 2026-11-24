@@ -74,12 +74,13 @@ struct NowPage: View {
         .navigationTitle("Now")
     }
 
-    private func degree(_ celsius: Double) -> String {
-        guard let number = store.formatter.temperatureNumber(celsius) else { return "—" }
+    private func degree(_ celsius: Double?) -> String {
+        guard let celsius, let number = store.formatter.temperatureNumber(celsius) else { return "—" }
         return "\(number)°"
     }
 
-    private func temperatureColor(_ celsius: Double) -> Color {
+    private func temperatureColor(_ celsius: Double?) -> Color {
+        guard let celsius else { return .white }
         let rgb = TemperatureColorScale.color(celsius: celsius)
         return Color(red: rgb.red, green: rgb.green, blue: rgb.blue)
     }
@@ -88,8 +89,9 @@ struct NowPage: View {
     private func rangeLine(_ conditions: CurrentConditions) -> String {
         let today = span(conditions.low, conditions.high)
         guard let gauge = store.todayGauge,
-              let usual = span(gauge.averageLow, gauge.averageHigh) else { return today }
-        return "\(today) · usual \(usual)"
+              let low = gauge.averageLow,
+              let high = gauge.averageHigh else { return today }
+        return "\(today) · usual \(span(low, high))"
     }
 
     private func span(_ low: Double?, _ high: Double?) -> String {
@@ -118,7 +120,7 @@ struct NowPage: View {
     }
 
     @ViewBuilder
-    private func badgeOrFallback(temperature: Double) -> some View {
+    private func badgeOrFallback(temperature: Double?) -> some View {
         if let badge = store.badge {
             Text(badge.text)
                 .font(.system(size: 12, weight: .semibold))
@@ -158,10 +160,10 @@ struct NowPage: View {
         .accessibilityHint("Changes temperature and wind units")
     }
 
-    private func badgeColor(_ kind: AnomalyKind, temperature: Double) -> Color {
+    private func badgeColor(_ kind: AnomalyKind, temperature: Double?) -> Color {
         switch kind {
         case .warm: return temperatureColor(temperature)
-        case .cold: return temperatureColor(min(temperature, 8))
+        case .cold: return temperatureColor(temperature.map { min($0, 8) })
         default: return badgeTint(kind)
         }
     }
