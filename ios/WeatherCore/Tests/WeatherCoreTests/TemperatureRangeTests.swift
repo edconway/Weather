@@ -207,6 +207,18 @@ final class TemperatureRangeTests: XCTestCase {
         XCTAssertNil(watch.lowLabel)
         XCTAssertNotNil(watch.nowLabel)
         XCTAssertFalse(watch.bracketCurves.isEmpty)
+        // The bracket, the dot, and the caption each keep their own band.
+        let ringTop = (watch.dot?.y ?? 0) - watch.dotRadius - TemperatureRangeLayout.ringWidth
+        let ringBottom = (watch.dot?.y ?? 0) + watch.dotRadius + TemperatureRangeLayout.ringWidth
+        XCTAssertLessThan(watch.bracketLegEnd, ringTop - 3)
+        if let historic = watch.historicLabel {
+            XCTAssertGreaterThan(watch.bracketTop, historic.maxY)
+        }
+        let now = watch.nowLabel
+        XCTAssertGreaterThan(now?.y ?? 0, ringBottom)
+        XCTAssertLessThanOrEqual(now?.maxY ?? 0, watch.height)
+        let font = TemperatureRangeLayout.markerFontSize(for: 170, compact: true)
+        XCTAssertGreaterThanOrEqual(now?.height ?? 0, TemperatureRangeLayout.cursiveLineHeight(font) - 0.1)
     }
 
     func testRowStyleIsTheBarAndDotOnly() {

@@ -348,9 +348,11 @@ public enum TemperatureRangeLayout {
         var historicText: String?
         let compact = style.compactNotes
         let markerSize = markerFontSize(for: width, compact: compact)
-        let noteHeight = compact ? 16.0 : 26.0
+        // Cedarville's line box is taller than the em. The watch reserves that
+        // full box so the notes are not clipped. The phone keeps its layout.
+        let noteHeight = compact ? cursiveLineHeight(markerSize) : 26.0
         let bracketSpan = compact ? 14.0 : 24.0
-        let nowHeight = compact ? 18.0 : 30.0
+        let nowHeight = compact ? cursiveLineHeight(markerSize) : 30.0
         if handwriting, hasAverage, let averageLow = data.averageLow, let averageHigh = data.averageHigh {
             // The phone keeps the historic-average wording. The watch says
             // "typical range" because the usual numbers are already on the line above.
@@ -362,19 +364,31 @@ public enum TemperatureRangeLayout {
                 (map(averageLow) + map(averageHigh)) / 2,
                 labelWidth: labelWidth,
                 bounds: width)
+            let tilt = compact ? cursiveTiltPad(text: historicText ?? "", fontSize: markerSize, seed: seed) : 0
+            y += tilt
             historicLabel = GaugeRect(x: center - labelWidth / 2, y: y, width: labelWidth, height: noteHeight)
-            y += noteHeight + (compact ? 2 : 4)
+            y += noteHeight + (compact ? 4 + tilt : 4)
             bracketTop = y
             y += bracketSpan
+            bracketLegEnd = y
             bracketLowX = map(averageLow)
             bracketHighX = map(averageHigh)
             bracketNarrow = abs((bracketHighX ?? 0) - (bracketLowX ?? 0)) < (compact ? 28 : 40)
+            if compact {
+                // The dot and its ring stand above the thin track. Keep the
+                // bracket above that ring, not merely above the bar.
+                let markTop = hasCurrent
+                    ? style.dotDiameter / 2 + ringWidth
+                    : style.trackHeight / 2
+                let barTop = bracketLegEnd + 4 + markTop - barRow / 2
+                y = max(y, barTop)
+            }
         }
 
         let barCenterY = y + barRow / 2
         let trackTop = barCenterY - style.trackHeight / 2
-        if hasAverage, handwriting {
-            bracketLegEnd = trackTop - (compact ? 2 : 4)
+        if hasAverage, handwriting, !compact {
+            bracketLegEnd = trackTop - 4
             bracketTop = bracketLegEnd - bracketSpan
         }
         y += barRow
@@ -412,10 +426,11 @@ public enum TemperatureRangeLayout {
             let center = slidCenter(width / 2, labelWidth: fitted, bounds: width)
             let ringBottom = (dot?.y ?? barCenterY) + style.dotDiameter / 2 + ringWidth
             let gap = compact ? 4.0 : 6.0
-            let wordTop = max(y + gap, ringBottom + gap)
+            let tilt = compact ? cursiveTiltPad(text: phrase, fontSize: markerSize, seed: seed) : 0
+            let wordTop = max(y + gap, ringBottom + gap + tilt)
             nowLabel = GaugeRect(x: center - fitted / 2, y: wordTop, width: fitted, height: nowHeight)
             nowText = phrase
-            y = wordTop + nowHeight
+            y = wordTop + nowHeight + tilt + (compact ? 2 : 0)
         }
 
         let curves = bracketCurves(
@@ -478,6 +493,17 @@ public enum TemperatureRangeLayout {
         start = max(limitStart, start)
         end = min(limitEnd, max(start + 1, end))
         return (start, end)
+    }
+
+    /// Cedarville Cursive line box. Ascender 1279, descender 663, em 1024.
+    static func cursiveLineHeight(_ fontSize: Double) -> Double {
+        fontSize * (1279.0 + 663.0) / 1024.0
+    }
+
+    /// How far a slightly rotated note sticks out past its box, on one side.
+    private static func cursiveTiltPad(text: String, fontSize: Double, seed: TemperatureGaugeSeed) -> Double {
+        let radians = abs(labelRotation(seed: seed)) * .pi / 180
+        return textWidth(text, fontSize: fontSize, handwriting: true) * sin(radians) / 2
     }
 
     /// Cursive, large enough to read. The watch uses the compact size.
