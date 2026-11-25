@@ -84,20 +84,23 @@ public enum TemperatureGaugeStyle: Equatable, Sendable {
         }
     }
 
-    /// Handwritten bracket, historic label, and the curved arrow.
+    /// Handwritten bracket and historic label.
+    /// The watch Now page uses `.widget` and keeps the notes. A list row does not.
     public var drawsHandwriting: Bool {
+        switch self {
+        case .hero, .widget: return true
+        case .row: return false
+        }
+    }
+
+    public var drawsValueLabels: Bool {
         switch self {
         case .hero: return true
         case .row, .widget: return false
         }
     }
 
-    public var drawsValueLabels: Bool {
-        switch self {
-        case .hero, .widget: return true
-        case .row: return false
-        }
-    }
+    var compactNotes: Bool { self == .widget }
 }
 
 public struct GaugePoint: Equatable, Sendable {
@@ -163,20 +166,6 @@ public struct GaugeCubic: Equatable, Sendable {
     }
 }
 
-public struct GaugeArrowGeometry: Equatable, Sendable {
-    public var curves: [GaugeCubic]
-    public var tip: GaugePoint
-    /// Unit vector at the tip, pointing at the dot.
-    public var finalTangent: GaugePoint
-    public var chevronLeft: GaugePoint
-    public var chevronRight: GaugePoint
-    public var label: GaugeRect
-
-    public var samples: [GaugePoint] {
-        curves.flatMap { $0.samples() }
-    }
-}
-
 public struct GaugePlacement: Equatable, Sendable {
     public var domain: TemperatureScaleDomain
     public var inset: Double
@@ -197,7 +186,7 @@ public struct GaugePlacement: Equatable, Sendable {
     public var lowLabel: GaugeRect?
     public var highLabel: GaugeRect?
     public var combinedLabel: GaugeRect?
-    public var arrow: GaugeArrowGeometry?
+    public var nowLabel: GaugeRect?
     public var height: Double
     public var labelRotationDegrees: Double
     public var lowText: String
@@ -242,6 +231,19 @@ public enum TemperatureRangeLayout {
         let width = max(usableWidth, 0.001)
         let raw = inset + (temperature - domain.lower) / domain.span * width
         return min(inset + width, max(inset, raw))
+    }
+
+    /// Inverse of `x(temperature:)`, clamped to the track. Used to colour a
+    /// slice of the bar by the temperatures it actually covers.
+    public static func temperature(
+        atX x: Double,
+        domain: TemperatureScaleDomain,
+        inset: Double,
+        usableWidth: Double
+    ) -> Double {
+        let width = max(usableWidth, 0.001)
+        let fraction = min(1, max(0, (x - inset) / width))
+        return domain.lower + fraction * domain.span
     }
 
     public static func roundedDegrees(_ celsius: Double, unit: UnitTemperature) -> Int {
@@ -315,8 +317,7 @@ public enum TemperatureRangeLayout {
         unit: UnitTemperature,
         width: Double,
         seed: TemperatureGaugeSeed,
-        stackedLabels: Bool,
-        allowArrow: Bool = true
+        stackedLabels: Bool
     ) -> GaugePlacement {
         let data = data.normalized()
         let domain = domain(for: data)
@@ -345,28 +346,50 @@ public enum TemperatureRangeLayout {
         var bracketHighX: Double?
         var bracketNarrow = false
         var historicText: String?
-        let markerSize = markerFontSize(for: width)
+        let compact = style.compactNotes
+        let markerSize = markerFontSize(for: width, compact: compact)
+        // Cedarville's line box is taller than the em. The watch reserves that
+        // full box so the notes are not clipped. The phone keeps its layout.
+        let noteHeight = compact ? cursiveLineHeight(markerSize) : 26.0
+        let bracketSpan = compact ? 14.0 : 24.0
+        let nowHeight = compact ? cursiveLineHeight(markerSize) : 30.0
         if handwriting, hasAverage, let averageLow = data.averageLow, let averageHigh = data.averageHigh {
-            historicText = "HISTORIC AVERAGE \(degreeLabel(averageLow, unit: unit))–\(degreeLabel(averageHigh, unit: unit))"
+            // The phone keeps the historic-average wording. The watch says
+            // "typical range" because the usual numbers are already on the line above.
+            historicText = compact
+                ? "typical range"
+                : "historic average \(degreeLabel(averageLow, unit: unit))–\(degreeLabel(averageHigh, unit: unit))"
             let labelWidth = textWidth(historicText ?? "", fontSize: markerSize, handwriting: true)
             let center = slidCenter(
                 (map(averageLow) + map(averageHigh)) / 2,
                 labelWidth: labelWidth,
                 bounds: width)
-            historicLabel = GaugeRect(x: center - labelWidth / 2, y: y, width: labelWidth, height: 28)
-            y += 28 + 6
+            let tilt = compact ? cursiveTiltPad(text: historicText ?? "", fontSize: markerSize, seed: seed) : 0
+            y += tilt
+            historicLabel = GaugeRect(x: center - labelWidth / 2, y: y, width: labelWidth, height: noteHeight)
+            y += noteHeight + (compact ? 4 + tilt : 4)
             bracketTop = y
-            y += 28
+            y += bracketSpan
+            bracketLegEnd = y
             bracketLowX = map(averageLow)
             bracketHighX = map(averageHigh)
-            bracketNarrow = abs((bracketHighX ?? 0) - (bracketLowX ?? 0)) < 40
+            bracketNarrow = abs((bracketHighX ?? 0) - (bracketLowX ?? 0)) < (compact ? 28 : 40)
+            if compact {
+                // The dot and its ring stand above the thin track. Keep the
+                // bracket above that ring, not merely above the bar.
+                let markTop = hasCurrent
+                    ? style.dotDiameter / 2 + ringWidth
+                    : style.trackHeight / 2
+                let barTop = bracketLegEnd + 4 + markTop - barRow / 2
+                y = max(y, barTop)
+            }
         }
 
         let barCenterY = y + barRow / 2
         let trackTop = barCenterY - style.trackHeight / 2
-        if hasAverage, handwriting {
+        if hasAverage, handwriting, !compact {
             bracketLegEnd = trackTop - 4
-            bracketTop = bracketLegEnd - 24
+            bracketTop = bracketLegEnd - bracketSpan
         }
         y += barRow
 
@@ -395,21 +418,19 @@ public enum TemperatureRangeLayout {
 
         let dot: GaugePoint? = data.current.map { GaugePoint(x: map($0), y: barCenterY) }
         var nowText: String?
-        var arrow: GaugeArrowGeometry?
-        if handwriting, allowArrow, data.current != nil, let dot {
-            let nowWidth = textWidth("TEMPERATURE NOW", fontSize: markerSize, handwriting: true)
-            let nowRect = nowLabelRect(dotX: dot.x, y: y + 4, width: nowWidth, bounds: width)
-            let obstacles = [lowLabel, highLabel, combinedLabel].compactMap { $0 }
-            if let built = makeArrow(
-                dot: dot,
-                outerRadius: style.dotDiameter / 2 + ringWidth,
-                label: nowRect,
-                obstacles: obstacles,
-                bounds: width) {
-                arrow = built
-                nowText = "TEMPERATURE NOW"
-                y += 4 + 34
-            }
+        var nowLabel: GaugeRect?
+        if handwriting, data.current != nil {
+            let phrase = "temperature now"
+            let nowWidth = textWidth(phrase, fontSize: markerSize, handwriting: true)
+            let fitted = min(nowWidth, max(1, width - 8))
+            let center = slidCenter(width / 2, labelWidth: fitted, bounds: width)
+            let ringBottom = (dot?.y ?? barCenterY) + style.dotDiameter / 2 + ringWidth
+            let gap = compact ? 4.0 : 6.0
+            let tilt = compact ? cursiveTiltPad(text: phrase, fontSize: markerSize, seed: seed) : 0
+            let wordTop = max(y + gap, ringBottom + gap + tilt)
+            nowLabel = GaugeRect(x: center - fitted / 2, y: wordTop, width: fitted, height: nowHeight)
+            nowText = phrase
+            y = wordTop + nowHeight + tilt + (compact ? 2 : 0)
         }
 
         let curves = bracketCurves(
@@ -440,13 +461,13 @@ public enum TemperatureRangeLayout {
             lowLabel: lowLabel,
             highLabel: highLabel,
             combinedLabel: combinedLabel,
-            arrow: arrow,
+            nowLabel: nowLabel,
             height: max(y, barRow),
             labelRotationDegrees: labelRotation(seed: seed),
             lowText: lowText,
             highText: highText,
             historicText: historicText,
-            nowText: arrow == nil ? nil : nowText)
+            nowText: nowText)
     }
 
     // MARK: - Pieces
@@ -474,13 +495,26 @@ public enum TemperatureRangeLayout {
         return (start, end)
     }
 
-    /// Large enough to read as a marker, small enough that "TEMPERATURE NOW"
-    /// still leaves a sweep up to a centred dot.
-    static func markerFontSize(for width: Double) -> Double {
-        let room = max(48, width / 2 - 32 - 4)
-        // "TEMPERATURE NOW": 14 letters at 0.70em and one 0.36em space.
-        let emPerPoint = 14 * 0.70 + 0.36
-        return min(18, max(14, room / emPerPoint))
+    /// Cedarville Cursive line box. Ascender 1279, descender 663, em 1024.
+    static func cursiveLineHeight(_ fontSize: Double) -> Double {
+        fontSize * (1279.0 + 663.0) / 1024.0
+    }
+
+    /// How far a slightly rotated note sticks out past its box, on one side.
+    private static func cursiveTiltPad(text: String, fontSize: Double, seed: TemperatureGaugeSeed) -> Double {
+        let radians = abs(labelRotation(seed: seed)) * .pi / 180
+        return textWidth(text, fontSize: fontSize, handwriting: true) * sin(radians) / 2
+    }
+
+    /// Cursive, large enough to read. The watch uses the compact size.
+    static func markerFontSize(for width: Double, compact: Bool = false) -> Double {
+        if compact {
+            return min(13, max(11, width / 14))
+        }
+        let room = max(72, width / 2 - 16)
+        // "temperature now": 14 letters at 0.62em and one 0.34em space.
+        let emPerPoint = 14 * 0.62 + 0.34
+        return min(22, max(16, room / emPerPoint))
     }
 
     static func textWidth(_ text: String, fontSize: Double, handwriting: Bool) -> Double {
@@ -507,19 +541,6 @@ public enum TemperatureRangeLayout {
     private static func labelRect(centerX: Double, y: Double, width: Double, bounds: Double) -> GaugeRect {
         let x = min(max(0, centerX - width / 2), max(0, bounds - width))
         return GaugeRect(x: x, y: y, width: width, height: 24)
-    }
-
-    /// Pins the label to the outer edge of the side that leaves the longer
-    /// sweep from its inner edge up to the dot.
-    private static func nowLabelRect(dotX: Double, y: Double, width: Double, bounds: Double) -> GaugeRect {
-        let margin = 4.0
-        let fitted = min(width, max(1, bounds - margin * 2))
-        let rightX = bounds - margin - fitted
-        let leftX = margin
-        let rightSweep = rightX - dotX
-        let leftSweep = dotX - (leftX + fitted)
-        let x = rightSweep >= leftSweep ? rightX : leftX
-        return GaugeRect(x: x, y: y, width: fitted, height: 34)
     }
 
     private static func bracketCurves(
@@ -566,72 +587,6 @@ public enum TemperatureRangeLayout {
             c1: GaugePoint(x: x1, y: y + dy1),
             c2: GaugePoint(x: x2, y: y + dy2),
             end: GaugePoint(x: right, y: y))
-    }
-
-    private static func makeArrow(
-        dot: GaugePoint,
-        outerRadius: Double,
-        label: GaugeRect,
-        obstacles: [GaugeRect],
-        bounds: Double
-    ) -> GaugeArrowGeometry? {
-        let tip = GaugePoint(x: dot.x, y: dot.y + outerRadius + 2)
-        let labelOnRight = label.midX >= dot.x
-        // Leave from the inner edge of the words, level with the lettering.
-        let startX = min(max(labelOnRight ? label.x : label.maxX, 0), bounds)
-        let start = GaugePoint(x: startX, y: label.midY)
-        let blocked = obstacles.map { $0.inset(by: 2) }
-        let span = tip.x - start.x
-        let rise = max(start.y - tip.y, 8)
-        // Quarter-ellipse first. If that crosses a number, a slightly tighter
-        // hook that stays low until it is past the label. Both arrive vertically.
-        let attempts = [(lead: 0.45, lift: 0.55), (lead: 0.70, lift: 0.72)]
-        var chosen: GaugeCubic?
-        for attempt in attempts {
-            let curve = GaugeCubic(
-                start: start,
-                c1: GaugePoint(x: start.x + span * attempt.lead, y: start.y),
-                c2: GaugePoint(x: tip.x, y: tip.y + rise * attempt.lift),
-                end: tip)
-            let hits = curve.samples(count: 24).contains { sample in
-                blocked.contains { $0.contains(sample) }
-            }
-            if !hits {
-                chosen = curve
-                break
-            }
-        }
-        guard let curve = chosen else { return nil }
-        let approach = curve.c2
-        let approachLength = max(hypot(tip.x - approach.x, tip.y - approach.y), 0.001)
-        let tangent = GaugePoint(
-            x: (tip.x - approach.x) / approachLength,
-            y: (tip.y - approach.y) / approachLength)
-        let chevron = chevronPoints(tip: tip, tangent: tangent)
-        return GaugeArrowGeometry(
-            curves: [curve],
-            tip: tip,
-            finalTangent: tangent,
-            chevronLeft: chevron.left,
-            chevronRight: chevron.right,
-            label: label)
-    }
-
-    private static func chevronPoints(
-        tip: GaugePoint, tangent: GaugePoint
-    ) -> (left: GaugePoint, right: GaugePoint) {
-        let angle = 42.0 * Double.pi / 180
-        // A broad open head. The arms trail back from the tip.
-        let back = GaugePoint(x: -tangent.x, y: -tangent.y)
-        let length = 16.0
-        func arm(_ turn: Double) -> GaugePoint {
-            let c = cos(turn)
-            let s = sin(turn)
-            return GaugePoint(
-                x: tip.x + (back.x * c - back.y * s) * length,
-                y: tip.y + (back.x * s + back.y * c) * length)
-        }
-        return (arm(angle), arm(-angle))
     }
 
     private static func spoken(_ celsius: Double, unit: UnitTemperature) -> String {

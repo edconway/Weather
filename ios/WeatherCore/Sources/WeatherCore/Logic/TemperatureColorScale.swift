@@ -49,6 +49,30 @@ public enum TemperatureColorScale {
         return stops[stops.count - 1].color
     }
 
+    /// Colours for a bar that runs from `start` °C to `end` °C.
+    /// Location 0 is `start` and location 1 is `end`, wherever that bar sits
+    /// on the track. A 3°C bar stays blue. A 30°C bar stays red.
+    public static func stops(
+        from start: Double, to end: Double
+    ) -> [(location: Double, color: TemperatureRGB)] {
+        let span = end - start
+        if abs(span) < 0.05 {
+            let flat = color(celsius: start)
+            return [(0, flat), (1, flat)]
+        }
+        var placed: [(location: Double, color: TemperatureRGB)] = [
+            (0, color(celsius: start)),
+            (1, color(celsius: end))
+        ]
+        for stop in self.stops {
+            let location = (stop.celsius - start) / span
+            if location > 0.02, location < 0.98 {
+                placed.append((location, stop.color))
+            }
+        }
+        return placed.sorted { $0.location < $1.location }
+    }
+
     /// Gradient stops across a domain. End colours are the scale at the domain
     /// edges, so a stop that falls outside the domain still tints the end it is
     /// nearest. Interior stops keep their real temperature position.

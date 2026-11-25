@@ -84,6 +84,25 @@ final class TemperatureRangeTests: XCTestCase {
         XCTAssertGreaterThan(hotDay.last!.color.red, hotDay.last!.color.blue)
     }
 
+    func testBarColourFollowsAbsoluteTemperature() {
+        let mild = TemperatureColorScale.stops(from: 7, to: 10)
+        XCTAssertGreaterThan(mild[0].color.blue, mild[0].color.red)
+        XCTAssertGreaterThan(mild.last!.color.blue, mild.last!.color.red)
+
+        let hot = TemperatureColorScale.stops(from: 28, to: 34)
+        XCTAssertGreaterThan(hot[0].color.red, hot[0].color.blue)
+        XCTAssertEqual(hot.last!.color.red, TemperatureColorScale.color(celsius: 30).red, accuracy: 0.001)
+
+        let freezing = TemperatureColorScale.stops(from: -20, to: -10)
+        XCTAssertEqual(freezing[0].color.blue, TemperatureRGB(hex: 0x2F8CFF).blue, accuracy: 0.001)
+        XCTAssertEqual(freezing.last!.color.red, TemperatureRGB(hex: 0x2F8CFF).red, accuracy: 0.001)
+
+        let full = TemperatureColorScale.stops(from: -10, to: 30)
+        XCTAssertEqual(full[0].color.red, TemperatureRGB(hex: 0x2F8CFF).red, accuracy: 0.001)
+        XCTAssertEqual(full.last!.color.red, TemperatureRGB(hex: 0xFF5A4E).red, accuracy: 0.001)
+        XCTAssertTrue(full.contains { abs($0.location - (24.0 / 40.0)) < 0.001 })
+    }
+
     func testVoiceOverReadsColderWarmerAndInLine() {
         XCTAssertEqual(
             TemperatureRangeLayout.voiceOver(TemperatureRangeData(
@@ -126,32 +145,31 @@ final class TemperatureRangeTests: XCTestCase {
         XCTAssertTrue(first.allSatisfy { abs($0) >= 1 && abs($0) <= 2 })
     }
 
-    func testArrowEndsJustOutsideTheRingAndMissesTheLabels() throws {
+    func testNowWordsSitCenteredUnderTheGauge() {
         let placed = TemperatureRangeLayout.placement(
             data: TemperatureRangeData(todayLow: 7, todayHigh: 10, current: 8, averageLow: 5, averageHigh: 12),
             style: .hero, unit: .celsius, width: 320, seed: seed, stackedLabels: false)
-        let arrow = try XCTUnwrap(placed.arrow)
-        let dot = try XCTUnwrap(placed.dot)
-        let distance = hypot(arrow.tip.x - dot.x, arrow.tip.y - dot.y)
-        let outer = placed.dotRadius + TemperatureRangeLayout.ringWidth
-        XCTAssertGreaterThan(distance, outer)
-        XCTAssertLessThan(distance, outer + 4)
-        let towardX = dot.x - arrow.tip.x
-        let towardY = dot.y - arrow.tip.y
-        let toward = hypot(towardX, towardY)
-        let dotProduct = (arrow.finalTangent.x * towardX + arrow.finalTangent.y * towardY) / toward
-        XCTAssertGreaterThan(dotProduct, 0.95)
-        let blocked = [placed.lowLabel, placed.highLabel].compactMap { $0 }
-        for sample in arrow.samples {
-            XCTAssertFalse(blocked.contains { $0.contains(sample) })
+        let now = placed.nowLabel
+        XCTAssertEqual(placed.nowText, "temperature now")
+        XCTAssertNotNil(now)
+        XCTAssertEqual(now?.midX ?? 0, 160, accuracy: 1)
+        if let low = placed.lowLabel {
+            XCTAssertGreaterThan(now?.y ?? 0, low.maxY)
         }
+        let watch = TemperatureRangeLayout.placement(
+            data: TemperatureRangeData(todayLow: 9, todayHigh: 28, current: 28, averageLow: 4, averageHigh: 16),
+            style: .widget, unit: .celsius, width: 170, seed: seed, stackedLabels: false)
+        XCTAssertEqual(watch.nowText, "temperature now")
+        XCTAssertEqual(watch.nowLabel?.midX ?? 0, 85, accuracy: 1)
+        let ringBottom = (watch.dot?.y ?? 0) + watch.dotRadius + TemperatureRangeLayout.ringWidth
+        XCTAssertGreaterThan(watch.nowLabel?.y ?? 0, ringBottom)
     }
 
-    func testAccessibilitySizeDropsTheArrow() {
+    func testAccessibilitySizeStacksTheRangeLabels() {
         let placed = TemperatureRangeLayout.placement(
             data: TemperatureRangeData(todayLow: 7, todayHigh: 10, current: 8, averageLow: 5, averageHigh: 12),
-            style: .hero, unit: .celsius, width: 320, seed: seed, stackedLabels: true, allowArrow: false)
-        XCTAssertNil(placed.arrow)
+            style: .hero, unit: .celsius, width: 320, seed: seed, stackedLabels: true)
+        XCTAssertEqual(placed.nowText, "temperature now")
         XCTAssertNotNil(placed.combinedLabel)
         XCTAssertNil(placed.lowLabel)
     }
@@ -172,12 +190,43 @@ final class TemperatureRangeTests: XCTestCase {
         XCTAssertLessThanOrEqual(dot, placed.inset + placed.usableWidth)
     }
 
+    func testNotesAreCursiveWording() {
+        let phone = TemperatureRangeLayout.placement(
+            data: TemperatureRangeData(todayLow: 9, todayHigh: 28, current: 28, averageLow: 4, averageHigh: 16),
+            style: .hero, unit: .celsius, width: 360, seed: seed, stackedLabels: false)
+        XCTAssertEqual(phone.historicText, "historic average 4°–16°")
+        XCTAssertEqual(phone.nowText, "temperature now")
+        XCTAssertNotNil(phone.nowLabel)
+        XCTAssertFalse(phone.bracketCurves.isEmpty)
+
+        let watch = TemperatureRangeLayout.placement(
+            data: TemperatureRangeData(todayLow: 9, todayHigh: 28, current: 28, averageLow: 4, averageHigh: 16),
+            style: .widget, unit: .celsius, width: 170, seed: seed, stackedLabels: false)
+        XCTAssertEqual(watch.historicText, "typical range")
+        XCTAssertEqual(watch.nowText, "temperature now")
+        XCTAssertNil(watch.lowLabel)
+        XCTAssertNotNil(watch.nowLabel)
+        XCTAssertFalse(watch.bracketCurves.isEmpty)
+        // The bracket, the dot, and the caption each keep their own band.
+        let ringTop = (watch.dot?.y ?? 0) - watch.dotRadius - TemperatureRangeLayout.ringWidth
+        let ringBottom = (watch.dot?.y ?? 0) + watch.dotRadius + TemperatureRangeLayout.ringWidth
+        XCTAssertLessThan(watch.bracketLegEnd, ringTop - 3)
+        if let historic = watch.historicLabel {
+            XCTAssertGreaterThan(watch.bracketTop, historic.maxY)
+        }
+        let now = watch.nowLabel
+        XCTAssertGreaterThan(now?.y ?? 0, ringBottom)
+        XCTAssertLessThanOrEqual(now?.maxY ?? 0, watch.height)
+        let font = TemperatureRangeLayout.markerFontSize(for: 170, compact: true)
+        XCTAssertGreaterThanOrEqual(now?.height ?? 0, TemperatureRangeLayout.cursiveLineHeight(font) - 0.1)
+    }
+
     func testRowStyleIsTheBarAndDotOnly() {
         let placed = TemperatureRangeLayout.placement(
             data: TemperatureRangeData(todayLow: 7, todayHigh: 10, current: 8, averageLow: 5, averageHigh: 12),
             style: .row, unit: .celsius, width: 320, seed: seed, stackedLabels: false)
         XCTAssertNil(placed.bracketLowX)
-        XCTAssertNil(placed.arrow)
+        XCTAssertNil(placed.nowText)
         XCTAssertNil(placed.lowLabel)
         XCTAssertNotNil(placed.dot)
         XCTAssertEqual(placed.height, 14, accuracy: 0.1)

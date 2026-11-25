@@ -26,8 +26,6 @@ struct HeroView: View {
         VStack(alignment: .leading, spacing: 0) {
             chrome
             temperatureRow
-            conditionLine
-            voiceButton
             if let gauge {
                 TemperatureRangeGauge(
                     data: gauge,
@@ -36,16 +34,20 @@ struct HeroView: View {
                     weatherBackground: atmosphere.mid,
                     ink: .chalk,
                     seed: gaugeSeed)
-                    .padding(.top, 12)
+                    .padding(.top, 10)
             }
             stats
+            voiceButton
         }
         .padding(.horizontal, 20)
         .padding(.top, topInset + 8)
         .padding(.bottom, 48)
         .frame(maxWidth: .infinity, alignment: .leading)
         .foregroundStyle(atmosphere.foreground)
-        .background { AtmosphereBackground(colors: atmosphere) }
+        .background {
+            AtmosphereBackground(colors: atmosphere)
+                .ignoresSafeArea(edges: [.horizontal, .top])
+        }
     }
 
     private var chrome: some View {
@@ -83,63 +85,53 @@ struct HeroView: View {
     }
 
     private var temperatureRow: some View {
-        HStack(alignment: .top) {
-            HStack(alignment: .firstTextBaseline, spacing: 2) {
+        let feels = conditions.feelsLike.map { " · feels \(formatter.temperatureShort($0))" } ?? ""
+        return HStack(alignment: .center, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
                 Text(formatter.temperatureNumber(conditions.temperature).map(String.init) ?? "—")
-                    .font(.system(size: 76, weight: .semibold, design: .rounded))
+                    .font(.system(size: 64, weight: .semibold, design: .rounded))
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
-                Text(formatter.temperatureUnit)
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(atmosphere.secondaryForeground)
+                Text("°")
+                    .font(.system(size: 32, weight: .semibold, design: .rounded))
             }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Currently \(formatter.temperature(conditions.temperature)), "
-                                + conditions.condition.label)
-            Spacer(minLength: 12)
+            Text(conditions.condition.label + feels)
+                .font(.title3.weight(.semibold))
+                .lineLimit(2)
+                .minimumScaleFactor(0.7)
+                .layoutPriority(1)
+            Spacer(minLength: 4)
             Image(systemName: conditions.symbolName)
                 .symbolRenderingMode(.hierarchical)
-                .font(.system(size: 56))
+                .font(.system(size: 34))
                 .foregroundStyle(atmosphere.foreground.opacity(0.95))
                 .accessibilityHidden(true)
         }
-        .padding(.top, 8)
-    }
-
-    private var conditionLine: some View {
-        let feels = conditions.feelsLike.map { " · feels \(formatter.temperatureShort($0))" } ?? ""
-        return Text(conditions.condition.label + feels)
-            .font(.title3.weight(.semibold))
-            .padding(.top, 8)
-    }
-
-    private var voiceButton: some View {
-        Group {
-            if let voice {
-                Button {
-                    onVoice(voice.panel)
-                } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(voice.headline)
-                            .font(.title3.weight(.semibold))
-                            .multilineTextAlignment(.leading)
-                        Text(voice.detail)
-                            .font(.subheadline)
-                            .foregroundStyle(atmosphere.secondaryForeground)
-                            .multilineTextAlignment(.leading)
-                            .frame(minHeight: 18, alignment: .topLeading)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(.plain)
-                .accessibilityHint("Shows the \(Self.panelName(voice.panel)) section")
-            } else {
-                Color.clear.frame(height: 44)
-                    .accessibilityHidden(true)
-            }
-        }
         .padding(.top, 10)
-        .frame(minHeight: 48, alignment: .topLeading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Currently \(formatter.temperature(conditions.temperature)), "
+                            + conditions.condition.label + feels)
+    }
+
+    @ViewBuilder
+    private var voiceButton: some View {
+        if let voice {
+            Button {
+                onVoice(voice.panel)
+            } label: {
+                Text(voice.headline)
+                    .font(.subheadline.weight(.semibold))
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(Color.white.opacity(0.18), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 14)
+            .accessibilityLabel(voice.detail.isEmpty ? voice.headline : "\(voice.headline). \(voice.detail)")
+            .accessibilityHint("Shows the \(Self.panelName(voice.panel)) section")
+        }
     }
 
     private static func panelName(_ panel: PanelID) -> String {
@@ -152,20 +144,16 @@ struct HeroView: View {
     }
 
     private var stats: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top, spacing: 8) {
-                stat("Rain", outlook.heroValue)
-                stat("Wind", formatter.wind(conditions.windSpeed))
-                stat(conditions.isDay ? "UV" : "UV peak", formatter.uvIndexCompact(conditions.uvIndex))
-            }
+        HStack(alignment: .top, spacing: 6) {
+            stat("Rain", outlook.heroValue)
+            stat("Wind", formatter.wind(conditions.windSpeed))
+            stat(conditions.isDay ? "UV" : "UV peak", formatter.uvIndexCompact(conditions.uvIndex))
             if let sun {
-                HStack(alignment: .top, spacing: 8) {
-                    sunStat("Sunrise", sun.sunrise, symbol: SunEvent.Kind.sunrise.symbolName)
-                    sunStat("Sunset", sun.sunset, symbol: SunEvent.Kind.sunset.symbolName)
-                }
+                sunStat("Sunrise", sun.sunrise, symbol: SunEvent.Kind.sunrise.symbolName)
+                sunStat("Sunset", sun.sunset, symbol: SunEvent.Kind.sunset.symbolName)
             }
         }
-        .padding(.top, 28)
+        .padding(.top, 16)
     }
 
     private func sunStat(_ label: String, _ time: String, symbol: String) -> some View {
